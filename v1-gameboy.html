@@ -1,0 +1,1199 @@
+<title>Wesenwelt</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: ein Handheld-Gehäuse – Bildschirm oben, Steuerkreuz und Tasten darunter, Hilfe am Ende */
+:root{
+  --bg:#0e1611; --shell:#1b2820; --shell-hi:#253629; --bezel:#0a110c;
+  --ink:#d6e8cc; --muted:#86a08c; --btn:#2e4535; --btn-hi:#3c5a45; --accent:#88c070;
+  --f-pixel:"Press Start 2P", ui-monospace, monospace;
+  --f-body:"IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px;
+  display:flex;justify-content:center;-webkit-user-select:none;user-select:none}
+.shell{width:100%;max-width:560px;display:flex;flex-direction:column;gap:18px;align-items:stretch}
+.bezel{background:var(--shell);border-radius:14px 14px 40px 14px;padding:18px 18px 22px;display:flex;flex-direction:column;gap:10px;
+  box-shadow:inset 0 2px 0 var(--shell-hi),0 10px 30px rgba(0,0,0,.45)}
+.bezel-top{display:flex;justify-content:space-between;align-items:center;font-family:var(--f-pixel);font-size:8px;letter-spacing:.12em;color:var(--muted)}
+.led{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:8px;box-shadow:0 0 6px var(--accent)}
+.screen-wrap{background:var(--bezel);border-radius:6px;padding:10px;display:flex;justify-content:center}
+canvas{display:block;width:100%;max-width:100%;aspect-ratio:160/144;image-rendering:pixelated;image-rendering:crisp-edges;background:#e0f8d0}
+.pad{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:6px 4px 0}
+.dpad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px)}
+.dpad button{background:var(--btn);border:0;color:var(--muted);font-size:12px}
+.dpad .u{grid-column:2;grid-row:1;border-radius:6px 6px 0 0}.dpad .l{grid-column:1;grid-row:2;border-radius:6px 0 0 6px}
+.dpad .r{grid-column:3;grid-row:2;border-radius:0 6px 6px 0}.dpad .d{grid-column:2;grid-row:3;border-radius:0 0 6px 6px}
+.dpad .c{grid-column:2;grid-row:2;background:var(--btn);pointer-events:none}
+.mid{display:flex;justify-content:center;gap:10px;align-self:end;padding-bottom:4px}
+.pill{font-family:var(--f-pixel);font-size:7px;letter-spacing:.1em;color:var(--muted);background:var(--btn);border:0;border-radius:999px;padding:8px 10px}
+.ab{display:flex;gap:12px;transform:rotate(-18deg)}
+.ab button{width:54px;height:54px;border-radius:50%;border:0;background:var(--btn);color:var(--ink);font-family:var(--f-pixel);font-size:12px}
+.ab .a{margin-top:-18px}
+button{cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent}
+button:active,button.on{background:var(--btn-hi)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.help{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 16px;font-size:12px;color:var(--muted);line-height:1.5}
+.help b{font-weight:600;color:var(--ink)}
+.help p{margin:0;min-width:0}
+@media (max-width:380px){.dpad{grid-template-columns:repeat(3,38px);grid-template-rows:repeat(3,38px)}.ab button{width:46px;height:46px}}
+</style>
+
+<div class="shell">
+  <div class="bezel">
+    <div class="bezel-top"><span><span class="led"></span>WESENWELT</span><span>KLASSIK</span></div>
+    <div class="screen-wrap"><canvas id="screen" width="160" height="144" aria-label="Spielbildschirm"></canvas></div>
+    <div class="pad">
+      <div class="dpad">
+        <button class="u" data-k="up" aria-label="Hoch">▲</button>
+        <button class="l" data-k="left" aria-label="Links">◀</button>
+        <span class="c"></span>
+        <button class="r" data-k="right" aria-label="Rechts">▶</button>
+        <button class="d" data-k="down" aria-label="Runter">▼</button>
+      </div>
+      <div class="mid"><button class="pill" data-k="SELECT">KARTE</button><button class="pill" data-k="START">START</button></div>
+      <div class="ab"><button class="b" data-k="B">B</button><button class="a" data-k="A">A</button></div>
+    </div>
+  </div>
+  <div class="help">
+    <p><b>Pfeile / WASD</b> laufen</p>
+    <p><b>Z / Leertaste</b> A: sprechen, bestätigen</p>
+    <p><b>X</b> B: zurück, gedrückt halten = rennen</p>
+    <p><b>Enter</b> Start-Menü · <b>M</b> Karte</p>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================
+   WESENWELT – Grundgerüst (Welt, Bewegung, Städte, Arenen, Orden)
+   Kämpfe und Wesen sind als Platzhalter-Hooks angelegt (siehe "HOOKS").
+   ===================================================================== */
+
+const CONFIG = {
+  seed: 1996,
+  encounters: false,      // HOOK: auf true setzen, sobald es Wesen gibt
+  encounterRate: 1 / 10,
+  textSpeed: 1,           // Zeichen pro Frame
+  saveKey: 'wesenwelt.save.v1',
+};
+
+const PAL = ['#e0f8d0', '#88c070', '#346856', '#081820']; // hell → dunkel
+const VW = 160, VH = 144, TS = 16;
+const cv = document.getElementById('screen');
+const ctx = cv.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+const FONT = '8px "Press Start 2P", monospace';
+
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const K = (x, y) => x + ',' + y;
+const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+const OPP = { up: 'down', down: 'up', left: 'right', right: 'left' };
+
+/* ---------------------------------------------------------------------
+   TILES
+   --------------------------------------------------------------------- */
+const T = {
+  GRASS: 0, TREE: 1, TALL: 2, PATH: 3, WATER: 4, SAND: 5, FLOWER: 6, BRIDGE: 7,
+  ROOF: 8, WALL: 9, DOOR: 10, WINDOW: 11, SIGN: 12, FENCE: 13, FLOOR: 14, IWALL: 15,
+  COUNTER: 16, MAT: 17, SHELF: 18, TABLE: 19, PLANT: 20, ROOF_GYM: 21, ROOF_CENTER: 22,
+  ROOF_SHOP: 23, ROCK: 24, GYMFLOOR: 25, PC: 26, STATUE: 27, VOID: 28,
+  WALL_CENTER: 29, WALL_SHOP: 30, WALL_GYM: 31,
+};
+const NT = 32;
+const SOLID = new Set([T.TREE, T.WATER, T.ROOF, T.WALL, T.WINDOW, T.SIGN, T.FENCE, T.IWALL, T.COUNTER,
+  T.SHELF, T.TABLE, T.PLANT, T.ROOF_GYM, T.ROOF_CENTER, T.ROOF_SHOP, T.ROCK, T.PC, T.STATUE, T.VOID,
+  T.WALL_CENTER, T.WALL_SHOP, T.WALL_GYM]);
+
+const atlas = [0, 1].map(() => { const c = document.createElement('canvas'); c.width = NT * TS; c.height = TS; return c; });
+
+function painter(g, ox) {
+  return {
+    p(x, y, c) { if (x < 0 || y < 0 || x > 15 || y > 15) return; g.fillStyle = PAL[c]; g.fillRect(ox + x, y, 1, 1); },
+    r(x, y, w, h, c) { g.fillStyle = PAL[c]; g.fillRect(ox + x, y, w, h); },
+  };
+}
+function grass(P) {
+  P.r(0, 0, 16, 16, 1);
+  for (const [x, y] of [[2, 3], [10, 5], [5, 10], [12, 12]]) { P.p(x, y, 2); P.p(x + 2, y, 2); P.p(x + 1, y + 1, 2); }
+}
+function floor(P) { P.r(0, 0, 16, 16, 0); for (let i = 0; i < 16; i++) { P.p(i, 15, 1); P.p(15, i, 1); } }
+function wall(P) { P.r(0, 0, 16, 16, 0); P.r(0, 5, 16, 1, 1); P.r(0, 10, 16, 1, 1); P.r(0, 15, 16, 1, 3); P.r(0, 0, 16, 1, 2); }
+function pattern(P, rows, ox = 0, oy = 0) {
+  rows.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] !== '.') P.p(ox + x, oy + y, +row[x]); });
+}
+const BUSH = ['........', '..3..3..', '.323323.', '.322223.', '32222223', '32122123', '33222233', '.333333.'];
+
+const TILE_ART = {
+  [T.GRASS]: P => grass(P),
+  [T.TREE]: P => {
+    grass(P);
+    for (let y = 0; y < 14; y++) for (let x = 0; x < 16; x++) {
+      const d = Math.hypot(x - 7.5, y - 6.5);
+      if (d >= 6.9) continue;
+      let c = 2;
+      if (d > 5.9) c = 3; else if (Math.hypot(x - 5, y - 4) < 2.2) c = 1; else if ((x * 3 + y * 5) % 7 === 0 && d < 5) c = 3;
+      P.p(x, y, c);
+    }
+    P.r(6, 12, 4, 4, 3); P.r(7, 12, 2, 3, 2);
+  },
+  [T.TALL]: P => { P.r(0, 0, 16, 16, 1); for (const [ox, oy] of [[0, 0], [8, 0], [0, 8], [8, 8]]) pattern(P, BUSH, ox, oy); },
+  [T.PATH]: P => { P.r(0, 0, 16, 16, 0); for (const [x, y] of [[3, 4], [11, 2], [7, 9], [13, 12], [2, 13], [9, 14]]) P.p(x, y, 1); },
+  [T.WATER]: (P, f) => {
+    P.r(0, 0, 16, 16, 2);
+    for (const [x, y] of [[1, 3], [9, 7], [3, 12], [11, 15]]) {
+      const xx = (x + f * 2) % 16;
+      P.p(xx, y, 1); P.p((xx + 1) % 16, y - 1, 1); P.p((xx + 2) % 16, y - 1, 1); P.p((xx + 3) % 16, y, 1);
+    }
+    if (f) P.p(6, 9, 0); else P.p(13, 5, 0);
+  },
+  [T.SAND]: P => { P.r(0, 0, 16, 16, 0); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if ((x * 7 + y * 13) % 11 === 0) P.p(x, y, 1); },
+  [T.FLOWER]: (P, f) => {
+    grass(P);
+    for (const [x, y] of [[4, 4], [11, 10]]) {
+      const xx = x + (f ? 1 : 0);
+      P.p(xx, y - 1, 0); P.p(xx - 1, y, 0); P.p(xx + 1, y, 0); P.p(xx, y + 1, 0); P.p(xx, y, 3); P.p(x, y + 2, 2); P.p(x, y + 3, 2);
+    }
+  },
+  [T.BRIDGE]: P => {
+    P.r(0, 0, 16, 16, 0);
+    for (let i = 0; i < 16; i++) { P.p(3, i, 1); P.p(7, i, 1); P.p(11, i, 1); P.p(15, i, 2); }
+    for (let x = 0; x < 16; x++) { P.p(x, 7, 1); }
+  },
+  [T.ROOF]: P => { P.r(0, 0, 16, 16, 2); P.r(0, 0, 16, 1, 1); for (let y = 3; y < 16; y += 4) { P.r(0, y, 16, 1, 3); for (let x = (y % 8 === 3 ? 0 : 4); x < 16; x += 8) P.r(x, y - 3, 1, 3, 3); } },
+  [T.ROOF_GYM]: P => { P.r(0, 0, 16, 16, 3); P.r(0, 0, 16, 1, 2); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if ((x + y) % 8 === 0) P.p(x, y, 2); },
+  [T.ROOF_CENTER]: P => { P.r(0, 0, 16, 16, 1); P.r(0, 0, 16, 1, 0); for (let y = 3; y < 16; y += 4) P.r(0, y, 16, 1, 3); },
+  [T.ROOF_SHOP]: P => { P.r(0, 0, 16, 16, 2); for (let x = 0; x < 16; x += 4) P.r(x, 0, 2, 16, 1); P.r(0, 15, 16, 1, 3); },
+  [T.WALL]: P => wall(P),
+  [T.WINDOW]: P => { wall(P); P.r(3, 2, 10, 10, 3); P.r(4, 3, 8, 8, 1); P.r(7, 3, 1, 8, 3); P.p(5, 4, 0); P.p(5, 5, 0); },
+  [T.DOOR]: P => { wall(P); P.r(3, 1, 10, 15, 3); P.r(4, 2, 8, 14, 2); P.p(10, 9, 0); },
+  [T.WALL_CENTER]: P => { wall(P); P.r(4, 2, 8, 9, 3); P.r(5, 3, 6, 7, 0); P.r(7, 4, 2, 5, 3); P.r(6, 5, 4, 3, 3); P.r(7, 5, 2, 3, 3); },
+  [T.WALL_SHOP]: P => { wall(P); P.r(4, 2, 8, 9, 3); P.r(5, 3, 6, 7, 1); P.r(6, 5, 4, 4, 3); P.r(7, 4, 2, 1, 3); },
+  [T.WALL_GYM]: P => { wall(P); P.r(3, 2, 10, 9, 3); P.r(4, 3, 8, 7, 1); for (const [x, y] of [[8, 4], [7, 5], [8, 5], [9, 5], [6, 6], [7, 6], [8, 6], [9, 6], [10, 6], [7, 7], [9, 7], [8, 8]]) P.p(x - 0, y, 3); },
+  [T.SIGN]: P => { grass(P); P.r(7, 9, 2, 7, 3); P.r(2, 2, 12, 8, 3); P.r(3, 3, 10, 6, 0); P.r(4, 5, 8, 1, 1); P.r(4, 7, 6, 1, 1); },
+  [T.FENCE]: P => { grass(P); P.r(0, 5, 16, 2, 3); P.r(0, 10, 16, 2, 3); P.r(1, 3, 2, 11, 3); P.r(13, 3, 2, 11, 3); P.r(0, 5, 16, 1, 0); },
+  [T.ROCK]: P => {
+    grass(P);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const d = Math.hypot((x - 7.5) / 6.5, (y - 9) / 5.5);
+      if (d < 1) P.p(x, y, d > 0.82 ? 3 : (y > 10 ? 2 : (x < 6 && y < 8 ? 0 : 1)));
+    }
+  },
+  [T.FLOOR]: P => floor(P),
+  [T.IWALL]: P => { P.r(0, 0, 16, 16, 1); for (let x = 0; x < 16; x += 4) P.r(x, 0, 1, 14, 2); P.r(0, 14, 16, 2, 3); },
+  [T.COUNTER]: P => { floor(P); P.r(0, 4, 16, 5, 0); P.r(0, 3, 16, 1, 3); P.r(0, 9, 16, 7, 2); P.r(0, 9, 16, 1, 3); P.r(0, 15, 16, 1, 3); },
+  [T.MAT]: P => { floor(P); P.r(1, 3, 14, 10, 2); for (let x = 3; x < 14; x += 3) P.r(x, 4, 1, 8, 1); },
+  [T.SHELF]: P => { P.r(0, 0, 16, 16, 2); for (const y of [5, 10, 15]) P.r(0, y, 16, 1, 3); for (const y of [1, 6, 11]) for (let x = 1; x < 15; x += 3) P.r(x, y, 2, 4, (x + y) % 2 ? 1 : 0); },
+  [T.TABLE]: P => { floor(P); P.r(1, 3, 14, 9, 3); P.r(2, 4, 12, 6, 1); P.r(2, 12, 2, 3, 3); P.r(12, 12, 2, 3, 3); },
+  [T.PLANT]: P => {
+    floor(P); P.r(5, 11, 6, 5, 3); P.r(6, 12, 4, 3, 2);
+    for (let y = 0; y < 12; y++) for (let x = 0; x < 16; x++) { const d = Math.hypot(x - 7.5, y - 6); if (d < 5.5) P.p(x, y, d > 4.5 ? 3 : ((x + y) % 3 ? 2 : 1)); }
+  },
+  [T.GYMFLOOR]: P => { P.r(0, 0, 16, 16, 0); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (Math.abs(x - 7.5) + Math.abs(y - 7.5) === 7) P.p(x, y, 1); },
+  [T.PC]: P => { P.r(0, 0, 16, 16, 1); P.r(2, 2, 12, 10, 3); P.r(3, 3, 10, 7, 0); P.r(4, 4, 6, 1, 1); P.r(4, 6, 4, 1, 1); P.r(5, 12, 6, 4, 3); },
+  [T.STATUE]: P => { P.r(0, 0, 16, 16, 0); P.r(3, 12, 10, 4, 3); P.r(4, 12, 8, 2, 2); P.r(5, 2, 6, 10, 3); P.r(6, 3, 4, 8, 2); P.r(6, 0, 4, 3, 3); P.p(7, 4, 1); },
+  [T.VOID]: P => P.r(0, 0, 16, 16, 3),
+};
+function buildAtlas() {
+  atlas.forEach((c, f) => {
+    const g = c.getContext('2d');
+    for (let t = 0; t < NT; t++) { const art = TILE_ART[t]; if (art) art(painter(g, t * TS), f); }
+  });
+}
+
+/* ---------------------------------------------------------------------
+   SPRITES (16x16, '.' = transparent, 0-3 = Palette)
+   --------------------------------------------------------------------- */
+const HEAD_DOWN = [
+  '................', '.....333333.....', '....32222223....', '...3222222223...', '...3222222223...',
+  '...3333333333...', '...3311111133...', '...3131111313...', '...3111111113...', '....31111113....',
+];
+const HEAD_UP = [
+  '................', '.....333333.....', '....32222223....', '...3222222223...', '...3222222223...',
+  '...3222222223...', '...3333333333...', '...3333333333...', '...3333333333...', '....33333333....',
+];
+const BODY = ['...3322222233...', '..311222222113..', '..311222222113..', '...3322222233...'];
+const LEGS_STAND = ['....31133113....', '....333..333....'];
+const LEGS_WALK = ['....31133333....', '.....333........'];
+const SIDE_HEAD = [
+  '................', '......33333.....', '.....3222223....', '....322222223...', '..33333222223...',
+  '....313333333...', '....311113333...', '....31311133....', '....3111113.....', '.....331133.....',
+];
+const SIDE_BODY = ['....32222233....', '....32211223....', '....32211223....', '....33222233....'];
+const SIDE_STAND = ['.....311133.....', '.....33333......'];
+const SIDE_WALK = ['....31133113....', '....333..333....'];
+const ITEM_ART = [
+  '................', '................', '................', '......3333......', '.......33.......', '.....322223.....',
+  '....32211223....', '...3221111223...', '...3211111123...', '...3211331123...', '...3211111123...',
+  '...3221111223...', '....32222223....', '.....333333.....', '................', '................',
+];
+const VARIANTS = [{}, { 2: 1 }, { 2: 0 }, { 2: 3 }];
+const mirror = rows => rows.map(r => r.split('').reverse().join(''));
+
+function spriteCanvas(rows, variant, flip) {
+  const c = document.createElement('canvas'); c.width = 16; c.height = 16;
+  const g = c.getContext('2d'); const map = VARIANTS[variant] || {};
+  rows.forEach((row, y) => {
+    row = row.padEnd(16, '.').slice(0, 16);
+    for (let x = 0; x < 16; x++) {
+      const ch = row[x]; if (ch === '.') continue;
+      let v = +ch; if (map[v] !== undefined) v = map[v];
+      g.fillStyle = PAL[v]; g.fillRect(flip ? 15 - x : x, y, 1, 1);
+    }
+  });
+  return c;
+}
+const SPRITES = {};
+function getSprite(kind, variant, dir, frame) {
+  const key = kind + variant;
+  if (!SPRITES[key]) {
+    if (kind === 'item') { const c = spriteCanvas(ITEM_ART, 0, false); SPRITES[key] = { down: [c, c, c] }; }
+    else {
+      const down = [[...HEAD_DOWN, ...BODY, ...LEGS_STAND], [...HEAD_DOWN, ...BODY, ...LEGS_WALK], [...HEAD_DOWN, ...BODY, ...mirror(LEGS_WALK)]];
+      const up = [[...HEAD_UP, ...BODY, ...LEGS_STAND], [...HEAD_UP, ...BODY, ...LEGS_WALK], [...HEAD_UP, ...BODY, ...mirror(LEGS_WALK)]];
+      const side = [[...SIDE_HEAD, ...SIDE_BODY, ...SIDE_STAND], [...SIDE_HEAD, ...SIDE_BODY, ...SIDE_WALK], [...SIDE_HEAD, ...SIDE_BODY, ...SIDE_WALK]];
+      SPRITES[key] = {
+        down: down.map(r => spriteCanvas(r, variant, false)),
+        up: up.map(r => spriteCanvas(r, variant, false)),
+        left: side.map(r => spriteCanvas(r, variant, false)),
+        right: side.map(r => spriteCanvas(r, variant, true)),
+      };
+    }
+  }
+  const s = SPRITES[key];
+  return (s[dir] || s.down)[frame];
+}
+
+/* ---------------------------------------------------------------------
+   DATEN: Städte, Arenen, Orden
+   --------------------------------------------------------------------- */
+const REGIONS = ['ARVEN', 'SOLMAR'];
+const TOWNS = [
+  { name: 'Heimweiler', start: true, line: 'Heimweiler ist klein, aber hier beginnt jede große Reise!' },
+  { name: 'Moosbach', leader: 'Linde', type: 'PFLANZE', badge: 'Blatt-Orden', line: 'Linde pflegt die ältesten Bäume von Arven.' },
+  { name: 'Steinfurt', leader: 'Bruno', type: 'GESTEIN', badge: 'Fels-Orden', line: 'Unter Steinfurt soll es riesige Höhlen geben.' },
+  { name: 'Wellenhafen', leader: 'Marina', type: 'WASSER', badge: 'Wellen-Orden', line: 'Bald legen hier wieder Schiffe ab. Wenn der Kapitän aufwacht.' },
+  { name: 'Funkenau', leader: 'Volt', type: 'ELEKTRO', badge: 'Blitz-Orden', line: 'Das Kraftwerk von Funkenau versorgt ganz Arven mit Strom.' },
+  { name: 'Nebelried', leader: 'Nyx', type: 'GEIST', badge: 'Schatten-Orden', line: 'Nachts hört man im Nebel seltsame Stimmen.' },
+  { name: 'Glutheim', leader: 'Flamm', type: 'FEUER', badge: 'Glut-Orden', line: 'Der Vulkan hinter dem Dorf ist schon lange still.' },
+  { name: 'Windhöh', leader: 'Aero', type: 'FLUG', badge: 'Feder-Orden', line: 'Hier oben weht der Wind so stark, dass man fast fliegt.' },
+  { name: 'Eisenbrück', leader: 'Ferro', type: 'STAHL', badge: 'Eisen-Orden', line: 'Die große Brücke im Osten führt übers Meer nach Solmar.' },
+  { name: 'Sonnstrand', leader: 'Sol', type: 'NORMAL', badge: 'Sonnen-Orden', line: 'Willkommen in Solmar! Hier scheint fast immer die Sonne.' },
+  { name: 'Frostkamm', leader: 'Frieda', type: 'EIS', badge: 'Kristall-Orden', line: 'Brrr! Pack dich warm ein, Reisender.' },
+  { name: 'Giftmoor', leader: 'Toxa', type: 'GIFT', badge: 'Gift-Orden', line: 'Trink bloß nicht aus dem Moor!' },
+  { name: 'Kampfburg', leader: 'Kai', type: 'KAMPF', badge: 'Faust-Orden', line: 'Die Mönche der Kampfburg trainieren jeden Morgen.' },
+  { name: 'Traumtal', leader: 'Mira', type: 'PSYCHO', badge: 'Traum-Orden', line: 'Manche sagen, dieses Tal gibt es nur im Traum.' },
+  { name: 'Käferwald', leader: 'Hummel', type: 'KÄFER', badge: 'Panzer-Orden', line: 'Im Wald summt und krabbelt es überall.' },
+  { name: 'Sandwehr', leader: 'Duna', type: 'BODEN', badge: 'Dünen-Orden', line: 'Die Dünen wandern jedes Jahr ein Stück weiter.' },
+  { name: 'Drachenfels', leader: 'Draco', type: 'DRACHE', badge: 'Drachen-Orden', line: 'Nur die Stärksten erklimmen den Drachenfels.' },
+  { name: 'Meistergipfel', league: true, line: 'Hier wartet der Champion. Bist du bereit?' },
+];
+// Raster-Positionen (Mittelpunkt). Schlangenförmig, damit sich Routen nie kreuzen.
+const SLOTS = [[20, 112], [68, 112], [116, 112], [116, 66], [68, 66], [20, 66], [20, 20], [68, 20], [116, 20],
+  [176, 20], [224, 20], [272, 20], [272, 66], [224, 66], [176, 66], [176, 112], [224, 112], [272, 112]];
+const TW = 22, TH = 18, TCX = 11, TCY = 9;
+const WORLD_W = 292, WORLD_H = 132;
+const SEA_X0 = 136, SEA_X1 = 154;
+const ITEM_POOL = ['Trank', 'Wesenkapsel', 'Supertrank', 'Gegengift', 'Fluchtseil', 'Beere', 'Sonderbonbon'];
+const TRAINER_CLASSES = ['Wanderer', 'Schülerin', 'Käfersammler', 'Anglerin', 'Bergsteiger', 'Ass-Trainerin', 'Jungspund', 'Picknickerin'];
+const HINTS = [
+  'Mit START öffnest du das Menü. Dort kannst du speichern.',
+  'Hältst du B gedrückt, rennst du schneller.',
+  'Die Wachen auf den Routen lassen nur Trainer mit Orden durch.',
+  'Im hohen Gras sollen bald wilde Wesen leben.',
+  'Auf der KARTE siehst du, wie weit deine Reise noch ist.',
+];
+const regionOf = i => (i <= 8 ? 0 : 1);
+
+/* ---------------------------------------------------------------------
+   MAPS
+   --------------------------------------------------------------------- */
+const MAPS = {};
+const DOORS = {};          // interiorId → {x,y} der Tür in der Welt
+const AREA_NAMES = [''];   // areaId → Name
+function newMap(id, w, h, fill) {
+  return { id, w, h, tiles: new Uint8Array(w * h).fill(fill), area: new Uint8Array(w * h), npcs: [], objs: new Map(), warps: new Map(), outside: fill, outdoor: false };
+}
+function tget(m, x, y) { if (x < 0 || y < 0 || x >= m.w || y >= m.h) return m.outside; return m.tiles[y * m.w + x]; }
+function tset(m, x, y, t) { if (x < 0 || y < 0 || x >= m.w || y >= m.h) return; m.tiles[y * m.w + x] = t; }
+function aset(m, x, y, a) { if (x < 0 || y < 0 || x >= m.w || y >= m.h) return; m.area[y * m.w + x] = a; }
+function aget(m, x, y) { if (x < 0 || y < 0 || x >= m.w || y >= m.h) return 0; return m.area[y * m.w + x]; }
+
+function building(m, x, y, w, h, roof, doorX, emblem) {
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    let t = T.WALL;
+    if (j < h - 2) t = roof; else if (j === h - 2 && i % 2 === 1) t = T.WINDOW;
+    tset(m, x + i, y + j, t);
+  }
+  tset(m, x + doorX, y + h - 1, T.DOOR);
+  if (emblem != null) tset(m, x + doorX, y + h - 2, emblem); else tset(m, x + doorX, y + h - 2, T.WALL);
+  return { x: x + doorX, y: y + h - 1 };
+}
+
+let TOWN_RECTS = [];
+let ROUTES = [];
+
+function genWorld() {
+  const rng = mulberry32(CONFIG.seed);
+  const ri = (a, b) => a + Math.floor(rng() * (b - a + 1));
+  const m = newMap('world', WORLD_W, WORLD_H, T.TREE);
+  m.outdoor = true;
+  MAPS.world = m;
+
+  // Meer zwischen den Regionen
+  for (let y = 0; y < WORLD_H; y++) for (let x = SEA_X0; x <= SEA_X1; x++) tset(m, x, y, T.WATER);
+
+  // Stadtpositionen mit leichtem Versatz
+  const centers = SLOTS.map(([x, y], i) => i === 0 ? { x, y } : { x: x + ri(-4, 4), y: y + ri(-4, 4) });
+  TOWN_RECTS = centers.map(c => ({ x0: c.x - TCX, y0: c.y - TCY, x1: c.x - TCX + TW - 1, y1: c.y - TCY + TH - 1, cx: c.x, cy: c.y }));
+  TOWNS.forEach((t, i) => { AREA_NAMES[i + 1] = t.name.toUpperCase(); });
+  const inRect = (r, x, y) => x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1;
+  const inAnyTown = (x, y) => TOWN_RECTS.some(r => inRect(r, x, y));
+  const rectDist = (r, x, y) => Math.max(r.x0 - x, x - r.x1, r.y0 - y, y - r.y1);
+
+  // --- Routen: Pass 1 = Korridor freischlagen
+  const R = 4; // halbe Korridorbreite
+  const core = new Set();
+  for (let i = 0; i < TOWNS.length - 1; i++) {
+    const a = centers[i], b = centers[i + 1];
+    const mode = SLOTS[i][1] === SLOTS[i + 1][1] ? 'H' : 'V';
+    const pts = [];
+    const seg = (x0, y0, x1, y1) => {
+      const dx = Math.sign(x1 - x0), dy = Math.sign(y1 - y0);
+      if (!dx && !dy) return;
+      let x = x0, y = y0;
+      for (;;) { pts.push({ x, y, dx, dy }); if (x === x1 && y === y1) break; x += dx; y += dy; }
+    };
+    if (mode === 'H') { const mx = Math.round((a.x + b.x) / 2); seg(a.x, a.y, mx, a.y); seg(mx, a.y, mx, b.y); seg(mx, b.y, b.x, b.y); }
+    else { const my = Math.round((a.y + b.y) / 2); seg(a.x, a.y, a.x, my); seg(a.x, my, b.x, my); seg(b.x, my, b.x, b.y); }
+    const areaId = AREA_NAMES.length; AREA_NAMES.push('ROUTE ' + (i + 1));
+    const route = { i, n: i + 1, from: i, to: i + 1, pts: pts.filter(p => !inRect(TOWN_RECTS[i], p.x, p.y) && !inRect(TOWN_RECTS[i + 1], p.x, p.y)), areaId };
+    ROUTES.push(route);
+    for (const p of route.pts) {
+      for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+        const x = p.x + dx, y = p.y + dy;
+        if (inAnyTown(x, y)) continue;
+        const t = tget(m, x, y);
+        if (t === T.TREE) tset(m, x, y, T.GRASS);
+        if (!aget(m, x, y)) aset(m, x, y, areaId);
+      }
+    }
+    for (const p of route.pts) {
+      const cells = p.dy === 0 ? [[p.x, p.y], [p.x, p.y + 1]] : [[p.x, p.y], [p.x + 1, p.y]];
+      for (const [x, y] of cells) {
+        if (inAnyTown(x, y)) continue;
+        tset(m, x, y, tget(m, x, y) === T.WATER ? T.BRIDGE : T.PATH);
+        core.add(K(x, y));
+      }
+    }
+  }
+
+  // --- Städte
+  TOWNS.forEach((t, i) => buildTown(m, i, TOWN_RECTS[i], rng));
+
+  // --- Routen: Pass 2 = Deko, Seen, Trainer, Items, Schilder, Wachen
+  const free = (x, y) => tget(m, x, y) === T.GRASS && !core.has(K(x, y)) && !inAnyTown(x, y);
+  for (const route of ROUTES) {
+    const pts = route.pts; if (!pts.length) continue;
+    const src = TOWN_RECTS[route.from];
+    const perp = p => (p.dy === 0 ? [0, 1] : [1, 0]);
+    const nearCorner = idx => { for (let k = Math.max(0, idx - 6); k < Math.min(pts.length, idx + 6); k++) if (pts[k].dx !== pts[idx].dx || pts[k].dy !== pts[idx].dy) return true; return false; };
+    let gateIdx = pts.findIndex(p => rectDist(src, p.x, p.y) === 5);
+    if (gateIdx < 0) gateIdx = Math.min(4, pts.length - 1);
+
+    // See neben der Route
+    if (route.i % 2 === 0 && pts.length > 24) {
+      const mid = Math.floor(pts.length / 2); let p = pts[mid];
+      for (let k = mid; k < pts.length - 8; k++) if (!nearCorner(k)) { p = pts[k]; break; }
+      const [px, py] = perp(p); const side = rng() < 0.5 ? -1 : 1;
+      const horiz = p.dy === 0;
+      const rx = horiz ? 5 : 3, ry = horiz ? 3 : 5;
+      const cx = p.x + px * side * 9, cy = p.y + py * side * 9;
+      let ok = true;
+      for (let y = cy - ry - 1; y <= cy + ry + 1 && ok; y++) for (let x = cx - rx - 1; x <= cx + rx + 1; x++) if (tget(m, x, y) !== T.TREE) { ok = false; break; }
+      if (ok) {
+        for (let y = cy - ry; y <= cy + ry; y++) for (let x = cx - rx; x <= cx + rx; x++) {
+          if (((x - cx) / (rx + 0.5)) ** 2 + ((y - cy) / (ry + 0.5)) ** 2 <= 1) { tset(m, x, y, T.WATER); aset(m, x, y, route.areaId); }
+        }
+        for (let along = -4; along <= 4; along++) for (let off = 5; off <= 6; off++) {
+          const x = p.x + (horiz ? along : side * off + (side > 0 ? 0 : 0));
+          const y = p.y + (horiz ? side * off : along);
+          if (tget(m, x, y) === T.TREE) { tset(m, x, y, T.GRASS); aset(m, x, y, route.areaId); }
+        }
+      }
+    }
+
+    // Deko
+    pts.forEach((p, idx) => {
+      if (Math.abs(idx - gateIdx) <= 3 || idx < 3 || idx > pts.length - 4) return;
+      const [px, py] = perp(p);
+      if (rng() < 0.07) {
+        const off = ri(-3, 3), rad = ri(1, 2);
+        const cx = p.x + px * off, cy = p.y + py * off;
+        for (let y = cy - rad; y <= cy + rad; y++) for (let x = cx - rad; x <= cx + rad; x++) {
+          const t = tget(m, x, y);
+          if ((t === T.GRASS || t === T.PATH) && !inAnyTown(x, y) && Math.abs(x - cx) + Math.abs(y - cy) <= rad + 1) tset(m, x, y, T.TALL);
+        }
+      }
+      if (nearCorner(idx)) return;
+      const offs = [-4, -3, -2, 3, 4];
+      const pick = () => { const o = offs[ri(0, offs.length - 1)]; return [p.x + px * o, p.y + py * o]; };
+      if (rng() < 0.06) { const [x, y] = pick(); if (free(x, y)) tset(m, x, y, T.TREE); }
+      if (rng() < 0.05) { const [x, y] = pick(); if (free(x, y)) tset(m, x, y, T.FLOWER); if (free(x + py, y + px)) tset(m, x + py, y + px, T.FLOWER); }
+      if (rng() < 0.02) { const [x, y] = pick(); if (free(x, y)) tset(m, x, y, T.ROCK); }
+    });
+
+    // Routenschild
+    const signIdx = pts.findIndex(p => rectDist(src, p.x, p.y) === 2);
+    if (signIdx >= 0) {
+      const p = pts[signIdx]; const [px, py] = perp(p);
+      const sx = p.x - px, sy = p.y - py;
+      tset(m, sx, sy, T.SIGN);
+      m.objs.set(K(sx, sy), { text: `ROUTE ${route.n}\n${TOWNS[route.from].name} - ${TOWNS[route.to].name}` });
+    }
+
+    // Trainer (Platzhalter)
+    const nTrainers = 2;
+    for (let k = 0; k < nTrainers; k++) {
+      const idx = Math.floor(pts.length * (0.35 + 0.35 * k)); const p = pts[idx]; if (!p || Math.abs(idx - gateIdx) < 5) continue;
+      const [px, py] = perp(p); const side = rng() < 0.5 ? -1 : 1; const off = side > 0 ? 2 : -1;
+      const x = p.x + px * off, y = p.y + py * off;
+      if (SOLID.has(tget(m, x, y))) tset(m, x, y, T.GRASS);
+      const dir = p.dy === 0 ? (side > 0 ? 'up' : 'down') : (side > 0 ? 'left' : 'right');
+      const cls = TRAINER_CLASSES[ri(0, TRAINER_CLASSES.length - 1)];
+      m.npcs.push(new Actor({
+        x, y, dir, variant: ri(0, 1), id: `trainer:${route.n}:${k}`,
+        talk: async () => {
+          await say(`${cls.toUpperCase()}: Ich warte hier auf meinen ersten Wesen-Kampf!`);
+          await say('(Trainerkämpfe folgen, sobald es Wesen gibt.)');
+        },
+      }));
+    }
+
+    // Item
+    {
+      const idx = Math.floor(pts.length * 0.55); const p = pts[idx];
+      if (p && Math.abs(idx - gateIdx) > 4) {
+        const [px, py] = perp(p); const side = rng() < 0.5 ? -1 : 1; const off = side > 0 ? 4 : -3;
+        const x = p.x + px * off, y = p.y + py * off;
+        const bx = p.x + px * (side > 0 ? 2 : -1), by = p.y + py * (side > 0 ? 2 : -1);
+        const cx2 = p.x + px * (side > 0 ? 3 : -2), cy2 = p.y + py * (side > 0 ? 3 : -2);
+        for (const [qx, qy] of [[x, y], [bx, by], [cx2, cy2]]) if (SOLID.has(tget(m, qx, qy)) && tget(m, qx, qy) !== T.WATER) tset(m, qx, qy, T.GRASS);
+        if (tget(m, x, y) !== T.WATER) addItem(m, x, y, ITEM_POOL[ri(0, ITEM_POOL.length - 1)], `route${route.n}`);
+      }
+    }
+
+    // Wache am Routeneingang: braucht den Orden der Startstadt
+    if (route.from >= 1) {
+      const p = pts[gateIdx];
+      const horiz = p.dy === 0;
+      for (let o = -(R + 1); o <= R + 1; o++) {
+        const x = horiz ? p.x : p.x + o, y = horiz ? p.y + o : p.y;
+        if (o === 0) { tset(m, x, y, T.PATH); continue; }
+        if (tget(m, x, y) !== T.WATER) tset(m, x, y, T.TREE);
+      }
+      const needed = route.from - 1; // Orden-Index
+      const town = TOWNS[route.from];
+      const travel = horiz ? (p.dx > 0 ? 'right' : 'left') : (p.dy > 0 ? 'down' : 'up');
+      m.npcs.push(new Actor({
+        x: p.x, y: p.y, dir: OPP[travel], variant: 3, id: `guard:${route.n}`, gate: needed,
+        hidden: () => state.badges[needed],
+        talk: async () => {
+          await say(`WACHE: Halt! Nur wer den ${town.badge} von ${town.name} hat, darf hier durch.`);
+          await say(`Fordere zuerst ${town.leader} in der Arena heraus!`);
+        },
+      }));
+    }
+  }
+
+  // Ufer: Land neben Wasser wird zu Sand
+  const sand = [];
+  for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) {
+    const t = tget(m, x, y);
+    if ((t === T.GRASS || t === T.PATH) && !inAnyTown(x, y)) {
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (tget(m, x + dx, y + dy) === T.WATER) { sand.push([x, y]); break; }
+    }
+  }
+  for (const [x, y] of sand) tset(m, x, y, T.SAND);
+  buildMinimap(m);
+  return m;
+}
+
+function addItem(m, x, y, name, tag) {
+  const id = `item:${tag}:${x},${y}`;
+  m.npcs.push(new Actor({
+    x, y, sprite: 'item', id, hidden: () => !!state.flags[id], still: true,
+    talk: async () => {
+      state.flags[id] = 1;
+      state.items[name] = (state.items[name] || 0) + 1;
+      await say(`Du findest: ${name.toUpperCase()}!`);
+    },
+  }));
+}
+
+function buildTown(m, i, r, rng) {
+  const t = TOWNS[i];
+  const X = r.x0, Y = r.y0;
+  for (let y = 0; y < TH; y++) for (let x = 0; x < TW; x++) { tset(m, X + x, Y + y, T.GRASS); aset(m, X + x, Y + y, i + 1); }
+  for (let x = 0; x < TW; x++) { tset(m, X + x, Y + TCY, T.PATH); tset(m, X + x, Y + TCY + 1, T.PATH); }
+  for (let y = 0; y < TH; y++) { tset(m, X + TCX, Y + y, T.PATH); tset(m, X + TCX + 1, Y + y, T.PATH); }
+  for (let x = 3; x <= TCX; x++) tset(m, X + x, Y + 16, T.PATH);
+  for (let x = TCX; x <= 16; x++) tset(m, X + x, Y + 16, T.PATH);
+  tset(m, X + 3, Y + 16, T.PATH); tset(m, X + 4, Y + 8, T.PATH); tset(m, X + 16, Y + 8, T.PATH);
+  // Ecken mit Bäumen, Blumenbeet, Zaun
+  for (const [x, y] of [[0, 0], [1, 0], [0, 1], [TW - 1, 0], [TW - 2, 0], [TW - 1, 1], [0, TH - 1], [TW - 1, TH - 1]]) tset(m, X + x, Y + y, T.TREE);
+  for (let y = 13; y <= 15; y++) for (let x = 7; x <= 9; x++) tset(m, X + x, Y + y, T.FLOWER);
+  for (let x = 7; x <= 9; x++) tset(m, X + x, Y + 12, T.FENCE);
+
+  const slots = {
+    a: { x: 2, y: 4, w: 5, h: 4, door: 2 },   // Center / Zuhause
+    b: { x: 14, y: 2, w: 6, h: 6, door: 2 },  // Arena / Labor / Meisterhalle
+    c: { x: 2, y: 12, w: 4, h: 4, door: 1 },  // Laden
+    d: { x: 15, y: 12, w: 4, h: 4, door: 1 }, // Haus
+  };
+  const plan = t.start
+    ? { a: ['home', T.ROOF, null], b: ['lab', T.ROOF, null], c: ['house', T.ROOF, null], d: ['house2', T.ROOF, null] }
+    : t.league
+      ? { a: ['center', T.ROOF_CENTER, T.WALL_CENTER], b: ['league', T.ROOF_GYM, T.WALL_GYM], c: ['shop', T.ROOF_SHOP, T.WALL_SHOP], d: ['house', T.ROOF, null] }
+      : { a: ['center', T.ROOF_CENTER, T.WALL_CENTER], b: ['gym', T.ROOF_GYM, T.WALL_GYM], c: ['shop', T.ROOF_SHOP, T.WALL_SHOP], d: ['house', T.ROOF, null] };
+  for (const k of Object.keys(plan)) {
+    const s = slots[k]; const [kind, roof, emblem] = plan[k];
+    const door = building(m, X + s.x, Y + s.y, s.w, s.h, roof, s.door, emblem);
+    const id = `${kind}:${i}`;
+    DOORS[id] = door;
+    m.warps.set(K(door.x, door.y), { to: id, x: 4, y: ROOM_H[kind] - 2, dir: 'up' });
+  }
+  // Ortsschild
+  tset(m, X + 13, Y + 11, T.SIGN);
+  m.objs.set(K(X + 13, Y + 11), { text: `${t.name.toUpperCase()}\n${t.line}` });
+  // Bewohner
+  m.npcs.push(new Actor({ x: X + 8, y: Y + 10, dir: 'down', variant: 1, wander: true, id: `villager:${i}:0`, talk: t.line }));
+  m.npcs.push(new Actor({ x: X + 18, y: Y + 9, dir: 'left', variant: 0, wander: true, id: `villager:${i}:1`, talk: HINTS[i % HINTS.length] }));
+}
+
+/* ---------------------------------------------------------------------
+   INNENRÄUME (werden erst beim Betreten erzeugt)
+   --------------------------------------------------------------------- */
+const ROOM_H = { center: 8, shop: 8, house: 8, house2: 8, home: 8, lab: 10, gym: 14, league: 12 };
+function room(id, w, h, fl) {
+  const m = newMap(id, w, h, fl);
+  m.outside = T.VOID;
+  for (let x = 0; x < w; x++) { tset(m, x, 0, T.IWALL); tset(m, x, 1, T.IWALL); }
+  tset(m, 4, h - 1, T.MAT);
+  return m;
+}
+function getMap(id) {
+  if (!MAPS[id]) MAPS[id] = makeInterior(id);
+  return MAPS[id];
+}
+function makeInterior(id) {
+  const [kind, si] = id.split(':'); const i = +si; const t = TOWNS[i];
+  const H = ROOM_H[kind]; let m;
+  const npc = o => m.npcs.push(new Actor(o));
+  switch (kind) {
+    case 'center':
+      m = room(id, 10, H, T.FLOOR);
+      tset(m, 0, 3, T.PLANT); tset(m, 9, 3, T.PLANT);
+      for (let x = 1; x <= 8; x++) tset(m, x, 3, T.COUNTER);
+      tset(m, 9, 5, T.PC); m.objs.set(K(9, 5), { text: 'Ein PC. Das Wesen-Lager wird gerade eingerichtet.' });
+      tset(m, 1, 5, T.TABLE); tset(m, 1, 6, T.PLANT);
+      npc({ x: 4, y: 2, dir: 'down', variant: 2, id: 'nurse', talk: async () => {
+        await say('Willkommen im Wesen-Center!');
+        await healTeam(); // HOOK
+      } });
+      npc({ x: 7, y: 6, dir: 'left', variant: 1, wander: true, talk: 'Im Center ruhen sich Trainer aus. Hier ist es immer gemütlich.' });
+      break;
+    case 'shop':
+      m = room(id, 10, H, T.FLOOR);
+      for (let x = 0; x <= 3; x++) tset(m, x, 3, T.COUNTER);
+      for (let x = 4; x <= 9; x++) tset(m, x, 2, T.SHELF);
+      for (let x = 6; x <= 8; x++) tset(m, x, 5, T.SHELF);
+      npc({ x: 1, y: 2, dir: 'down', variant: 3, id: 'clerk', talk: async () => {
+        await say('Willkommen! Was darf es sein?');
+        await openShop(i); // HOOK
+      } });
+      break;
+    case 'house': case 'house2': case 'home': {
+      m = room(id, 10, H, T.FLOOR);
+      tset(m, 1, 1, T.SHELF); tset(m, 2, 1, T.SHELF); tset(m, 8, 1, T.SHELF);
+      tset(m, 4, 3, T.TABLE); tset(m, 5, 3, T.TABLE); tset(m, 0, 2, T.PLANT); tset(m, 9, 6, T.PLANT);
+      if (kind === 'home') {
+        npc({ x: 7, y: 4, dir: 'left', variant: 1, id: 'mom', talk: async () => {
+          await say('MAMA: Pass gut auf dich auf! Die Welt da draußen ist riesig.');
+          await say('Ruh dich kurz aus... So, jetzt bist du wieder fit!');
+        } });
+      } else {
+        const lines = [
+          `Früher war ${t.name} viel kleiner. Heute kommen Trainer von überall her.`,
+          `Hast du schon die Arena besucht? ${t.leader ? t.leader + ' ist wirklich stark!' : 'Sie ist weit weg.'}`,
+          'Mein Opa erzählt, dass es mehr als 100 Arten von Wesen gibt.',
+          'Zwei Regionen, 16 Orden. Wer alle hat, darf zum Meistergipfel.',
+        ];
+        npc({ x: 2, y: 4, dir: 'down', variant: (i + (kind === 'house2' ? 1 : 0)) % 2, wander: true, talk: lines[(i + kind.length) % lines.length] });
+      }
+      break;
+    }
+    case 'lab':
+      m = room(id, 10, H, T.FLOOR);
+      for (const x of [1, 2, 3, 6, 7, 8]) tset(m, x, 1, T.SHELF);
+      for (let x = 3; x <= 6; x++) tset(m, x, 4, T.TABLE);
+      tset(m, 0, 7, T.PLANT); tset(m, 9, 7, T.PLANT); tset(m, 9, 3, T.PC);
+      m.objs.set(K(9, 3), { text: 'Auf dem Bildschirm steht: WESEN-DATENBANK, 0 Einträge.' });
+      npc({ x: 5, y: 2, dir: 'down', variant: 2, id: 'prof', talk: async () => {
+        await say('PROF. ESPE: Meine Forschung an den Wesen ist fast fertig!');
+        await chooseStarter(); // HOOK
+      } });
+      npc({ x: 1, y: 6, dir: 'right', variant: 2, wander: true, talk: 'ASSISTENT: Der Professor arbeitet Tag und Nacht.' });
+      break;
+    case 'gym':
+      m = room(id, 10, H, T.GYMFLOOR);
+      tset(m, 3, H - 3, T.STATUE); tset(m, 6, H - 3, T.STATUE);
+      for (const y of [4, 7]) { tset(m, 1, y, T.STATUE); tset(m, 8, y, T.STATUE); }
+      for (const x of [3, 6]) m.objs.set(K(x, H - 3), { text: `ARENA ${t.name.toUpperCase()}\nLeitung: ${t.leader}\nTyp: ${t.type}` });
+      npc({ x: 4, y: 2, dir: 'down', variant: 3, id: 'leader', talk: () => leaderTalk(i) });
+      npc({ x: 2, y: 8, dir: 'right', variant: 0, talk: `Ich trainiere hier, um eines Tages ${t.leader} zu schlagen.` });
+      npc({ x: 7, y: 5, dir: 'left', variant: 1, talk: `Die Wesen in dieser Arena sind vom Typ ${t.type}.` });
+      npc({ x: 6, y: H - 2, dir: 'left', variant: 1, talk: `Hey, Herausforderer! ${t.leader} setzt auf ${t.type}-Wesen. Bereite dich gut vor!` });
+      break;
+    case 'league':
+      m = room(id, 10, H, T.GYMFLOOR);
+      for (const y of [3, 5, 7]) { tset(m, 2, y, T.STATUE); tset(m, 7, y, T.STATUE); }
+      npc({ x: 4, y: 2, dir: 'down', variant: 3, id: 'champion', talk: championTalk });
+      break;
+  }
+  const d = DOORS[id];
+  m.warps.set(K(4, H - 1), { to: 'world', x: d.x, y: d.y + 1, dir: 'down' });
+  return m;
+}
+
+/* ---------------------------------------------------------------------
+   ACTORS
+   --------------------------------------------------------------------- */
+class Actor {
+  constructor(o) {
+    Object.assign(this, { x: 0, y: 0, dir: 'down', moving: false, prog: 0, tx: 0, ty: 0, parity: 0, sprite: 'hero', variant: 0, wander: false, timer: 60 + Math.floor(Math.random() * 120) }, o);
+    this.home = { x: this.x, y: this.y };
+  }
+  get px() { return this.x * TS + (this.moving ? (this.tx - this.x) * this.prog : 0); }
+  get py() { return this.y * TS + (this.moving ? (this.ty - this.y) * this.prog : 0); }
+  visible() { return !(this.hidden && this.hidden()); }
+  start(dir) { const [dx, dy] = DIRS[dir]; this.dir = dir; this.tx = this.x + dx; this.ty = this.y + dy; this.moving = true; this.prog = 0; this.parity ^= 1; }
+  update(spd) { if (!this.moving) return false; this.prog += spd; if (this.prog >= TS) { this.x = this.tx; this.y = this.ty; this.moving = false; this.prog = 0; return true; } return false; }
+  frame() { if (this.moving && this.prog < 8) return this.parity ? 1 : 2; return 0; }
+}
+
+const state = { badges: Array(16).fill(false), flags: {}, items: {}, steps: 0 };
+const player = new Actor({ sprite: 'hero', variant: 0 });
+let cur = null;
+let lastArea = 0, popup = { text: '', t: 0 };
+let turnTimer = 0;
+
+function occupied(m, x, y, self) {
+  if (self !== player && ((player.x === x && player.y === y) || (player.moving && player.tx === x && player.ty === y))) return true;
+  for (const n of m.npcs) {
+    if (n === self || !n.visible()) continue;
+    if ((n.x === x && n.y === y) || (n.moving && n.tx === x && n.ty === y)) return true;
+  }
+  return false;
+}
+function blocked(m, x, y, self) {
+  if (self === player && noclip) return false;
+  return SOLID.has(tget(m, x, y)) || occupied(m, x, y, self);
+}
+function npcAt(m, x, y) { return m.npcs.find(n => n.visible() && n.x === x && n.y === y); }
+
+/* ---------------------------------------------------------------------
+   INPUT
+   --------------------------------------------------------------------- */
+const held = {}, pressed = {};
+const KEYMAP = {
+  ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
+  KeyZ: 'A', Space: 'A', KeyJ: 'A', KeyX: 'B', KeyK: 'B', Backspace: 'B', ShiftLeft: 'B', ShiftRight: 'B',
+  Enter: 'START', KeyP: 'START', KeyM: 'SELECT', Tab: 'SELECT',
+};
+let noclip = false;
+addEventListener('keydown', e => {
+  if (e.code === 'KeyN' && e.altKey) { noclip = !noclip; return; } // Entwickler: Alt+N = durch Wände laufen
+  const k = KEYMAP[e.code]; if (!k) return;
+  e.preventDefault();
+  if (!e.repeat) pressed[k] = true;
+  held[k] = true;
+});
+addEventListener('keyup', e => { const k = KEYMAP[e.code]; if (k) held[k] = false; });
+addEventListener('blur', () => { for (const k in held) held[k] = false; });
+document.querySelectorAll('[data-k]').forEach(b => {
+  const k = b.dataset.k;
+  const down = e => { e.preventDefault(); held[k] = true; pressed[k] = true; b.classList.add('on'); try { b.setPointerCapture(e.pointerId); } catch (_) {} };
+  const up = e => { e.preventDefault(); held[k] = false; b.classList.remove('on'); };
+  b.addEventListener('pointerdown', down); b.addEventListener('pointerup', up); b.addEventListener('pointercancel', up); b.addEventListener('lostpointercapture', up);
+  b.addEventListener('contextmenu', e => e.preventDefault());
+});
+const heldDir = () => ['up', 'down', 'left', 'right'].find(d => held[d]);
+
+/* ---------------------------------------------------------------------
+   UI-ZEICHENHILFEN
+   --------------------------------------------------------------------- */
+function box(x, y, w, h) {
+  ctx.fillStyle = PAL[3]; ctx.fillRect(x, y, w, h);
+  ctx.fillStyle = PAL[0]; ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
+  ctx.fillStyle = PAL[2]; ctx.fillRect(x + 3, y + 3, w - 6, 1); ctx.fillRect(x + 3, y + h - 4, w - 6, 1); ctx.fillRect(x + 3, y + 3, 1, h - 6); ctx.fillRect(x + w - 4, y + 3, 1, h - 6);
+}
+function text(s, x, y, c = 3) { ctx.font = FONT; ctx.textBaseline = 'top'; ctx.fillStyle = PAL[c]; ctx.fillText(s, x, y); }
+function arrowRight(x, y, c = 3) { ctx.fillStyle = PAL[c]; for (let i = 0; i < 4; i++) ctx.fillRect(x + i, y + i, 1, 7 - i * 2); }
+function arrowDown(x, y, c = 3) { ctx.fillStyle = PAL[c]; for (let i = 0; i < 4; i++) ctx.fillRect(x + i, y + i, 7 - i * 2, 1); }
+function wrap(s, n) {
+  const out = [];
+  for (const para of s.split('\n')) {
+    let line = '';
+    for (const w of para.split(' ')) {
+      if (!line) line = w; else if ((line + ' ' + w).length <= n) line += ' ' + w; else { out.push(line); line = w; }
+      while (line.length > n) { out.push(line.slice(0, n)); line = line.slice(n); }
+    }
+    out.push(line);
+  }
+  return out;
+}
+
+/* ---------------------------------------------------------------------
+   UI-LAYER (Stapel): Dialog, Auswahl, Menü, Orden, Karte, Titel
+   --------------------------------------------------------------------- */
+const layers = [];
+let busy = 0;
+const topLayer = () => layers[layers.length - 1];
+function pop(l) { const i = layers.lastIndexOf(l); if (i >= 0) layers.splice(i, 1); }
+
+class Dialog {
+  constructor(s, done) { const lines = wrap(s, 18); this.pages = []; for (let i = 0; i < lines.length; i += 2) this.pages.push(lines.slice(i, i + 2)); this.pi = 0; this.shown = 0; this.done = done; }
+  get len() { return this.pages[this.pi].join('').length; }
+  update() {
+    if (this.shown < this.len) { this.shown += CONFIG.textSpeed * (held.A || held.B ? 3 : 1); if (pressed.A || pressed.B) this.shown = this.len; return; }
+    if (pressed.A || pressed.B) { if (this.pi < this.pages.length - 1) { this.pi++; this.shown = 0; } else { pop(this); this.done(); } }
+  }
+  draw() {
+    box(0, 96, 160, 48);
+    let left = Math.floor(this.shown);
+    this.pages[this.pi].forEach((ln, k) => { const s = ln.slice(0, Math.max(0, left)); left -= ln.length; text(s, 8, 104 + k * 16); });
+    if (this.shown >= this.len && (tick >> 4) & 1) arrowDown(146, 134);
+  }
+}
+const say = s => new Promise(res => layers.push(new Dialog(s, res)));
+
+class Choice {
+  constructor(prompt, opts, done) { this.d = new Dialog(prompt, () => {}); this.d.pi = this.d.pages.length - 1; this.opts = opts; this.sel = 0; this.done = done; }
+  update() {
+    if (this.d.shown < this.d.len) { this.d.shown += 2; return; }
+    if (pressed.up) this.sel = (this.sel + this.opts.length - 1) % this.opts.length;
+    if (pressed.down) this.sel = (this.sel + 1) % this.opts.length;
+    if (pressed.A) { pop(this); this.done(this.sel); }
+    else if (pressed.B) { pop(this); this.done(this.opts.length - 1); }
+  }
+  draw() {
+    this.d.draw();
+    if (this.d.shown < this.d.len) return;
+    const w = Math.max(...this.opts.map(o => o.length)) * 8 + 24, h = this.opts.length * 16 + 12;
+    const x = 160 - w, y = 96 - h;
+    box(x, y, w, h);
+    this.opts.forEach((o, k) => { text(o, x + 16, y + 8 + k * 16); if (k === this.sel) arrowRight(x + 7, y + 8 + k * 16); });
+  }
+}
+const ask = (prompt, opts) => new Promise(res => layers.push(new Choice(prompt, opts, res)));
+
+class Menu {
+  constructor() { this.items = ['ORDEN', 'KARTE', 'TEAM', 'TASCHE', 'SICHERN', 'ZURÜCK']; this.sel = 0; }
+  update() {
+    if (pressed.up) this.sel = (this.sel + this.items.length - 1) % this.items.length;
+    if (pressed.down) this.sel = (this.sel + 1) % this.items.length;
+    if (pressed.B || pressed.START) { pop(this); return; }
+    if (pressed.A) {
+      const it = this.items[this.sel];
+      if (it === 'ZURÜCK') return pop(this);
+      run(async () => {
+        if (it === 'ORDEN') await screen(new BadgeScreen());
+        if (it === 'KARTE') await screen(new MapScreen());
+        if (it === 'TEAM') await showTeam(); // HOOK
+        if (it === 'TASCHE') await showBag();
+        if (it === 'SICHERN') {
+          const c = await ask('Spielstand sichern?', ['JA', 'NEIN']);
+          if (c === 0) await say(saveGame() ? 'Spielstand gesichert!' : 'Speichern ist in diesem Browser nicht möglich.');
+        }
+      });
+    }
+  }
+  draw() {
+    const w = 80, h = this.items.length * 16 + 12, x = 160 - w;
+    box(x, 0, w, h);
+    this.items.forEach((o, k) => { text(o, x + 16, 8 + k * 16); if (k === this.sel) arrowRight(x + 7, 8 + k * 16); });
+  }
+}
+
+function screen(layer) { return new Promise(res => { layer.done = res; layers.push(layer); }); }
+
+function badgePixels(i) {
+  const n = 3 + (i % 8), rot = -Math.PI / 2 + (i >= 8 ? Math.PI / n : 0), R = 6.8;
+  const pts = []; for (let k = 0; k < n; k++) pts.push([Math.cos(rot + k * 2 * Math.PI / n) * R, Math.sin(rot + k * 2 * Math.PI / n) * R]);
+  const inPoly = (x, y) => { let c = false; for (let a = 0, b = n - 1; a < n; b = a++) { const [xa, ya] = pts[a], [xb, yb] = pts[b]; if ((ya > y) !== (yb > y) && x < (xb - xa) * (y - ya) / (yb - ya) + xa) c = !c; } return c; };
+  const ins = (x, y) => inPoly(x + 0.5 - 8, y + 0.5 - 8) && !(i >= 8 && Math.hypot(x + 0.5 - 8, y + 0.5 - 8) < 2.4);
+  const out = [];
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    if (!ins(x, y)) continue;
+    const edge = !ins(x + 1, y) || !ins(x - 1, y) || !ins(x, y + 1) || !ins(x, y - 1);
+    out.push([x, y, edge]);
+  }
+  return out;
+}
+const BADGE_PX = Array.from({ length: 16 }, (_, i) => badgePixels(i));
+function drawBadge(i, x, y, got) {
+  for (const [px, py, edge] of BADGE_PX[i]) {
+    if (!got && !edge) continue;
+    ctx.fillStyle = PAL[got ? (edge ? 3 : (px + py < 13 ? 1 : 2)) : 1];
+    ctx.fillRect(x + px, y + py, 1, 1);
+  }
+}
+
+class BadgeScreen {
+  constructor() { this.sel = 0; }
+  update() {
+    if (pressed.left) this.sel = (this.sel + 15) % 16;
+    if (pressed.right) this.sel = (this.sel + 1) % 16;
+    if (pressed.up || pressed.down) this.sel = (this.sel + 8) % 16;
+    if (pressed.B || pressed.A || pressed.START) { pop(this); this.done(); }
+  }
+  draw() {
+    ctx.fillStyle = PAL[0]; ctx.fillRect(0, 0, 160, 144);
+    const n = state.badges.filter(Boolean).length;
+    text('ORDEN', 8, 6); text(String(n).padStart(2, '0') + '/16', 112, 6);
+    for (let r = 0; r < 2; r++) {
+      const y0 = 22 + r * 38;
+      text(REGIONS[r], 8, y0, 2);
+      ctx.fillStyle = PAL[2]; ctx.fillRect(8, y0 + 10, 144, 1);
+      for (let c = 0; c < 8; c++) {
+        const i = r * 8 + c, x = 9 + c * 18, y = y0 + 14;
+        if (i === this.sel) { ctx.fillStyle = PAL[3]; ctx.fillRect(x - 1, y - 1, 18, 18); ctx.fillStyle = PAL[0]; ctx.fillRect(x, y, 16, 16); }
+        drawBadge(i, x, y, state.badges[i]);
+      }
+    }
+    const t = TOWNS[this.sel + 1];
+    box(0, 96, 160, 48);
+    text(t.badge.toUpperCase(), 8, 104);
+    text(state.badges[this.sel] ? `${t.leader} · ${t.name}`.slice(0, 18) : `${t.name}`.slice(0, 18), 8, 120, state.badges[this.sel] ? 3 : 2);
+  }
+}
+
+let MINIMAP = null;
+function buildMinimap(m) {
+  const w = Math.ceil(m.w / 2), h = Math.ceil(m.h / 2);
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d');
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let col = 1;
+    let walk = 0, water = 0, town = 0;
+    for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) {
+      const X = x * 2 + dx, Y = y * 2 + dy; const t = tget(m, X, Y); const a = aget(m, X, Y);
+      if (a >= 1 && a <= TOWNS.length) town++;
+      if (t === T.WATER) water++; else if (!SOLID.has(t) || t === T.ROOF) walk++;
+    }
+    if (town >= 2) col = 3; else if (water >= 2) col = 2; else if (walk >= 2) col = 0;
+    g.fillStyle = PAL[col]; g.fillRect(x, y, 1, 1);
+  }
+  MINIMAP = c;
+}
+
+class MapScreen {
+  constructor() {
+    const pos = cur.outdoor ? player : DOORS[cur.id] || player;
+    let best = 0, bd = 1e9;
+    TOWN_RECTS.forEach((r, i) => { const d = Math.hypot(r.cx - pos.x, r.cy - pos.y); if (d < bd) { bd = d; best = i; } });
+    this.sel = best; this.here = { x: pos.x, y: pos.y };
+  }
+  update() {
+    if (pressed.left || pressed.up) this.sel = (this.sel + TOWNS.length - 1) % TOWNS.length;
+    if (pressed.right || pressed.down) this.sel = (this.sel + 1) % TOWNS.length;
+    if (pressed.B || pressed.A || pressed.START || pressed.SELECT) { pop(this); this.done(); }
+  }
+  draw() {
+    ctx.fillStyle = PAL[0]; ctx.fillRect(0, 0, 160, 144);
+    text('KARTE', 8, 6); text(REGIONS[regionOf(this.sel)], 160 - 8 - REGIONS[regionOf(this.sel)].length * 8, 6, 2);
+    const ox = 7, oy = 20;
+    ctx.fillStyle = PAL[3]; ctx.fillRect(ox - 1, oy - 1, MINIMAP.width + 2, MINIMAP.height + 2);
+    ctx.drawImage(MINIMAP, ox, oy);
+    const r = TOWN_RECTS[this.sel];
+    if ((tick >> 3) & 1) { ctx.fillStyle = PAL[0]; ctx.fillRect(ox + Math.floor(r.cx / 2) - 2, oy + Math.floor(r.cy / 2) - 2, 5, 5); ctx.fillStyle = PAL[3]; ctx.fillRect(ox + Math.floor(r.cx / 2) - 1, oy + Math.floor(r.cy / 2) - 1, 3, 3); }
+    if ((tick >> 4) & 1) { ctx.fillStyle = PAL[0]; ctx.fillRect(ox + Math.floor(this.here.x / 2) - 1, oy + Math.floor(this.here.y / 2) - 1, 3, 3); }
+    box(0, 96, 160, 48);
+    const t = TOWNS[this.sel];
+    text(t.name.toUpperCase(), 8, 104);
+    let info = t.start ? 'Dein Heimatort' : t.league ? 'Champion-Liga' : (state.badges[this.sel - 1] ? 'Orden erhalten' : 'Arena: ' + t.type);
+    text(info.slice(0, 18), 8, 120, 2);
+  }
+}
+
+class Title {
+  constructor(done) { this.done = done; this.stage = 0; this.sel = 0; this.hasSave = !!loadRaw(); }
+  update() {
+    if (this.stage === 0) { if (pressed.A || pressed.START) { if (this.hasSave) this.stage = 1; else { pop(this); this.done('new'); } } return; }
+    if (pressed.up || pressed.down) this.sel ^= 1;
+    if (pressed.B) this.stage = 0;
+    if (pressed.A || pressed.START) { pop(this); this.done(this.sel === 0 ? 'continue' : 'new'); }
+  }
+  draw() {
+    ctx.fillStyle = PAL[0]; ctx.fillRect(0, 0, 160, 144);
+    for (let x = 0; x < 10; x++) { ctx.drawImage(atlas[0], T.TREE * 16, 0, 16, 16, x * 16, 112, 16, 16); ctx.drawImage(atlas[0], T.TALL * 16, 0, 16, 16, x * 16, 128, 16, 16); }
+    ctx.fillStyle = PAL[3]; ctx.fillRect(8, 14, 144, 36); ctx.fillStyle = PAL[1]; ctx.fillRect(10, 16, 140, 32);
+    ctx.font = '12px "Press Start 2P", monospace'; ctx.textBaseline = 'top'; ctx.fillStyle = PAL[3]; ctx.fillText('WESENWELT', 27, 25); ctx.fillStyle = PAL[0]; ctx.fillText('WESENWELT', 26, 24);
+    text('KLASSIK-EDITION', 20, 56, 2);
+    const walk = (tick >> 4) & 1;
+    ctx.drawImage(getSprite('hero', 0, 'down', walk ? 0 : 0), 72, 72);
+    if (this.stage === 0) { if ((tick >> 5) & 1) text('START DRÜCKEN', 28, 96); }
+    else {
+      box(24, 82, 112, 44);
+      text('WEITER', 48, 90); text('NEUES SPIEL', 48, 108);
+      arrowRight(36, 90 + this.sel * 18);
+    }
+  }
+}
+
+/* ---------------------------------------------------------------------
+   HOOKS – hier docken später Wesen, Kämpfe, Laden und Team an
+   --------------------------------------------------------------------- */
+async function battle(opts) {
+  // TODO: Kampfsystem. Rückgabe true = gewonnen.
+  await flash();
+  await say(`[KAMPF GEGEN ${opts.name.toUpperCase()}]`);
+  await say('Das Kampfsystem kommt im nächsten Schritt. Dieser Kampf zählt als gewonnen!');
+  return true;
+}
+async function wildEncounter(areaId) {
+  // TODO: wildes Wesen je nach Route (AREA_NAMES[areaId]) auswählen
+  await battle({ name: 'wildes Wesen', area: areaId });
+}
+async function healTeam() { await say('Später werden hier deine Wesen geheilt. Noch hast du keine!'); }
+async function openShop(townIndex) { await say('Die Regale werden gerade eingeräumt. Komm bald wieder!'); }
+async function chooseStarter() { await say('Bald darfst du hier dein erstes Wesen wählen. Bis dahin: Erkunde die Welt!'); }
+async function showTeam() { await say('Du hast noch keine Wesen dabei.'); }
+async function showBag() {
+  const names = Object.keys(state.items);
+  if (!names.length) return say('Deine Tasche ist leer.');
+  await say('TASCHE:\n' + names.map(n => `${n} x${state.items[n]}`).join('\n'));
+}
+
+async function leaderTalk(i) {
+  const t = TOWNS[i];
+  if (state.badges[i - 1]) {
+    const next = TOWNS[i + 1];
+    return say(`${t.leader.toUpperCase()}: Du hast meinen ${t.badge} schon. Auf nach ${next.name}!`);
+  }
+  await say(`${t.leader.toUpperCase()}: Willkommen in der Arena von ${t.name}!`);
+  await say(`Ich bin ${t.leader}. Meine Wesen sind vom Typ ${t.type}.`);
+  const c = await ask('Nimmst du die Herausforderung an?', ['JA', 'NEIN']);
+  if (c !== 0) return say(`${t.leader.toUpperCase()}: Komm wieder, wenn du bereit bist.`);
+  const won = await battle({ name: `Leiter ${t.leader}`, leader: i });
+  if (!won) return say(`${t.leader.toUpperCase()}: Trainiere weiter und versuche es noch einmal!`);
+  state.badges[i - 1] = true;
+  await say(`${t.leader.toUpperCase()}: Unglaublich! Du hast dir das verdient.`);
+  await say(`Du erhältst den ${t.badge.toUpperCase()}!`);
+  const n = state.badges.filter(Boolean).length;
+  if (i === 8) await say('Mit 8 Orden darfst du über die große Brücke nach SOLMAR!');
+  else if (i === 16) await say('Du hast alle 16 Orden! Der Weg zum MEISTERGIPFEL ist frei.');
+  else await say(`Das ist dein ${n}. Orden. Der Weg nach ${TOWNS[i + 1].name} ist jetzt offen.`);
+  saveGame();
+}
+
+async function championTalk() {
+  const n = state.badges.filter(Boolean).length;
+  if (state.flags.champion) return say('CHAMPION AURELIA: Du bist jetzt der Champion. Die Welt gehört dir!');
+  if (n < 16) return say(`CHAMPION AURELIA: Du hast ${n} von 16 Orden. Komm wieder, wenn du alle hast.`);
+  await say('CHAMPION AURELIA: Du hast es tatsächlich bis hierher geschafft.');
+  const c = await ask('Bist du bereit für den letzten Kampf?', ['JA', 'NEIN']);
+  if (c !== 0) return say('Ich warte hier auf dich.');
+  if (await battle({ name: 'Champion Aurelia' })) {
+    state.flags.champion = 1;
+    await say('Du bist der neue CHAMPION von Arven und Solmar!');
+    saveGame();
+  }
+}
+
+/* ---------------------------------------------------------------------
+   ÜBERGÄNGE
+   --------------------------------------------------------------------- */
+let fade = 0, fadeTarget = 0, fadeRes = null, flashT = 0, flashRes = null;
+const fadeTo = v => new Promise(res => { fadeTarget = v; fadeRes = res; });
+const flash = () => new Promise(res => { flashT = 36; flashRes = res; });
+async function run(fn) { busy++; try { await fn(); } finally { busy--; } }
+
+function setMap(id, x, y, dir) {
+  cur = id === 'world' ? MAPS.world : getMap(id);
+  player.x = x; player.y = y; player.dir = dir; player.moving = false;
+  if (cur.outdoor) { const a = aget(cur, x, y); if (a && a !== lastArea) showPopup(a); }
+}
+function showPopup(a) { lastArea = a; popup = { text: AREA_NAMES[a], t: 150 }; }
+
+function warp(w) {
+  run(async () => { await fadeTo(4); setMap(w.to, w.x, w.y, w.dir); await fadeTo(0); });
+}
+
+/* ---------------------------------------------------------------------
+   WELT-UPDATE
+   --------------------------------------------------------------------- */
+function interact() {
+  const [dx, dy] = DIRS[player.dir];
+  let x = player.x + dx, y = player.y + dy;
+  let n = npcAt(cur, x, y);
+  if (!n && tget(cur, x, y) === T.COUNTER) n = npcAt(cur, x + dx, y + dy);
+  if (n && n.talk) {
+    if (!n.still) n.dir = OPP[player.dir];
+    return run(async () => { if (typeof n.talk === 'string') await say(n.talk); else await n.talk(n); });
+  }
+  const o = cur.objs.get(K(x, y));
+  if (o) return run(async () => { if (o.fn) await o.fn(); else await say(o.text); });
+}
+
+function onArrive() {
+  state.steps++;
+  const w = cur.warps.get(K(player.x, player.y));
+  if (w) { warp(w); return true; }
+  if (cur.outdoor) {
+    const a = aget(cur, player.x, player.y);
+    if (a && a !== lastArea) showPopup(a);
+    if (tget(cur, player.x, player.y) === T.TALL && CONFIG.encounters && Math.random() < CONFIG.encounterRate) {
+      run(() => wildEncounter(a)); return true;
+    }
+  }
+  return false;
+}
+
+function worldUpdate() {
+  for (const n of cur.npcs) {
+    if (!n.visible()) continue;
+    if (n.moving) { n.update(1); continue; }
+    if (!n.wander) continue;
+    if (--n.timer > 0) continue;
+    n.timer = 90 + Math.floor(Math.random() * 150);
+    const dir = ['up', 'down', 'left', 'right'][Math.floor(Math.random() * 4)];
+    const [dx, dy] = DIRS[dir]; const x = n.x + dx, y = n.y + dy;
+    n.dir = dir;
+    if (Math.abs(x - n.home.x) > 2 || Math.abs(y - n.home.y) > 2) continue;
+    if (blocked(cur, x, y, n) || cur.warps.has(K(x, y)) || tget(cur, x, y) === T.DOOR || tget(cur, x, y) === T.MAT) continue;
+    n.start(dir);
+  }
+  if (popup.t > 0) popup.t--;
+
+  if (player.moving) {
+    if (player.update(held.B ? 2 : 1)) { if (onArrive()) return; } else return;
+  }
+  if (pressed.START) { layers.push(new Menu()); return; }
+  if (pressed.SELECT) { run(() => screen(new MapScreen())); return; }
+  if (pressed.A) { interact(); return; }
+  const d = heldDir();
+  if (!d) { turnTimer = 0; return; }
+  if (d !== player.dir && !player.moving && turnTimer === 0 && pressed[d]) { player.dir = d; turnTimer = 6; return; }
+  if (turnTimer > 0) { turnTimer--; return; }
+  player.dir = d;
+  const [dx, dy] = DIRS[d];
+  if (!blocked(cur, player.x + dx, player.y + dy, player)) player.start(d);
+}
+
+/* ---------------------------------------------------------------------
+   RENDER
+   --------------------------------------------------------------------- */
+let tick = 0;
+let mode = 'title';
+function drawWorld() {
+  const camX = Math.round(player.px) - 64, camY = Math.round(player.py) - 64;
+  const x0 = Math.floor(camX / TS), y0 = Math.floor(camY / TS);
+  const f = (tick >> 5) & 1;
+  for (let ty = y0; ty <= y0 + 9; ty++) for (let tx = x0; tx <= x0 + 10; tx++) {
+    ctx.drawImage(atlas[f], tget(cur, tx, ty) * TS, 0, TS, TS, tx * TS - camX, ty * TS - camY, TS, TS);
+  }
+  const actors = cur.npcs.filter(n => n.visible()).concat(player).sort((a, b) => a.py - b.py);
+  for (const a of actors) {
+    const sx = Math.round(a.px) - camX, sy = Math.round(a.py) - camY - 4;
+    if (sx < -16 || sy < -16 || sx > 160 || sy > 144) continue;
+    ctx.drawImage(getSprite(a.sprite, a.variant, a.dir, a.frame()), sx, a.sprite === 'item' ? sy + 4 : sy);
+  }
+  // hohes Gras verdeckt die Füße
+  const gx = Math.round(player.px / TS), gy = Math.round(player.py / TS);
+  if (tget(cur, gx, gy) === T.TALL) ctx.drawImage(atlas[0], T.TALL * TS, 9, TS, 7, gx * TS - camX, gy * TS - camY + 9, TS, 7);
+  if (popup.t > 0 && cur.outdoor) { const w = popup.text.length * 8 + 16; box(0, 0, w, 24); text(popup.text, 8, 8); }
+  if (noclip) text('NOCLIP', 104, 2, 0);
+}
+
+function render() {
+  ctx.fillStyle = PAL[0]; ctx.fillRect(0, 0, VW, VH);
+  if (cur && mode === 'world') drawWorld();
+  for (const l of layers) l.draw();
+  if (fade > 0) { ctx.globalAlpha = Math.min(1, fade / 4); ctx.fillStyle = PAL[3]; ctx.fillRect(0, 0, VW, VH); ctx.globalAlpha = 1; }
+  if (flashT > 0 && (flashT >> 2) % 2) { ctx.fillStyle = PAL[(flashT >> 3) % 2 ? 3 : 0]; ctx.fillRect(0, 0, VW, VH); }
+}
+
+function step() {
+  tick++;
+  if (fade !== fadeTarget) {
+    if (tick % 3 === 0) fade += Math.sign(fadeTarget - fade);
+    if (fade === fadeTarget && fadeRes) { const r = fadeRes; fadeRes = null; r(); }
+  } else if (fadeRes) { const r = fadeRes; fadeRes = null; r(); }
+  if (flashT > 0) { flashT--; if (!flashT && flashRes) { const r = flashRes; flashRes = null; r(); } }
+  else if (fade === fadeTarget) {
+    if (layers.length) topLayer().update();
+    else if (mode === 'world' && busy === 0) worldUpdate();
+  }
+  for (const k in pressed) pressed[k] = false;
+}
+
+/* ---------------------------------------------------------------------
+   SPEICHERN / LADEN
+   --------------------------------------------------------------------- */
+function snapshot() { return { map: cur ? cur.id : 'home:0', x: player.x, y: player.y, dir: player.dir, badges: state.badges, flags: state.flags, items: state.items, steps: state.steps }; }
+function saveGame() { try { localStorage.setItem(CONFIG.saveKey, JSON.stringify(snapshot())); return true; } catch (e) { return false; } }
+function loadRaw() { try { const s = localStorage.getItem(CONFIG.saveKey); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+function applySave(s) {
+  state.badges = (s.badges || []).slice(0, 16).concat(Array(16).fill(false)).slice(0, 16);
+  state.flags = s.flags || {}; state.items = s.items || {}; state.steps = s.steps || 0;
+  lastArea = 0;
+  setMap(s.map || 'home:0', s.x ?? 4, s.y ?? 6, s.dir || 'down');
+}
+
+/* ---------------------------------------------------------------------
+   START
+   --------------------------------------------------------------------- */
+async function newGame() {
+  state.badges = Array(16).fill(false); state.flags = {}; state.items = {}; state.steps = 0;
+  lastArea = 1;
+  setMap('home:0', 4, 4, 'down');
+  mode = 'world';
+  await fadeTo(0);
+  await say('PROF. ESPE: Hallo! Willkommen in der Welt der WESEN!');
+  await say('Unsere Welt hat zwei Regionen: ARVEN im Westen und SOLMAR im Osten.');
+  await say('In jeder Region warten 8 Arenaleiter. Sammle alle 16 Orden!');
+  await say('Dann darfst du auf dem MEISTERGIPFEL den Champion herausfordern.');
+  await say('Deine Reise beginnt hier in HEIMWEILER. Besuch mich im Labor!');
+}
+
+async function boot() {
+  try { await Promise.race([document.fonts.load(FONT), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
+  buildAtlas();
+  genWorld();
+  requestAnimationFrame(loop);
+  const hot = window.claude?.hot;
+  if (hot?.snapshot) { try { hot.snapshot(() => (mode === 'world' ? snapshot() : null)); } catch (e) {} }
+  const hotData = hot?.data;
+  if (hotData && hotData.map) { applySave(hotData); mode = 'world'; return; }
+  const choice = await new Promise(res => layers.push(new Title(res)));
+  await fadeTo(4);
+  if (choice === 'continue') { applySave(loadRaw()); mode = 'world'; await fadeTo(0); }
+  else await run(newGame);
+}
+
+let last = performance.now(), acc = 0;
+function loop(now) {
+  acc += Math.min(100, now - last); last = now;
+  while (acc >= 1000 / 60) { step(); acc -= 1000 / 60; }
+  render();
+  requestAnimationFrame(loop);
+}
+
+window.WW = { MAPS, TOWNS, TOWN_RECTS: () => TOWN_RECTS, ROUTES: () => ROUTES, state, player, T, SOLID, tget, aget, DOORS, setMap: (...a) => { setMap(...a); mode = 'world'; } };
+boot();
+</script>
