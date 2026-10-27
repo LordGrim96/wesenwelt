@@ -127,7 +127,7 @@ const CONFIG = {
   textSpeed: 1,
   saveKey: 'wesenwelt.urzeit.v1',
 };
-const GAME_VERSION = '202610272001'; // wird von build_app.py durch die Build-Zeit ersetzt
+const GAME_VERSION = '202610272005'; // wird von build_app.py durch die Build-Zeit ersetzt
 
 const VW = 256, VH = 192, TS = 16;
 const cv = document.getElementById('screen');
@@ -276,7 +276,7 @@ function floorWood(P) {
   for (let y = 0; y < 16; y += 4) P.p(((y / 4) % 2) * 8 + 3, y + 1, '#b08850');
   P.r(0, 0, 16, 1, '#e8c890');
 }
-function bigTree(b) {
+function bigTree(b, f = 0) {
   // 32x32-Baum, wird in 4 Viertel zerlegt: Wälder wirken wie auf dem DS
   const c = document.createElement('canvas'); c.width = 32; c.height = 32; const g = c.getContext('2d');
   g.fillStyle = b.g[1]; g.fillRect(0, 0, 32, 32);
@@ -289,7 +289,8 @@ function bigTree(b) {
     let col;
     if (d > r - 1.1) col = b.t[0];
     else {
-      const leaf = Math.sin(x * 1.1 + Math.sin(y * 0.7) * 2) + Math.sin(y * 1.3 - x * 0.4);
+      // Wind: die Lichtflecken im Laub wandern leicht mit jeder Animationsphase
+      const leaf = Math.sin(x * 1.1 + f * 0.55 + Math.sin(y * 0.7) * 2) + Math.sin(y * 1.3 - x * 0.4 + f * 0.35);
       const l = (-dx * 0.6 - dy * 0.8) / r + leaf * 0.12 + (hash(x, y, 11) - 0.5) * 0.25;
       col = l > 0.42 ? b.t[3] : l > 0.02 ? b.t[2] : l > -0.45 ? b.t[1] : b.t[0];
     }
@@ -300,7 +301,11 @@ function bigTree(b) {
 
 const TILE_ART = {
   [T.GRASS]: (P, f, b) => grass(P, b),
-  [T.TALL]: (P, f, b) => { P.r(0, 0, 16, 16, b.g[1]); const m = { o: b.t[0], 1: b.g[0], 2: b.g[2], 3: b.g[3] }; for (const [ox, oy] of [[0, 0], [8, 0], [0, 8], [8, 8]]) pat(P, TUFT, m, ox, oy); },
+  [T.TALL]: (P, f, b) => {
+    // Halmspitzen wiegen sich im Wind
+    P.r(0, 0, 16, 16, b.g[1]); const m = { o: b.t[0], 1: b.g[0], 2: b.g[2], 3: b.g[3] }, sway = [0, 1, 0, -1][f];
+    for (const [ox, oy] of [[0, 0], [8, 0], [0, 8], [8, 8]]) TUFT.forEach((row, y) => { const dx = y < 3 ? sway : 0; for (let x = 0; x < 8; x++) if (row[x] !== '.') P.p(ox + x + dx, oy + y, m[row[x]]); });
+  },
   [T.PATH]: (P, f, b) => { P.r(0, 0, 16, 16, b.d[1]); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const h = hash(x, y, 5); if (h < 0.07) P.p(x, y, b.d[0]); else if (h > 0.92) P.p(x, y, b.d[2]); } },
   [T.WATER]: (P, f, b) => {
     P.r(0, 0, 16, 16, b.w[1]);
@@ -308,13 +313,13 @@ const TILE_ART = {
       const v = Math.sin((x + f * 3) * 0.8 + Math.sin(y * 0.9) * 1.5) + Math.sin(y * 1.2 + f);
       if (v > 1.3) P.p(x, y, b.w[2]); else if (v < -1.4) P.p(x, y, b.w[0]);
     }
-    P.p(f ? 4 : 11, f ? 5 : 11, b.w[3]); P.p(f ? 5 : 12, f ? 5 : 11, b.w[3]);
+    const sp = [[4, 5], [11, 11], [8, 2], [2, 12]][f]; P.p(sp[0], sp[1], b.w[3]); P.p(sp[0] + 1, sp[1], b.w[3]);
   },
   [T.SAND]: P => { P.r(0, 0, 16, 16, '#ecd8a0'); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const h = hash(x, y, 7); if (h < 0.08) P.p(x, y, '#d4b878'); else if (h > 0.94) P.p(x, y, '#fff0c8'); } },
   [T.FLOWER]: (P, f, b) => {
     grass(P, b);
     for (const [x, y] of [[4, 4], [11, 10]]) {
-      const xx = x + (f ? 1 : 0);
+      const xx = x + [0, 1, 0, -1][f];
       P.p(x, y + 2, b.g[0]); P.p(x, y + 3, b.g[0]);
       for (const [dx, dy] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) P.p(xx + dx, y + dy, b.f[0]);
       P.p(xx, y, b.f[1]); P.p(xx - 1, y - 1, shade(b.f[0], 0.4));
@@ -410,9 +415,9 @@ const TILE_ART = {
   [T.TORCH]: (P, f, b) => {
     grass(P, b);
     P.r(7, 7, 2, 9, '#4a2c18'); P.r(7, 7, 1, 9, '#8a6038'); P.r(5, 5, 6, 3, '#5a544a'); P.r(5, 5, 6, 1, '#a09888');
-    const fl = f ? ['..o.', '.oo.', 'oyyo', 'oyyo'] : ['.o..', '.oo.', 'oyyo', 'oyyo'];
+    const fl = [['..o.', '.oo.', 'oyyo', 'oyyo'], ['.o..', '.oo.', 'oyyo', 'oyyo'], ['..o.', '.oyo', 'oyyo', 'oyyo'], ['.o..', 'ooo.', 'oyyo', 'oyyo']][f];
     pat(P, fl, { o: '#f06820', y: '#f8d048' }, 6, 1);
-    P.p(f ? 8 : 7, 0, '#f8a030');
+    P.p([8, 7, 9, 6][f], 0, '#f8a030');
   },
 };
 
@@ -421,7 +426,7 @@ const OV = { fT: 0, wT: 4, rL: 8, rR: 9, rT: 10, rB: 11, sT: 12, sL: 13, d1: 14,
 const NOV = 19;
 let ovl = []; // ovl[gebiet][frame]
 function buildOverlays() {
-  ovl = BIOMES.map(b => [0, 1].map(f => {
+  ovl = BIOMES.map(b => [0, 1, 2, 3].map(f => {
     const c = document.createElement('canvas'); c.width = NOV * TS; c.height = TS;
     const g = c.getContext('2d');
     const P = i => painter(g, i * TS);
@@ -466,11 +471,11 @@ function buildGlow() {
   g.fillStyle = gr; g.fillRect(0, 0, 48, 48);
 }
 function buildAtlas() {
-  atlas = BIOMES.map(b => [0, 1].map(f => {
+  atlas = BIOMES.map(b => [0, 1, 2, 3].map(f => {
     const c = document.createElement('canvas'); c.width = NT * TS; c.height = TS;
     const g = c.getContext('2d');
     for (let t = 0; t < NT; t++) { const art = TILE_ART[t]; if (art) art(painter(g, t * TS), f, b); }
-    const tree = bigTree(b);
+    const tree = bigTree(b, f);
     for (let q = 0; q < 4; q++) g.drawImage(tree, (q & 1) * 16, (q >> 1) * 16, 16, 16, (TREE_Q + q) * TS, 0, 16, 16);
     return c;
   }));
@@ -505,11 +510,27 @@ const SIDE_W = ['..oppo.oPpo.....', '..obbo.obbo.....', '..ooo..ooo......'];
 const ITEM_ART = ['................', '................', '................', '................', '......oooo......', '.....oyyyyo.....', '....oyhwyyYo....',
   '....oyhyyyYo....', '...oyyyyyyYYo...', '...oyyyyyyYYo...', '...oYyyyyYYYo...', '....oYYYYYYo....', '.....oooooo.....', '................', '...SSSSSSSSSS...', '................'];
 
+// Licht von oben links: Kanten unter der Kontur heller, über der Kontur dunkler
+function shadeChar(c) {
+  const g = c.getContext('2d'), w = c.width, h = c.height, im = g.getImageData(0, 0, w, h), d = im.data, src = new Uint8ClampedArray(d);
+  const OL = hexRgb(CH.o), EY = hexRgb(CH.e);
+  const isLine = i => src[i + 3] === 0 || (src[i] === OL[0] && src[i + 1] === OL[1] && src[i + 2] === OL[2]);
+  const out = (x, y) => x < 0 || y < 0 || x >= w || y >= h || isLine((y * w + x) * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4;
+    if (isLine(i) || (src[i] === EY[0] && src[i + 1] === EY[1] && src[i + 2] === EY[2])) continue;
+    const up = out(x, y - 1), dn = out(x, y + 1), lf = out(x - 1, y), rt = out(x + 1, y);
+    const f = up && !dn ? 0.2 : dn && !up ? -0.18 : rt && !lf ? -0.12 : lf && !rt ? 0.08 : 0;
+    if (f) for (let k = 0; k < 3; k++) d[i + k] = f > 0 ? src[i + k] + (255 - src[i + k]) * f : src[i + k] * (1 + f);
+  }
+  g.putImageData(im, 0, 0);
+  return c;
+}
 function charCanvas(rows, variant, flip) {
   const c = document.createElement('canvas'); c.width = 16; c.height = rows.length;
   const g = c.getContext('2d'); const pal = { ...CH, ...(VARIANTS[variant] || {}) };
   rows.forEach((row, y) => { row = row.padEnd(16, '.').slice(0, 16); for (let x = 0; x < 16; x++) { const ch = row[x]; if (ch === '.' || !pal[ch]) continue; g.fillStyle = ch === 'S' && rows === ITEM_ART ? 'rgba(0,0,0,.25)' : pal[ch]; g.fillRect(flip ? 15 - x : x, y, 1, 1); } });
-  return c;
+  return rows === ITEM_ART ? c : shadeChar(c);
 }
 /* --- Eigene Spielfigur aus dem Charakter-Editor --- */
 const LOOK_OPTS = {
@@ -558,6 +579,7 @@ function playerSprite(look, dir, frame) {
   c = document.createElement('canvas'); c.width = 16; c.height = rows.length;
   const g = c.getContext('2d');
   rows.forEach((row, y) => { for (let x = 0; x < 16; x++) { const ch = row[x]; if (ch === '.' || !pal[ch]) continue; g.fillStyle = pal[ch]; g.fillRect(dir === 'right' ? 15 - x : x, y, 1, 1); } });
+  shadeChar(c);
   PCHAR.set(key, c); return c;
 }
 
@@ -1437,7 +1459,7 @@ addEventListener('keydown', e => {
   // Namenseingabe: echte Tastatur tippt direkt
   if (textInput && textInput === topLayer() && !e.altKey && !e.ctrlKey && !e.metaKey && textInput.onKey(e)) { e.preventDefault(); return; }
   if (e.code === 'KeyN' && e.altKey) { noclip = !noclip; return; } // Entwickler: Alt+N = durch Wände laufen
-  if (e.code === 'KeyT' && e.altKey) { timeMode = (timeMode + 1) % TIMES.length; popup = { text: 'ZEIT: ' + TIMES[timeMode].toUpperCase(), t: 90 }; return; } // Alt+T = Tageszeit
+  if (e.code === 'KeyT' && e.altKey) { timeMode = OPTS.time = (timeMode + 1) % TIMES.length; saveOpts(); popup = { text: 'ZEIT: ' + TIMES[timeMode].toUpperCase(), t: 90 }; return; } // Alt+T = Tageszeit
   const k = KEYMAP[e.code]; if (!k) return;
   e.preventDefault();
   if (!e.repeat) pressed[k] = true;
@@ -1731,8 +1753,39 @@ class TrainerCard {
   }
 }
 
+class OptionsScreen {
+  constructor() { this.sel = 0; this.rows = [['gfx', 'GRAFIK', GFX_NAMES], ['time', 'TAGESZEIT', ['AUTOMATISCH', 'MORGEN', 'TAG', 'ABEND', 'NACHT']], ['text', 'TEXTTEMPO', TEXT_NAMES], ['back', 'ZURÜCK']]; }
+  update() {
+    const n = this.rows.length, [key, , vals] = this.rows[this.sel];
+    if (pressed.up) this.sel = (this.sel + n - 1) % n;
+    if (pressed.down) this.sel = (this.sel + 1) % n;
+    if (vals && (pressed.left || pressed.right || pressed.A)) {
+      OPTS[key] = (OPTS[key] + (pressed.left ? vals.length - 1 : 1)) % vals.length;
+      timeMode = OPTS.time; CONFIG.textSpeed = TEXT_SPEEDS[OPTS.text]; saveOpts();
+    }
+    if (pressed.B || pressed.START || (pressed.A && key === 'back')) { pop(this); this.done(); }
+  }
+  draw() {
+    bgPattern('#dfe7f0', '#d6e0ec');
+    header('OPTIONEN');
+    box(4, 26, 248, 100);
+    this.rows.forEach(([key, label, vals], r) => {
+      const y = 34 + r * 22, sel = r === this.sel;
+      if (sel) rr(10, y, 236, 18, 4, '#f8e0d8');
+      text(label, 20, y + 1, sel ? UI.red : UI.text, null);
+      if (!vals) return;
+      const v = vals[OPTS[key]]; text(v, 186 - measure(v) / 2, y + 1, UI.text, null);
+      if (sel) { ctx.fillStyle = UI.red; for (let i = 0; i < 4; i++) { ctx.fillRect(126 + i, y + 9 - i, 1, 1 + i * 2); ctx.fillRect(244 - i, y + 9 - i, 1, 1 + i * 2); } }
+    });
+    box(DLG.x, 146, DLG.w, 44);
+    const key = this.rows[this.sel][0];
+    const info = { gfx: ['Alle Effekte: Wolken, Flugsaurier, Vignette.', 'Fast alle Effekte, schont den Akku.', 'Ohne Wetter und Effekte, für ältere Handys.'][OPTS.gfx], time: OPTS.time ? 'Feste Tageszeit für die ganze Welt.' : 'Tageszeit nach deiner echten Uhrzeit.', text: 'So schnell erscheinen die Texte.', back: 'Einstellungen werden automatisch gespeichert.' }[key];
+    text(info, 12, 150); text('Links/Rechts: ändern   B: zurück', 12, 166, '#7888a0', null);
+  }
+}
+
 class Menu {
-  constructor() { this.items = ['URDEX', 'TEAM', 'TASCHE', 'PROFIL', 'ORDEN', 'KARTE', 'SICHERN', 'ZURÜCK']; this.sel = 0; }
+  constructor() { this.items = ['URDEX', 'TEAM', 'TASCHE', 'PROFIL', 'ORDEN', 'KARTE', 'OPTIONEN', 'SICHERN', 'ZURÜCK']; this.sel = 0; }
   update() {
     if (pressed.up) this.sel = (this.sel + this.items.length - 1) % this.items.length;
     if (pressed.down) this.sel = (this.sel + 1) % this.items.length;
@@ -1745,6 +1798,7 @@ class Menu {
         if (it === 'TEAM') await openScreen(new TeamScreen());
         if (it === 'TASCHE') await showBag();
         if (it === 'PROFIL') await openScreen(new TrainerCard());
+        if (it === 'OPTIONEN') await openScreen(new OptionsScreen());
         if (it === 'ORDEN') await openScreen(new BadgeScreen());
         if (it === 'KARTE') await openScreen(new MapScreen());
         if (it === 'SICHERN') {
@@ -1997,7 +2051,12 @@ class Title {
     ctx.fillStyle = '#2a1a1e'; ctx.fillRect(0, 128, VW, 64);
     for (let x = -8; x < VW; x += 16) ctx.drawImage(atlas[0][0], T.FERN * TS, 0, 16, 16, x + 8, 120, 16, 16);
     for (let x = 0; x < VW; x += 16) ctx.drawImage(atlas[0][0], T.TALL * TS, 0, 16, 16, x, 136, 16, 16);
-    drawWesen(SPID.Tyrannodrak, 152, 40, 1.5);
+    for (let i = 0; i < 18; i++) {
+      const sp = 0.25 + (i % 4) * 0.12, x = (i * 53 + Math.sin((tick + i * 40) / 50) * 12) % VW, y = 150 - ((tick * sp + i * 37) % 150);
+      ctx.fillStyle = i % 3 ? '#f8a040' : '#ffe080'; ctx.globalAlpha = Math.min(1, y / 60); ctx.fillRect(Math.round(x), Math.round(y), 1 + (i % 2), 1 + (i % 2)); ctx.globalAlpha = 1;
+    }
+    const breath = Math.round(Math.sin(tick / 28) * 1.5);
+    drawWesen(SPID.Tyrannodrak, 152, 40 + breath, 1.5);
     textOutline('WESENWELT', 14, 10, '#f8e8b0', '#3a1a10', 40);
     textOutline('URZEIT-EDITION', 18, 50, '#f8a030', '#3a1a10', 16);
     ctx.fillStyle = '#1a1014'; ctx.fillRect(0, 152, VW, 40);
@@ -2123,10 +2182,12 @@ function onArrive() {
   const w = cur.warps.get(K(player.x, player.y));
   if (w) { warp(w); return true; }
   if (cur.outdoor) {
+    const t = tget(cur, player.x, player.y), b = bget(cur, player.x, player.y);
     const a = aget(cur, player.x, player.y);
     if (a && a !== lastArea) showPopup(a);
-    if (tget(cur, player.x, player.y) === T.TALL) rustleAt(player.x, player.y);
-    if (tget(cur, player.x, player.y) === T.TALL && CONFIG.encounters && state.team.length && Math.random() < CONFIG.encounterRate) {
+    if (gfx(1) && (t === T.SAND || (b === 2 && (t === T.GRASS || t === T.PATH || t === T.TALL)) || (b === 3 && t === T.GRASS))) addPrint(player, b);
+    if (t === T.TALL) rustleAt(player.x, player.y);
+    if (t === T.TALL && CONFIG.encounters && state.team.length && Math.random() < CONFIG.encounterRate) {
       run(() => wildEncounter(player.x, player.y)); return true;
     }
   }
@@ -2136,7 +2197,12 @@ function worldUpdate() {
   for (const n of cur.npcs) {
     if (!n.visible()) continue;
     if (n.moving) { n.update(1); continue; }
-    if (!n.wander || --n.timer > 0) continue;
+    if (!n.wander) {
+      // Stehende Figuren schauen sich ab und zu um
+      if (!n.still && n.gate === undefined && --n.timer <= 0) { n.timer = 180 + Math.floor(Math.random() * 320); n.dir = ['up', 'down', 'left', 'right'][Math.floor(Math.random() * 4)]; }
+      continue;
+    }
+    if (--n.timer > 0) continue;
     n.timer = 90 + Math.floor(Math.random() * 150);
     const dir = ['up', 'down', 'left', 'right'][Math.floor(Math.random() * 4)];
     const [dx, dy] = DIRS[dir]; const x = n.x + dx, y = n.y + dy;
@@ -2156,7 +2222,7 @@ function worldUpdate() {
   if (turnTimer > 0) { turnTimer--; return; }
   player.dir = d;
   const [dx, dy] = DIRS[d];
-  if (!blocked(cur, player.x + dx, player.y + dy, player)) player.start(d);
+  if (!blocked(cur, player.x + dx, player.y + dy, player)) { player.start(d); if (held.B) dustPuff(player, dx, dy); }
 }
 
 /* ---------------------------------------------------------------------
@@ -2165,6 +2231,12 @@ function worldUpdate() {
 let tick = 0;
 let mode = 'title';
 const tileIndex = (t, x, y) => (t === T.TREE ? TREE_Q + (x & 1) + ((y & 1) << 1) : t);
+/* --- Optionen: Grafikstufe, Tageszeit, Textgeschwindigkeit --- */
+const OPTS = { gfx: 0, time: 0, text: 1 };
+const GFX_NAMES = ['ULTRA', 'HOCH', 'EINFACH'], TEXT_NAMES = ['LANGSAM', 'NORMAL', 'SCHNELL'], TEXT_SPEEDS = [0.5, 1, 2];
+const gfx = lvl => OPTS.gfx <= lvl; // gfx(0): nur ULTRA, gfx(1): ULTRA und HOCH
+function loadOpts() { try { Object.assign(OPTS, JSON.parse(localStorage.getItem('wesenwelt.options') || '{}')); } catch (e) {} timeMode = OPTS.time; CONFIG.textSpeed = TEXT_SPEEDS[OPTS.text]; }
+function saveOpts() { try { localStorage.setItem('wesenwelt.options', JSON.stringify(OPTS)); } catch (e) {} }
 /* --- Tageszeit (wie auf dem DS nach echter Uhrzeit), Alt+T schaltet zum Testen durch --- */
 const TIMES = ['auto', 'morgen', 'tag', 'abend', 'nacht'];
 let timeMode = 0;
@@ -2175,44 +2247,120 @@ function dayPhase() {
 }
 const TINT = { morgen: '#fff0dc', tag: null, abend: '#ffc08c', nacht: '#5a6aac' };
 
-/* --- Wetter-Partikel je Gebiet --- */
-const parts = [];
+/* --- Lebendige Welt: Partikel, Fußspuren, Wasserringe, Wolken, Flugsaurier --- */
+const parts = [], prints = [], ripples = [];
 const rustle = new Map();
+let clouds = null, flock = null, flockT = 900;
+let CLOUD_SPR = [], VIGNETTE = null;
+function buildAmbient() {
+  CLOUD_SPR = [0, 1, 2].map(k => {
+    const c = document.createElement('canvas'); c.width = 112; c.height = 56; const g = c.getContext('2d');
+    const blobs = Array.from({ length: 5 + k }, (_, i) => [24 + i * 13 + hash(i, k, 51) * 10, 26 + (hash(i, k, 52) - 0.5) * 14, 12 + hash(i, k, 53) * 10]);
+    g.fillStyle = '#14202a';
+    for (let y = 0; y < 56; y++) for (let x = 0; x < 112; x++) if (blobs.some(([bx, by, r]) => Math.hypot(x - bx, (y - by) * 1.4) < r)) g.fillRect(x, y, 1, 1);
+    return c;
+  });
+  VIGNETTE = document.createElement('canvas'); VIGNETTE.width = VW; VIGNETTE.height = VH;
+  const g = VIGNETTE.getContext('2d'); const gr = g.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.72);
+  gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(10,6,20,.38)');
+  g.fillStyle = gr; g.fillRect(0, 0, VW, VH);
+}
+function addPrint(a, b) {
+  prints.push({ map: cur.id, x: a.x * TS, y: a.y * TS, dir: a.dir, side: a.parity, life: 900, col: b === 2 ? '80,100,140' : '120,86,40' });
+  if (prints.length > 60) prints.shift();
+}
+function dustPuff(a, dx, dy) {
+  if (!gfx(1) || !cur.outdoor) return;
+  const t = tget(cur, a.x, a.y), b = bget(cur, a.x, a.y);
+  const c = t === T.SAND || b === 3 ? '#e8d0a0' : b === 2 ? '#ffffff' : b === 1 ? '#8a7a70' : '#e8e0d0';
+  for (let i = 0; i < 2; i++) parts.push({ x: a.x * TS + 7 - dx * 4 + (Math.random() - 0.5) * 6, y: a.y * TS + 13, vx: -dx * 0.25 + (Math.random() - 0.5) * 0.3, vy: -0.15, s: 2, c, life: 18, max: 18, fade: 1, grow: 1 });
+}
 function weatherStep() {
   for (const [k, v] of rustle) { if (v <= 1) rustle.delete(k); else rustle.set(k, v - 1); }
-  if (!cur || !cur.outdoor) { parts.length = 0; return; }
+  for (let i = prints.length - 1; i >= 0; i--) if (--prints[i].life <= 0) prints.splice(i, 1);
+  for (let i = ripples.length - 1; i >= 0; i--) { const r = ripples[i]; if (++r.t === 20 && r.lava) for (let k = 0; k < 3; k++) parts.push({ x: r.x, y: r.y, vx: (Math.random() - 0.5) * 0.8, vy: -0.6 - Math.random() * 0.5, g: 0.04, s: 1, c: '#ffd060', life: 30, glow: 1 }); if (r.t > 40) ripples.splice(i, 1); }
+  if (!cur || !cur.outdoor || OPTS.gfx === 2) { parts.length = 0; flock = null; return; }
   const b = bget(cur, player.x, player.y), ph = dayPhase(), dark = ph === 'nacht' || ph === 'abend';
   const camX = player.px - 120, camY = player.py - 88, R = Math.random;
-  const add = o => { if (parts.length < 170) parts.push(o); };
+  const cap = gfx(0) ? 220 : 120;
+  const add = o => { if (parts.length < cap) parts.push(o); };
   if (b === 2 && R() < 0.9) add({ x: camX + R() * 300 - 20, y: camY - 6, vx: -0.15 + R() * 0.1, vy: 0.35 + R() * 0.45, s: R() < 0.3 ? 2 : 1, c: '#ffffff', life: 700, sway: R() * 9 });
   if (b === 1) {
     if (R() < 0.25) add({ x: camX + R() * 290, y: camY - 6, vx: 0.1, vy: 0.25 + R() * 0.2, s: 1, c: '#9a8a80', life: 700, sway: R() * 9 });
     if (R() < 0.14) add({ x: camX + R() * 256, y: camY + 196, vx: (R() - 0.5) * 0.3, vy: -0.4 - R() * 0.5, s: 1, c: R() < 0.5 ? '#f8a040' : '#ffd060', life: 320, glow: 1, flick: 1 });
   }
-  if ((b === 4 || (b === 0 && dark)) && parts.length < (dark ? 40 : 16) && R() < 0.06) add({ x: camX + R() * 256, y: camY + R() * 192, vx: 0, vy: 0, s: 1, c: '#e0f878', life: 500, glow: 1, fly: 1, ph: R() * 6 });
+  if ((b === 4 || (b === 0 && dark)) && parts.filter(p => p.fly && !p.bfly).length < (dark ? 40 : 16) && R() < 0.06) add({ x: camX + R() * 256, y: camY + R() * 192, vx: 0, vy: 0, s: 1, c: '#e0f878', life: 500, glow: 1, fly: 1, ph: R() * 6 });
   if (b === 3 && R() < 0.22) add({ x: camX - 10, y: camY + R() * 192, vx: 2 + R() * 1.5, vy: 0.1, s: 1, w: 3, c: '#f4e2b4', life: 200 });
   if (b === 0 && !dark && R() < 0.035) add({ x: camX + R() * 300 - 20, y: camY - 6, vx: 0.2, vy: 0.4 + R() * 0.2, s: 2, c: R() < 0.5 ? '#7ac050' : '#d8c048', life: 700, sway: R() * 9 });
+  // Schmetterlinge im Urwald am Tag
+  if (b === 0 && !dark && parts.filter(p => p.bfly).length < 6 && R() < 0.02) add({ x: camX + R() * 256, y: camY + R() * 192, vx: 0, vy: 0, s: 2, c: ['#f8a0c8', '#f8e070', '#a0d0f8', '#ffffff'][Math.floor(R() * 4)], life: 700, fly: 1, bfly: 1, ph: R() * 6 });
+  // Ringe auf dem Wasser, Blasen auf der Lava
+  if (R() < 0.08) {
+    const tx = Math.floor((camX + R() * VW) / TS), ty = Math.floor((camY + R() * VH) / TS);
+    if (tget(cur, tx, ty) === T.WATER) ripples.push({ x: tx * TS + 3 + R() * 10, y: ty * TS + 3 + R() * 10, t: 0, lava: bget(cur, tx, ty) === 1 });
+  }
   for (let i = parts.length - 1; i >= 0; i--) {
     const p = parts[i];
-    if (p.fly) { p.vx = (p.vx + (R() - 0.5) * 0.08) * 0.96; p.vy = (p.vy + (R() - 0.5) * 0.08) * 0.96; }
+    if (p.fly) { const k = p.bfly ? 0.16 : 0.08; p.vx = (p.vx + (R() - 0.5) * k) * 0.96; p.vy = (p.vy + (R() - 0.5) * k) * 0.96; }
     if (p.g) p.vy += p.g;
     p.x += p.vx + (p.sway !== undefined ? Math.sin((tick + p.sway * 20) / 30) * 0.3 : 0); p.y += p.vy;
     if (--p.life <= 0 || p.y > camY + 220 || p.y < camY - 40 || p.x < camX - 40 || p.x > camX + 300) parts.splice(i, 1);
   }
+  // Wolkenschatten ziehen über das Land
+  if (!clouds) clouds = Array.from({ length: 6 }, (_, i) => ({ x: camX - 200 + i * 130 + R() * 60, y: camY - 120 + R() * 400, k: i % 3 }));
+  for (const c of clouds) {
+    c.x += 0.14; c.y += 0.04;
+    if (c.x - camX > 420) c.x -= 760; if (c.x - camX < -340) c.x += 760;
+    if (c.y - camY > 300) c.y -= 520; if (c.y - camY < -220) c.y += 520;
+  }
+  // Ab und zu zieht ein Schwarm Flugsaurier über die Welt
+  if (!flock && !dark && gfx(1) && --flockT <= 0) { flock = { x: camX + 300, y: camY + 10 + R() * 70, vx: -1.1 - R() * 0.4 }; flockT = 1500 + Math.floor(R() * 2400); }
+  if (flock) { flock.x += flock.vx; flock.y += Math.sin(tick / 40) * 0.15; if (flock.x < camX - 160) flock = null; }
 }
 function rustleAt(x, y) {
   rustle.set(K(x, y), 16);
+  if (OPTS.gfx === 2) return;
   const b = BIOMES[bget(cur, x, y)];
   for (let i = 0; i < 4; i++) parts.push({ x: x * TS + 4 + Math.random() * 8, y: y * TS + 6, vx: (Math.random() - 0.5) * 1.2, vy: -0.9 - Math.random() * 0.6, g: 0.08, s: 2, c: i % 2 ? b.g[3] : b.g[2], life: 22 });
 }
 function drawParticles(camX, camY) {
   for (const p of parts) {
     if (p.flick && (tick + p.life) % 6 < 2) continue;
-    if (p.fly && Math.sin(tick / 14 + p.ph) < -0.3) continue;
+    if (p.fly && !p.bfly && Math.sin(tick / 14 + p.ph) < -0.3) continue;
     const x = Math.round(p.x - camX), y = Math.round(p.y - camY);
+    if (p.fade) ctx.globalAlpha = (p.life / p.max) * 0.8;
     if (p.glow) { ctx.globalAlpha = 0.35; ctx.fillStyle = p.c; ctx.fillRect(x - 1, y - 1, 3, 3); ctx.globalAlpha = 1; }
-    ctx.fillStyle = p.c; ctx.fillRect(x, y, p.w || p.s, p.s);
+    ctx.fillStyle = p.c;
+    if (p.bfly) { if ((tick + p.ph * 10) >> 3 & 1) { ctx.fillRect(x - 1, y, 1, 2); ctx.fillRect(x + 1, y, 1, 2); } ctx.fillStyle = '#403028'; ctx.fillRect(x, y, 1, 2); }
+    else { const s = p.s + (p.grow ? Math.floor((p.max - p.life) / 6) : 0); ctx.fillRect(x - (p.grow ? s >> 1 : 0), y - (p.grow ? s >> 1 : 0), p.w || s, s); }
+    ctx.globalAlpha = 1;
   }
+}
+function drawPrints(camX, camY) {
+  for (const p of prints) {
+    if (p.map !== cur.id) continue;
+    ctx.fillStyle = `rgba(${p.col},${Math.min(1, p.life / 300) * 0.35})`;
+    const x = p.x - camX, y = p.y - camY;
+    if (p.dir === 'up' || p.dir === 'down') ctx.fillRect(x + (p.side ? 9 : 5), y + 8 + (p.side ? 4 : 0), 2, 3);
+    else ctx.fillRect(x + 6 + (p.side ? 4 : 0), y + (p.side ? 12 : 9), 3, 2);
+  }
+}
+function drawRipples(camX, camY) {
+  for (const r of ripples) {
+    const k = r.t / 40, rad = 1 + k * 5, a = 1 - k;
+    ctx.fillStyle = r.lava ? `rgba(255,220,110,${a})` : `rgba(255,255,255,${a * 0.75})`;
+    for (let i = 0; i < 16; i++) { const an = i / 16 * Math.PI * 2; ctx.fillRect(Math.round(r.x - camX + Math.cos(an) * rad * 1.6), Math.round(r.y - camY + Math.sin(an) * rad), 1, 1); }
+  }
+}
+function drawFlock(camX, camY, shadow) {
+  if (!flock) return;
+  const id = SPID.Pteri;
+  [[0, 0], [20, -12], [26, 12]].forEach(([ox, oy], i) => {
+    const x = Math.round(flock.x - camX + ox), y = Math.round(flock.y - camY + oy);
+    const flap = ((tick >> 3) + i) & 1;
+    if (shadow) { ctx.globalAlpha = 0.18; drawWesen(id, x + 26, y + 74, 0.5, true); ctx.globalAlpha = 1; }
+    else ctx.drawImage(wesenSprite(id), 0, 0, 64, 64, x, y + (flap ? 3 : 0), 32, flap ? 26 : 32);
+  });
 }
 
 function drawTile(tx, ty, sx, sy, f) {
@@ -2235,19 +2383,34 @@ function drawTile(tx, ty, sx, sy, f) {
 function drawWorld() {
   const camX = Math.round(player.px) - 120, camY = Math.round(player.py) - 88;
   const x0 = Math.floor(camX / TS), y0 = Math.floor(camY / TS);
-  const f = (tick >> 5) & 1;
+  const f = (tick >> 4) & 3;
+  const ph = dayPhase(), fancy = cur.outdoor && OPTS.gfx !== 2;
   for (let ty = y0; ty <= y0 + 12; ty++) for (let tx = x0; tx <= x0 + 16; tx++) drawTile(tx, ty, tx * TS - camX, ty * TS - camY, f);
+  if (fancy) { drawPrints(camX, camY); drawRipples(camX, camY); drawFlock(camX, camY, true); }
   const actors = cur.npcs.filter(n => n.visible()).concat(player).sort((a, b) => a.py - b.py);
   for (const a of actors) {
     const sx = Math.round(a.px) - camX, sy = Math.round(a.py) - camY - 4;
     if (sx < -16 || sy < -24 || sx > VW || sy > VH) continue;
-    if (a.sprite !== 'item') { ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(sx + 3, sy + 18, 10, 2); ctx.fillRect(sx + 4, sy + 17, 8, 4); }
-    ctx.drawImage(getChar(a.sprite, a.variant, a.dir, a.frame()), sx, a.sprite === 'item' ? sy + 4 : sy);
+    if (a.sprite === 'item') {
+      ctx.drawImage(getChar('item', 0, 'down', 0), sx, sy + 4 + (((tick >> 5) + a.x) & 1));
+      const tw = (tick + a.x * 13 + a.y * 7) % 100;
+      if (tw < 12) { const r = tw < 6 ? tw >> 1 : (12 - tw) >> 1; ctx.fillStyle = '#ffffff'; ctx.fillRect(sx + 11, sy + 8 - r, 1, r * 2 + 1); ctx.fillRect(sx + 11 - r, sy + 8, r * 2 + 1, 1); }
+      continue;
+    }
+    ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(sx + 3, sy + 18, 10, 2); ctx.fillRect(sx + 4, sy + 17, 8, 4);
+    const bob = a.moving && a.prog >= 4 && a.prog < 12 ? -1 : 0;
+    ctx.drawImage(getChar(a.sprite, a.variant, a.dir, a.frame()), sx, sy + bob);
   }
   const gx = Math.round(player.px / TS), gy = Math.round(player.py / TS);
-  if (tget(cur, gx, gy) === T.TALL) ctx.drawImage(atlas[bget(cur, gx, gy)][0], (rustle.has(K(gx, gy)) ? T.TALL_RUSTLE : T.TALL) * TS, 8, TS, 8, gx * TS - camX, gy * TS - camY + 8, TS, 8);
+  if (tget(cur, gx, gy) === T.TALL) ctx.drawImage(atlas[bget(cur, gx, gy)][f], (rustle.has(K(gx, gy)) ? T.TALL_RUSTLE : T.TALL) * TS, 8, TS, 8, gx * TS - camX, gy * TS - camY + 8, TS, 8);
+  if (fancy) drawFlock(camX, camY, false);
+  // Wolkenschatten (nicht nachts)
+  if (fancy && gfx(0) && clouds && ph !== 'nacht') {
+    ctx.globalAlpha = ph === 'tag' ? 0.13 : 0.08;
+    for (const c of clouds) ctx.drawImage(CLOUD_SPR[c.k], Math.round(c.x - camX), Math.round(c.y - camY), 224, 112);
+    ctx.globalAlpha = 1;
+  }
   // Tageszeit-Licht und leuchtende Fenster, Fackeln, Lava
-  const ph = dayPhase();
   if (cur.outdoor && TINT[ph]) {
     ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = TINT[ph]; ctx.fillRect(0, 0, VW, VH); ctx.globalCompositeOperation = 'source-over';
     if (ph === 'nacht' || ph === 'abend') {
@@ -2260,10 +2423,13 @@ function drawWorld() {
         const sz = (t === T.TORCH ? 56 : lava ? 40 : 34) * (t === T.TORCH ? flick : 1);
         ctx.drawImage(GLOW, tx * TS - camX + 8 - sz / 2, ty * TS - camY + (t === T.TORCH ? 3 : 8) - sz / 2, sz, sz);
       }
+      // Laterne: ein warmer Lichtkreis um die Spielfigur
+      if (ph === 'nacht' && gfx(1)) { ctx.globalAlpha = 0.32; const s = 120 * flick; ctx.drawImage(GLOW, Math.round(player.px) - camX + 8 - s / 2, Math.round(player.py) - camY + 6 - s / 2, s, s); }
       ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
     }
   }
   drawParticles(camX, camY);
+  if (gfx(0) && VIGNETTE) ctx.drawImage(VIGNETTE, 0, 0);
   if (popup.t > 0 && cur.outdoor) {
     const w = Math.max(96, measure(popup.text) + 24), slide = popup.t > 150 ? (popup.t - 150) * 3 : popup.t < 12 ? (12 - popup.t) * 3 : 0;
     rr(2, 2 - slide, w, 22, 4, UI.dark); rr(3, 3 - slide, w - 2, 20, 3, '#f8f0e0'); ctx.fillStyle = '#c8a878'; ctx.fillRect(6, 19 - slide, w - 8, 1);
@@ -2397,6 +2563,8 @@ async function boot() {
   buildAtlas();
   buildOverlays();
   buildGlow();
+  buildAmbient();
+  loadOpts();
   genWorld();
   buildMinimap(MAPS.world);
   requestAnimationFrame(loop);
