@@ -105,6 +105,7 @@ const CONFIG = {
   textSpeed: 1,
   saveKey: 'wesenwelt.urzeit.v1',
 };
+const GAME_VERSION = 'dev'; // wird von build_app.py durch die Build-Zeit ersetzt
 
 const VW = 256, VH = 192, TS = 16;
 const cv = document.getElementById('screen');
@@ -1750,7 +1751,8 @@ class Title {
     textOutline('WESENWELT', 14, 10, '#f8e8b0', '#3a1a10', 40);
     textOutline('URZEIT-EDITION', 18, 50, '#f8a030', '#3a1a10', 16);
     ctx.fillStyle = '#1a1014'; ctx.fillRect(0, 152, VW, 40);
-    if (this.stage === 0) { if ((tick >> 5) & 1) text('START DRÜCKEN', 128 - measure('START DRÜCKEN') / 2, 162, '#f8e8b0', '#3a1a10'); }
+    const vl = versionLabel(); if (vl) text(vl, VW - 6 - measure(vl), 175, '#8a7460', null);
+    if (this.stage === 0) { if ((tick >> 5) & 1) text('START DRÜCKEN', 128 - measure('START DRÜCKEN') / 2, 158, '#f8e8b0', '#3a1a10'); }
     else {
       box(70, 116, 116, 52);
       text('WEITER', 98, 122); text('NEUES SPIEL', 98, 140);
@@ -2030,6 +2032,7 @@ function render() {
   for (const l of layers) l.draw();
   if (fade > 0) { ctx.globalAlpha = Math.min(1, fade / 4); ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, VW, VH); ctx.globalAlpha = 1; }
   if (flashT > 0 && (flashT >> 2) % 2) { ctx.fillStyle = (flashT >> 3) % 2 ? '#000000' : '#ffffff'; ctx.fillRect(0, 0, VW, VH); }
+  if (updateT) { const s = 'Neue Version! Spiel wird aktualisiert...'; box(16, 80, VW - 32, 30); text(s, 128 - measure(s) / 2, 86); }
 }
 function step() {
   tick++;
@@ -2043,7 +2046,29 @@ function step() {
     else if (mode === 'world' && busy === 0) worldUpdate();
   }
   if (mode === 'world') weatherStep();
+  updateStep();
   for (const k in pressed) pressed[k] = false;
+}
+
+/* ---------------------------------------------------------------------
+   APP-UPDATES: neue Version erst in einem sicheren Moment laden
+   --------------------------------------------------------------------- */
+let updatePending = false, updateT = 0;
+addEventListener('wesenwelt-update', () => { updatePending = true; });
+function updateStep() {
+  if (updatePending && !updateT) {
+    const onTitle = mode === 'title' && layers.length === 1 && layers[0] instanceof Title;
+    const calm = mode === 'world' && !layers.length && busy === 0 && !player.moving && fade === 0 && fadeTarget === 0;
+    if (onTitle || calm) {
+      if (calm) { saveGame(); try { sessionStorage.setItem('wesenwelt.resume', '1'); } catch (e) {} }
+      updateT = 75;
+    }
+  }
+  if (updateT && --updateT === 0) location.reload();
+}
+function versionLabel() {
+  const v = GAME_VERSION;
+  return /^\d{12}$/.test(v) ? `Version ${v.slice(6, 8)}.${v.slice(4, 6)}.${v.slice(0, 4)} ${v.slice(8, 10)}:${v.slice(10, 12)}` : '';
 }
 
 /* ---------------------------------------------------------------------
@@ -2087,6 +2112,10 @@ async function boot() {
   if (hot?.snapshot) { try { hot.snapshot(() => (mode === 'world' ? snapshot() : null)); } catch (e) {} }
   const hotData = hot?.data;
   if (hotData && hotData.map) { applySave(hotData); mode = 'world'; return; }
+  // Nach einem automatischen Update direkt weiterspielen
+  let resume = false;
+  try { resume = sessionStorage.getItem('wesenwelt.resume') === '1'; sessionStorage.removeItem('wesenwelt.resume'); } catch (e) {}
+  if (resume && loadRaw()) { applySave(loadRaw()); mode = 'world'; popup = { text: 'UPDATE INSTALLIERT', t: 160 }; return; }
   const choice = await new Promise(res => layers.push(new Title(res)));
   await fadeTo(4);
   if (choice === 'continue' && loadRaw()) { applySave(loadRaw()); mode = 'world'; await fadeTo(0); }

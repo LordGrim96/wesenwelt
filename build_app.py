@@ -5,18 +5,22 @@ Aufruf:  python3 build_app.py
 Ergebnis: app/index.html, app/manifest.webmanifest, app/sw.js (+ app/icons/ bleibt erhalten)
 """
 import json
+import os
 import pathlib
 import re
 import time
 
 ROOT = pathlib.Path(__file__).parent
 APP = ROOT / "app"
-VERSION = time.strftime("%Y%m%d%H%M")
+VERSION = os.environ.get("WW_VERSION") or time.strftime("%Y%m%d%H%M")
 
 src = (ROOT / "index.html").read_text(encoding="utf-8")
 
 # Der Artifact-Kopf (<title> + claude-Meta) wird durch einen vollständigen App-Kopf ersetzt
 src = re.sub(r'<title>.*?</title>\s*<meta name="claude:viewport-fit-sides"[^>]*>\s*', "", src, count=1)
+# Versionsnummer ins Spiel schreiben (steht auf dem Titelbild und wird mit dem Offline-Speicher verglichen)
+src, n = re.subn(r"const GAME_VERSION = '[^']*';", f"const GAME_VERSION = '{VERSION}';", src, count=1)
+assert n == 1, "GAME_VERSION nicht gefunden"
 
 head = """<!doctype html>
 <html lang="de">
@@ -43,11 +47,24 @@ body{margin:0;font:14px system-ui,sans-serif;overscroll-behavior:none;touch-acti
 </style>
 """
 
-sw_register = f"""
+sw_register = """
 <script>
-if ('serviceWorker' in navigator) {{
-  addEventListener('load', () => navigator.serviceWorker.register('sw.js?v={VERSION}').catch(() => {{}}));
-}}
+// Automatische Updates: regelmäßig und beim Öffnen nach einer neuen Version suchen.
+// Meldet der Offline-Speicher eine andere Version, lädt das Spiel in einem sicheren Moment neu.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', e => {
+    if (e.data && e.data.type === 'version' && e.data.v !== GAME_VERSION) dispatchEvent(new Event('wesenwelt-update'));
+  });
+  addEventListener('load', async () => {
+    try {
+      const reg = await navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' });
+      const check = () => reg.update().catch(() => {});
+      setInterval(check, 10 * 60 * 1000);
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+      addEventListener('online', check);
+    } catch (e) {}
+  });
+}
 </script>
 </body>
 </html>
@@ -79,19 +96,29 @@ manifest = {
 (APP / "manifest.webmanifest").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
 sw = f"""// Offline-Speicher für Wesenwelt (Version {VERSION})
-const CACHE = 'wesenwelt-{VERSION}';
+const VERSION = '{VERSION}';
+const CACHE = 'wesenwelt-' + VERSION;
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png',
   './icons/icon-maskable-512.png', './icons/apple-touch-icon.png', './icons/favicon-32.png'];
-self.addEventListener('install', e => {{ e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS))); self.skipWaiting(); }});
+self.addEventListener('install', e => {{
+  // cache: 'reload' umgeht den Zwischenspeicher von GitHub Pages, damit wirklich die neue Version landet
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS.map(u => new Request(u, {{ cache: 'reload' }})))));
+  self.skipWaiting();
+}});
 self.addEventListener('activate', e => {{
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))));
-  self.clients.claim();
+  e.waitUntil((async () => {{
+    const ks = await caches.keys();
+    await Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)));
+    await self.clients.claim();
+    for (const c of await self.clients.matchAll({{ includeUncontrolled: true }})) c.postMessage({{ type: 'version', v: VERSION }});
+  }})());
 }});
 self.addEventListener('fetch', e => {{
   if (e.request.method !== 'GET') return;
   // Spielseite: erst Netz (für Updates), sonst Offline-Kopie. Alles andere: erst Offline-Kopie.
   if (e.request.mode === 'navigate') {{
-    e.respondWith(fetch(e.request).then(r => {{ const c = r.clone(); caches.open(CACHE).then(x => x.put('./index.html', c)); return r; }})
+    e.respondWith(fetch(e.request.url, {{ cache: 'no-cache', credentials: 'same-origin' }})
+      .then(r => {{ const c = r.clone(); caches.open(CACHE).then(x => x.put('./index.html', c)); return r; }})
       .catch(() => caches.match('./index.html')));
     return;
   }}
