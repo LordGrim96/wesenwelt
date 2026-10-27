@@ -17,7 +17,7 @@ VERSION = os.environ.get("WW_VERSION") or time.strftime("%Y%m%d%H%M")
 src = (ROOT / "index.html").read_text(encoding="utf-8")
 
 # Der Artifact-Kopf (<title> + claude-Meta) wird durch einen vollständigen App-Kopf ersetzt
-src = re.sub(r'<title>.*?</title>\s*<meta name="claude:viewport-fit-sides"[^>]*>\s*', "", src, count=1)
+src = re.sub(r'<title>.*?</title>\s*<meta name="claude:viewport-fit-sides"[^>]*>\s*(?:<meta name="viewport"[^>]*>\s*)?', "", src, count=1)
 # Versionsnummer ins Spiel schreiben (steht auf dem Titelbild und wird mit dem Offline-Speicher verglichen)
 src, n = re.subn(r"const GAME_VERSION = '[^']*';", f"const GAME_VERSION = '{VERSION}';", src, count=1)
 assert n == 1, "GAME_VERSION nicht gefunden"
@@ -43,7 +43,7 @@ html{background:#14100d}
 body{margin:0;font:14px system-ui,sans-serif;overscroll-behavior:none;touch-action:manipulation}
 [hidden]{display:none!important}
 /* Als installierte App: keine Tastatur-Hilfe, kein Vollbild-Knopf nötig */
-@media (display-mode: standalone), (display-mode: fullscreen){ .help{display:none} #fs{display:none} }
+@media (display-mode: standalone), (display-mode: fullscreen){ #fs{display:none} }
 </style>
 """
 
@@ -71,7 +71,9 @@ if ('serviceWorker' in navigator) {
 """
 
 # Der Body-Inhalt beginnt nach dem Stylesheet-Link-Block des Spiels
-html = head + src.replace("</style>\n\n<div class=\"shell\">", "</style>\n</head>\n<body>\n<div class=\"shell\">", 1) + sw_register
+body_start = src.index('<div class="game"')
+assert body_start > 0, "Spielbereich nicht gefunden"
+html = head + src[:body_start] + "</head>\n<body>\n" + src[body_start:] + sw_register
 (APP / "index.html").write_text(html, encoding="utf-8")
 
 manifest = {

@@ -19,96 +19,66 @@ html{background:#14100d}
 body{margin:0;font:14px system-ui,sans-serif;overscroll-behavior:none;touch-action:manipulation}
 [hidden]{display:none!important}
 /* Als installierte App: keine Tastatur-Hilfe, kein Vollbild-Knopf nötig */
-@media (display-mode: standalone), (display-mode: fullscreen){ .help{display:none} #fs{display:none} }
+@media (display-mode: standalone), (display-mode: fullscreen){ #fs{display:none} }
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: Handheld-Gehäuse – Bildschirm oben, Steuerkreuz und Tasten darunter, Hilfe am Ende */
+/* Layout: Das Spielbild füllt den Bildschirm. Auf Touch-Geräten liegen die Tasten im Hochformat darunter,
+   im Querformat halbtransparent direkt auf dem Bild. */
 :root{
-  --bg:#14100d; --shell:#2a221c; --shell-hi:#3a2f26; --bezel:#0d0a08;
-  --ink:#f0e2cc; --muted:#a8937a; --btn:#4a3c30; --btn-hi:#6a5442; --accent:#f0a020;
+  --bg:#07090b; --btn:rgba(40,34,30,.78); --btn-hi:rgba(120,90,70,.92); --ink:#f0e2cc; --muted:#d0bca2; --accent:#f0a020; --line:rgba(255,240,220,.22);
   --f-pixel:"Press Start 2P", ui-monospace, monospace;
-  --f-body:"IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
   color-scheme:dark;
 }
-html,body{height:100%}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-body);
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px;
-  display:flex;justify-content:center;-webkit-user-select:none;user-select:none}
-.shell{width:100%;max-width:640px;display:flex;flex-direction:column;gap:18px;align-items:stretch}
-.bezel{background:var(--shell);border-radius:16px;padding:16px 16px 20px;display:flex;flex-direction:column;gap:10px;
-  box-shadow:inset 0 2px 0 var(--shell-hi),0 10px 30px rgba(0,0,0,.5)}
-.bezel-top{display:flex;justify-content:space-between;align-items:center;font-family:var(--f-pixel);font-size:8px;letter-spacing:.12em;color:var(--muted)}
-.led{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:8px;box-shadow:0 0 8px var(--accent)}
-.screen-wrap{background:var(--bezel);border-radius:6px;padding:8px;display:flex;justify-content:center}
-canvas{display:block;width:100%;max-width:100%;aspect-ratio:256/192;image-rendering:pixelated;image-rendering:crisp-edges;background:#101418}
-.pad{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:6px 4px 0}
-.dpad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px)}
-.dpad button{background:var(--btn);border:0;color:var(--muted);font-size:12px}
-.dpad .u{grid-column:2;grid-row:1;border-radius:6px 6px 0 0}.dpad .l{grid-column:1;grid-row:2;border-radius:6px 0 0 6px}
-.dpad .r{grid-column:3;grid-row:2;border-radius:0 6px 6px 0}.dpad .d{grid-column:2;grid-row:3;border-radius:0 0 6px 6px}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--ink);margin:0;-webkit-user-select:none;user-select:none;touch-action:none}
+.game{position:fixed;top:env(safe-area-inset-top,0px);bottom:env(safe-area-inset-bottom,0px);left:env(safe-area-inset-left,0px);right:env(safe-area-inset-right,0px);overflow:hidden}
+canvas{position:absolute;display:block;image-rendering:pixelated;image-rendering:crisp-edges;background:#101418}
+.controls{position:absolute;inset:0;pointer-events:none;display:none}
+.touch .controls{display:block}
+.controls > *{pointer-events:auto;position:absolute}
+.dpad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px)}
+.dpad button{background:var(--btn);border:1px solid var(--line);color:var(--muted);font-size:14px}
+.dpad .u{grid-column:2;grid-row:1;border-radius:8px 8px 0 0;border-bottom:0}.dpad .l{grid-column:1;grid-row:2;border-radius:8px 0 0 8px;border-right:0}
+.dpad .r{grid-column:3;grid-row:2;border-radius:0 8px 8px 0;border-left:0}.dpad .d{grid-column:2;grid-row:3;border-radius:0 0 8px 8px;border-top:0}
 .dpad .c{grid-column:2;grid-row:2;background:var(--btn);pointer-events:none}
-.mid{display:flex;justify-content:center;gap:10px;align-self:end;padding-bottom:4px;flex-wrap:wrap}
-.pill{font-family:var(--f-pixel);font-size:7px;letter-spacing:.1em;color:var(--muted);background:var(--btn);border:0;border-radius:999px;padding:8px 10px}
-.ab{display:flex;gap:12px;transform:rotate(-18deg)}
-.ab button{width:54px;height:54px;border-radius:50%;border:0;background:var(--btn);color:var(--ink);font-family:var(--f-pixel);font-size:12px}
-.ab .a{margin-top:-18px;background:#7a3a22}
+.ab{display:flex;gap:14px;transform:rotate(-18deg)}
+.ab button{width:64px;height:64px;border-radius:50%;border:1px solid var(--line);background:var(--btn);color:var(--ink);font-family:var(--f-pixel);font-size:13px}
+.ab .a{margin-top:-24px;background:rgba(140,58,30,.86)}
+.mid{display:flex;gap:10px}
+.pill{font-family:var(--f-pixel);font-size:8px;letter-spacing:.1em;color:var(--muted);background:var(--btn);border:1px solid var(--line);border-radius:999px;padding:9px 12px}
 button{cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent}
 button:active,button.on{background:var(--btn-hi)}
-.ab .a:active,.ab .a.on{background:#a04c2c}
+.ab .a:active,.ab .a.on{background:rgba(196,84,46,.96)}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.help{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 16px;font-size:12px;color:var(--muted);line-height:1.5}
-.help b{font-weight:600;color:var(--ink)}
-.help p{margin:0;min-width:0}
-@media (max-width:380px){.dpad{grid-template-columns:repeat(3,38px);grid-template-rows:repeat(3,38px)}.ab button{width:46px;height:46px}}
-/* Schmales Hochformat: Menü-Knöpfe in eine eigene Zeile unter Steuerkreuz und Tasten */
-@media (max-width:520px) and (orientation:portrait){
-  .pad{row-gap:14px}
-  .dpad{grid-column:1;grid-row:1}
-  .ab{grid-column:3;grid-row:1;margin-right:6px}
-  .mid{grid-column:1/-1;grid-row:2;flex-wrap:nowrap;padding-bottom:0}
-}
-/* Querformat auf dem Handy: Steuerkreuz links, Bildschirm Mitte, Tasten rechts */
-@media (orientation:landscape) and (max-height:540px){
-  body{padding-block:6px}
-  .shell{max-width:none;gap:0}
-  .help{display:none}
-  .bezel{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"top top top" "dpad screen ab" "mid mid mid";align-items:center;justify-items:center;gap:4px 18px;padding:6px 18px 8px;border-radius:16px}
-  .bezel-top{grid-area:top;justify-self:stretch}
-  .screen-wrap{grid-area:screen;padding:5px}
-  .pad{display:contents}
-  .dpad{grid-area:dpad}
-  .ab{grid-area:ab}
-  .mid{grid-area:mid;padding:0}
-  canvas{width:auto;height:calc(100dvh - 84px)}
-}
-:fullscreen .shell{max-width:none}
-:fullscreen body,:fullscreen{background:var(--bg)}
+/* Hochformat: Tastenleiste unter dem Bild */
+.portrait .dpad{left:18px;bottom:46px}
+.portrait .ab{right:26px;bottom:66px}
+.portrait .mid{left:50%;transform:translateX(-50%);bottom:10px}
+/* Querformat: Tasten liegen auf dem Bild */
+.landscape .controls > *{opacity:.7}
+.landscape .dpad{left:14px;bottom:14px}
+.landscape .ab{right:22px;bottom:30px}
+.landscape .mid{left:14px;bottom:186px;flex-direction:column;align-items:flex-start;gap:6px}
+.standalone #fs{display:none}
+@media (max-width:360px){.dpad{grid-template-columns:repeat(3,46px);grid-template-rows:repeat(3,46px)}.ab button{width:56px;height:56px}}
 </style>
+
 </head>
 <body>
-<div class="shell">
-  <div class="bezel">
-    <div class="bezel-top"><span><span class="led"></span>WESENWELT</span><span>URZEIT</span></div>
-    <div class="screen-wrap"><canvas id="screen" width="256" height="192" aria-label="Spielbildschirm"></canvas></div>
-    <div class="pad">
-      <div class="dpad">
-        <button class="u" data-k="up" aria-label="Hoch">▲</button>
-        <button class="l" data-k="left" aria-label="Links">◀</button>
-        <span class="c"></span>
-        <button class="r" data-k="right" aria-label="Rechts">▶</button>
-        <button class="d" data-k="down" aria-label="Runter">▼</button>
-      </div>
-      <div class="mid"><button class="pill" data-k="SELECT">KARTE</button><button class="pill" data-k="START">START</button><button class="pill" id="fs" type="button">VOLLBILD</button></div>
-      <div class="ab"><button class="b" data-k="B">B</button><button class="a" data-k="A">A</button></div>
+<div class="game" id="game">
+  <canvas id="screen" width="768" height="576" aria-label="Spielbildschirm"></canvas>
+  <div class="controls">
+    <div class="dpad">
+      <button class="u" data-k="up" aria-label="Hoch">▲</button>
+      <button class="l" data-k="left" aria-label="Links">◀</button>
+      <span class="c"></span>
+      <button class="r" data-k="right" aria-label="Rechts">▶</button>
+      <button class="d" data-k="down" aria-label="Runter">▼</button>
     </div>
-  </div>
-  <div class="help">
-    <p><b>Pfeile / WASD</b> laufen</p>
-    <p><b>Z / Leertaste</b> A: sprechen, bestätigen</p>
-    <p><b>X</b> B: zurück, gedrückt halten = rennen</p>
-    <p><b>Enter</b> Menü · <b>M</b> Karte</p>
+    <div class="mid"><button class="pill" data-k="SELECT">KARTE</button><button class="pill" data-k="START">START</button><button class="pill" id="fs" type="button">VOLLBILD</button></div>
+    <div class="ab"><button class="b" data-k="B">B</button><button class="a" data-k="A">A</button></div>
   </div>
 </div>
 
@@ -127,9 +97,11 @@ const CONFIG = {
   textSpeed: 1,
   saveKey: 'wesenwelt.urzeit.v1',
 };
-const GAME_VERSION = '202610272005'; // wird von build_app.py durch die Build-Zeit ersetzt
+const GAME_VERSION = '202610272019'; // wird von build_app.py durch die Build-Zeit ersetzt
 
-const VW = 256, VH = 192, TS = 16;
+// Logische Bildgröße passt sich dem Bildschirm an (mindestens 256x192); SC = interne Auflösung für scharfe Schrift
+let VW = 256, VH = 192, OX = 0, OY = 0, RW = 256, RH = 192;
+const TS = 16, SC = 3;
 const cv = document.getElementById('screen');
 const ctx = cv.getContext('2d');
 ctx.imageSmoothingEnabled = false;
@@ -159,17 +131,17 @@ const TYPES = {
 /* ---------------------------------------------------------------------
    TEXT (VT323, auf Pixel gerastert, mit Schatten wie auf dem DS)
    --------------------------------------------------------------------- */
-const tcv = document.createElement('canvas'); tcv.width = 600; tcv.height = 60;
+const tcv = document.createElement('canvas'); tcv.width = 2000; tcv.height = 180;
 const tg = tcv.getContext('2d', { willReadFrequently: true });
 const tcache = new Map();
 const fontOf = sz => `${sz}px "VT323", monospace`;
-function measure(s, sz = 16) { tg.font = fontOf(sz); return Math.ceil(tg.measureText(s).width); }
+function measure(s, sz = 16) { tg.font = fontOf(sz * SC); return Math.ceil(tg.measureText(s).width / SC); }
 function glyphs(s, col, sz = 16) {
   const key = sz + '|' + col + '|' + s;
   let c = tcache.get(key); if (c) return c;
-  if (tcache.size > 800) tcache.clear();
-  const w = Math.max(1, measure(s, sz) + 2), h = Math.ceil(sz * 1.25);
-  tg.clearRect(0, 0, tcv.width, tcv.height); tg.font = fontOf(sz); tg.textBaseline = 'top'; tg.fillStyle = '#000'; tg.fillText(s, 0, 0);
+  if (tcache.size > 300) tcache.clear();
+  const w = Math.max(1, (measure(s, sz) + 2) * SC), h = Math.ceil(sz * 1.25 * SC);
+  tg.clearRect(0, 0, tcv.width, tcv.height); tg.font = fontOf(sz * SC); tg.textBaseline = 'top'; tg.fillStyle = '#000'; tg.fillText(s, 0, 0);
   const im = tg.getImageData(0, 0, w, h); const [r, g, b] = hexRgb(col);
   for (let i = 0; i < im.data.length; i += 4) { const on = im.data[i + 3] > 110; im.data[i] = r; im.data[i + 1] = g; im.data[i + 2] = b; im.data[i + 3] = on ? 255 : 0; }
   c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').putImageData(im, 0, 0);
@@ -177,14 +149,15 @@ function glyphs(s, col, sz = 16) {
 }
 function text(s, x, y, col = UI.text, sh = UI.shadow, sz = 16, clipW) {
   if (!s) return;
-  const g = glyphs(s, col, sz); const w = Math.min(g.width, clipW ?? g.width);
-  if (sh) { const gs = glyphs(s, sh, sz); ctx.drawImage(gs, 0, 0, w, gs.height, x + 1, y, w, gs.height); ctx.drawImage(gs, 0, 0, w, gs.height, x, y + 1, w, gs.height); ctx.drawImage(gs, 0, 0, w, gs.height, x + 1, y + 1, w, gs.height); }
-  ctx.drawImage(g, 0, 0, w, g.height, x, y, w, g.height);
+  const g = glyphs(s, col, sz); const w = Math.min(g.width, clipW != null ? Math.ceil(clipW * SC) : g.width), h = g.height / SC;
+  if (sh) { const gs = glyphs(s, sh, sz), o = 2 / SC; for (const [dx, dy] of [[o, 0], [0, o], [o, o]]) ctx.drawImage(gs, 0, 0, w, gs.height, x + dx, y + dy, w / SC, h); }
+  ctx.drawImage(g, 0, 0, w, g.height, x, y, w / SC, h);
 }
 function textOutline(s, x, y, col, ol, sz) {
   const go = glyphs(s, ol, sz);
-  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1], [2, 2], [1, 2], [2, 1]]) ctx.drawImage(go, x + dx, y + dy);
-  ctx.drawImage(glyphs(s, col, sz), x, y);
+  const w = go.width / SC, h = go.height / SC;
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1], [2, 2], [1, 2], [2, 1]]) ctx.drawImage(go, x + dx, y + dy, w, h);
+  ctx.drawImage(glyphs(s, col, sz), x, y, w, h);
 }
 function wrapW(s, maxW) {
   const out = [];
@@ -1510,11 +1483,12 @@ function hpBar(x, y, w, hp, max) {
   ctx.fillStyle = col; ctx.fillRect(x + 2, y + 1, Math.round((w - 4) * r), 4); ctx.fillStyle = shade(col, 0.4); ctx.fillRect(x + 2, y + 1, Math.round((w - 4) * r), 1);
 }
 function bgPattern(c1, c2) {
-  ctx.fillStyle = c1; ctx.fillRect(0, 0, VW, VH);
-  ctx.fillStyle = c2; for (let y = 0; y < VH; y += 8) for (let x = (y / 8) % 2 * 8; x < VW; x += 16) ctx.fillRect(x, y, 8, 8);
+  ctx.fillStyle = c1; ctx.fillRect(-OX, -OY, RW, RH);
+  ctx.fillStyle = c2;
+  for (let y = -Math.ceil(OY / 8) * 8; y < RH - OY; y += 8) for (let x = -Math.ceil(OX / 16) * 16 + (((y / 8) % 2 + 2) % 2) * 8; x < RW - OX; x += 16) ctx.fillRect(x, y, 8, 8);
 }
 function header(title, right) {
-  ctx.fillStyle = UI.header; ctx.fillRect(0, 0, VW, 18); ctx.fillStyle = shade(UI.header, -0.4); ctx.fillRect(0, 18, VW, 2);
+  ctx.fillStyle = UI.header; ctx.fillRect(-OX, 0, RW, 18); ctx.fillStyle = shade(UI.header, -0.4); ctx.fillRect(-OX, 18, RW, 2);
   text(title, 8, 0, '#ffffff', '#1c2c48');
   if (right) text(right, VW - 8 - measure(right), 0, '#ffffff', '#1c2c48');
 }
@@ -1567,7 +1541,7 @@ class Choice {
     this.d.draw();
     if (this.d.shown < this.d.len) return;
     const w = Math.max(...this.opts.map(o => measure(o))) + 36, h = this.opts.length * 16 + 12;
-    const x = VW - w - 2, y = DLG.y - h - 2;
+    const x = DLG.x + DLG.w - w, y = DLG.y - h - 2;
     box(x, y, w, h);
     this.opts.forEach((o, k) => { text(o, x + 20, y + 4 + k * 16); if (k === this.sel) arrowRight(x + 9, y + 8 + k * 16); });
   }
@@ -1609,7 +1583,7 @@ class ProfileScreen {
         ['Neues', 'Profil'].forEach((s, k) => text(s, x + 38 - Math.floor(measure(s) / 2), y + 72 + k * 14, sel ? UI.text : '#8a7a60', null));
       }
     });
-    box(DLG.x, 146, DLG.w, 44);
+    box(2, 146, 252, 44);
     const d = this.data[this.sel];
     if (d) text(`${(d.profile || {}).name || 'Spieler'} · ${placeName(d)}`, 12, 150, UI.text, UI.shadow, 16, 230);
     else text('Leerer Platz für ein neues Abenteuer.', 12, 150);
@@ -1658,7 +1632,7 @@ class EditorScreen {
         for (let i = 0; i < 4; i++) { ctx.fillRect(vx - 6 + i, y + 7 - i, 1, 1 + i * 2); ctx.fillRect(vx + 40 - i, y + 7 - i, 1, 1 + i * 2); }
       }
     });
-    box(DLG.x, 148, DLG.w, 42);
+    box(2, 148, 252, 42);
     const key = EDIT_ROWS[this.sel][0];
     const hint = key === 'name' ? 'A: Namen eingeben' : key === 'done' ? 'A: Profil speichern' : key === 'hat' && this.look.style !== 0 ? 'Einen Hut gibt es nur mit der Frisur „Hut“.' : 'Links/Rechts: auswählen';
     text(hint, 12, 151); text('START: fertig   B: abbrechen', 12, 166, '#7888a0', null);
@@ -1719,7 +1693,7 @@ class NameScreen {
       if (r === this.cy && c === this.cx) { rr(x - 3, y + 1, 20, 16, 3, UI.red); rr(x - 2, y + 2, 18, 14, 2, '#fff0e8'); }
       text(ch === ' ' ? '_' : ch, x + 7 - Math.floor(measure(ch === ' ' ? '_' : ch) / 2), y, ch === ' ' ? '#a8b0bc' : UI.text, null);
     }
-    box(DLG.x, 148, DLG.w, 42);
+    box(2, 148, 252, 42);
     const btns = [[`${KB_PAGE_NAMES[(this.page + 1) % 3]}`, 12, 70], ['LÖSCHEN', 92, 76], ['OK', 178, 66]];
     btns.forEach(([label, x, w], b) => {
       const sel = this.cy === 3 && (this.cx < 3 ? 0 : this.cx < 7 ? 1 : 2) === b;
@@ -1748,7 +1722,7 @@ class TrainerCard {
     drawStage(202, 108, 24);
     ctx.drawImage(playerSprite(state.profile.look, 'down', 0), 178, 34, 48, 60);
     for (let i = 0; i < 16; i++) { const x = 24 + i * 13, got = state.badges[i]; rr(x, 120, 11, 9, 2, got ? shade(TYPES[TOWNS[i + 1].type], -0.4) : '#c8bca0'); if (got) rr(x + 1, 121, 9, 7, 2, TYPES[TOWNS[i + 1].type]); }
-    box(DLG.x, 146, DLG.w, 44);
+    box(2, 146, 252, 44);
     text('A: Aussehen und Namen ändern', 12, 150); text('B: zurück', 12, 166, '#7888a0', null);
   }
 }
@@ -1777,7 +1751,7 @@ class OptionsScreen {
       const v = vals[OPTS[key]]; text(v, 186 - measure(v) / 2, y + 1, UI.text, null);
       if (sel) { ctx.fillStyle = UI.red; for (let i = 0; i < 4; i++) { ctx.fillRect(126 + i, y + 9 - i, 1, 1 + i * 2); ctx.fillRect(244 - i, y + 9 - i, 1, 1 + i * 2); } }
     });
-    box(DLG.x, 146, DLG.w, 44);
+    box(2, 146, 252, 44);
     const key = this.rows[this.sel][0];
     const info = { gfx: ['Alle Effekte: Wolken, Flugsaurier, Vignette.', 'Fast alle Effekte, schont den Akku.', 'Ohne Wetter und Effekte, für ältere Handys.'][OPTS.gfx], time: OPTS.time ? 'Feste Tageszeit für die ganze Welt.' : 'Tageszeit nach deiner echten Uhrzeit.', text: 'So schnell erscheinen die Texte.', back: 'Einstellungen werden automatisch gespeichert.' }[key];
     text(info, 12, 150); text('Links/Rechts: ändern   B: zurück', 12, 166, '#7888a0', null);
@@ -1851,7 +1825,7 @@ class DexScreen {
       const nm = this.known(s.id) ? s.name : '-----';
       text(nm, 176, y - 1, UI.text, null, 16, Math.min(measure(nm), 74));
     }
-    box(DLG.x, 146, DLG.w, 44);
+    box(2, 146, 252, 44);
     if (known) {
       text(`${sp.name.toUpperCase()}  ·  ${sp.cat}-Wesen`, 12, 150);
       text('A: Eintrag lesen   B: zurück', 12, 166, '#7888a0', null);
@@ -1884,7 +1858,7 @@ class TeamScreen {
       const hpS = `${w.hp}/${st[0]}`;
       text(hpS, x + 116 - measure(hpS), y + 24, UI.text, null);
     });
-    box(DLG.x, 146, DLG.w, 44);
+    box(2, 146, 252, 44);
     text('Wähle ein Wesen.', 12, 150);
     text('A: Übersicht   B: zurück', 12, 166, '#7888a0', null);
   }
@@ -1907,8 +1881,8 @@ class SummaryScreen {
       const s = i === 0 ? `${w.hp}/${v}` : String(v);
       text(s, 244 - measure(s), 45 + i * 15, UI.text, null);
     });
-    box(DLG.x, 146, DLG.w, 44);
-    wrapW(sp.dex, DLG.w - 24).slice(0, 2).forEach((l, i) => text(l, 12, 150 + i * 16));
+    box(2, 146, 252, 44);
+    wrapW(sp.dex, 228).slice(0, 2).forEach((l, i) => text(l, 12, 150 + i * 16));
   }
 }
 
@@ -1932,9 +1906,9 @@ class StarterScreen {
       text(sp.name, x + 38 - Math.floor(measure(sp.name) / 2), y + 78);
       typeChip(sp.types[0], x + 14, y + 95);
     });
-    box(DLG.x, 146, DLG.w, 44);
+    box(2, 146, 252, 44);
     const sp = SPECIES[STARTERS[this.sel] - 1];
-    wrapW(sp.dex, DLG.w - 24).slice(0, 2).forEach((l, i) => text(l, 12, 150 + i * 16));
+    wrapW(sp.dex, 228).slice(0, 2).forEach((l, i) => text(l, 12, 150 + i * 16));
   }
 }
 
@@ -1985,7 +1959,7 @@ class BadgeScreen {
       }
     }
     const t = TOWNS[this.sel + 1];
-    box(DLG.x, 146, DLG.w, 44);
+    box(2, 146, 252, 44);
     text(t.badge.toUpperCase(), 12, 150);
     text(state.badges[this.sel] ? `Erhalten von ${t.leader} in ${t.name}` : `Arena ${t.name} · Typ ${t.type}`, 12, 166, state.badges[this.sel] ? UI.text : '#7888a0', null);
   }
@@ -2030,7 +2004,7 @@ class MapScreen {
     const r = TOWN_RECTS[this.sel];
     if ((tick >> 3) & 1) { const x = ox + Math.round(r.cx * sx), y = oy + Math.round(r.cy * sx); ctx.fillStyle = '#ffffff'; ctx.fillRect(x - 4, y - 4, 9, 9); ctx.fillStyle = UI.red; ctx.fillRect(x - 3, y - 3, 7, 7); }
     if ((tick >> 4) & 1) { const x = ox + Math.round(this.here.x * sx), y = oy + Math.round(this.here.y * sx); ctx.fillStyle = UI.dark; ctx.fillRect(x - 2, y - 2, 5, 5); ctx.fillStyle = '#58c8f0'; ctx.fillRect(x - 1, y - 1, 3, 3); }
-    box(DLG.x, 146, DLG.w, 44);
+    box(2, 146, 252, 44);
     const t = TOWNS[this.sel];
     text(`${t.name.toUpperCase()}  ·  ${BIOMES[t.biome].name}`, 12, 150);
     const info = t.start ? 'Dein Heimatort' : t.league ? 'Champion-Liga' : (state.badges[this.sel - 1] ? `${t.badge} erhalten` : `Arena: ${t.leader} · Typ ${t.type}`);
@@ -2044,13 +2018,13 @@ class Title {
   update() { if (pressed.A || pressed.START) { pop(this); this.done(); } }
   draw() {
     const sky = ['#f8b060', '#f09050', '#e07048', '#c05040', '#8a3a3a', '#5a2c34', '#3a2228', '#3a2228'];
-    sky.forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(0, i * 18, VW, 18); });
+    sky.forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(-OX, i ? i * 18 : -OY, RW, i ? 18 : 18 + OY); });
     ctx.fillStyle = '#fff0b0'; ctx.beginPath(); ctx.arc(60, 92, 22, 0, 7); ctx.fill();
     ctx.fillStyle = '#3a2228'; ctx.beginPath(); ctx.moveTo(96, 130); ctx.lineTo(160, 62); ctx.lineTo(178, 62); ctx.lineTo(256, 118); ctx.lineTo(256, 130); ctx.fill();
     ctx.fillStyle = '#f86828'; ctx.fillRect(160, 60, 18, 4); ctx.fillStyle = '#f8c040'; ctx.fillRect(165, 56 - ((tick >> 4) & 1) * 2, 8, 4);
-    ctx.fillStyle = '#2a1a1e'; ctx.fillRect(0, 128, VW, 64);
-    for (let x = -8; x < VW; x += 16) ctx.drawImage(atlas[0][0], T.FERN * TS, 0, 16, 16, x + 8, 120, 16, 16);
-    for (let x = 0; x < VW; x += 16) ctx.drawImage(atlas[0][0], T.TALL * TS, 0, 16, 16, x, 136, 16, 16);
+    ctx.fillStyle = '#2a1a1e'; ctx.fillRect(-OX, 128, RW, 64 + OY);
+    for (let x = -8 - Math.ceil(OX / 16) * 16; x < VW + OX; x += 16) ctx.drawImage(atlas[0][0], T.FERN * TS, 0, 16, 16, x + 8, 120, 16, 16);
+    for (let x = -Math.ceil(OX / 16) * 16; x < VW + OX; x += 16) ctx.drawImage(atlas[0][0], T.TALL * TS, 0, 16, 16, x, 136, 16, 16);
     for (let i = 0; i < 18; i++) {
       const sp = 0.25 + (i % 4) * 0.12, x = (i * 53 + Math.sin((tick + i * 40) / 50) * 12) % VW, y = 150 - ((tick * sp + i * 37) % 150);
       ctx.fillStyle = i % 3 ? '#f8a040' : '#ffe080'; ctx.globalAlpha = Math.min(1, y / 60); ctx.fillRect(Math.round(x), Math.round(y), 1 + (i % 2), 1 + (i % 2)); ctx.globalAlpha = 1;
@@ -2059,11 +2033,14 @@ class Title {
     drawWesen(SPID.Tyrannodrak, 152, 40 + breath, 1.5);
     textOutline('WESENWELT', 14, 10, '#f8e8b0', '#3a1a10', 40);
     textOutline('URZEIT-EDITION', 18, 50, '#f8a030', '#3a1a10', 16);
-    ctx.fillStyle = '#1a1014'; ctx.fillRect(0, 152, VW, 40);
-    const vl = versionLabel(); if (vl) text(vl, VW - 6 - measure(vl), 175, '#8a7460', null);
+    ctx.fillStyle = '#1a1014'; ctx.fillRect(-OX, 152, RW, 40 + OY);
+    if (!document.body.classList.contains('touch')) { const hlp = 'Pfeile laufen · Z = A · X = B · Enter = Menü'; text(hlp, 128 - measure(hlp) / 2, 175, '#8a7460', null); }
+    const vl = versionLabel(); if (vl) text(vl, VW - 6 - measure(vl), document.body.classList.contains('touch') ? 175 : 140, '#8a7460', null);
     if ((tick >> 5) & 1) text('START DRÜCKEN', 128 - measure('START DRÜCKEN') / 2, 158, '#f8e8b0', '#3a1a10');
   }
 }
+
+for (const C of [Title, ProfileScreen, EditorScreen, NameScreen, TrainerCard, OptionsScreen, DexScreen, TeamScreen, SummaryScreen, StarterScreen, BadgeScreen, MapScreen]) C.prototype.full = true;
 
 /* ---------------------------------------------------------------------
    HOOKS – hier docken Kämpfe, Laden und Heilen an
@@ -2260,6 +2237,9 @@ function buildAmbient() {
     for (let y = 0; y < 56; y++) for (let x = 0; x < 112; x++) if (blobs.some(([bx, by, r]) => Math.hypot(x - bx, (y - by) * 1.4) < r)) g.fillRect(x, y, 1, 1);
     return c;
   });
+  buildVignette();
+}
+function buildVignette() {
   VIGNETTE = document.createElement('canvas'); VIGNETTE.width = VW; VIGNETTE.height = VH;
   const g = VIGNETTE.getContext('2d'); const gr = g.createRadialGradient(VW / 2, VH / 2, VH * 0.35, VW / 2, VH / 2, VW * 0.72);
   gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(10,6,20,.38)');
@@ -2281,19 +2261,19 @@ function weatherStep() {
   for (let i = ripples.length - 1; i >= 0; i--) { const r = ripples[i]; if (++r.t === 20 && r.lava) for (let k = 0; k < 3; k++) parts.push({ x: r.x, y: r.y, vx: (Math.random() - 0.5) * 0.8, vy: -0.6 - Math.random() * 0.5, g: 0.04, s: 1, c: '#ffd060', life: 30, glow: 1 }); if (r.t > 40) ripples.splice(i, 1); }
   if (!cur || !cur.outdoor || OPTS.gfx === 2) { parts.length = 0; flock = null; return; }
   const b = bget(cur, player.x, player.y), ph = dayPhase(), dark = ph === 'nacht' || ph === 'abend';
-  const camX = player.px - 120, camY = player.py - 88, R = Math.random;
+  const camX = player.px + 8 - (VW >> 1), camY = player.py + 6 - (VH >> 1), R = Math.random;
   const cap = gfx(0) ? 220 : 120;
   const add = o => { if (parts.length < cap) parts.push(o); };
-  if (b === 2 && R() < 0.9) add({ x: camX + R() * 300 - 20, y: camY - 6, vx: -0.15 + R() * 0.1, vy: 0.35 + R() * 0.45, s: R() < 0.3 ? 2 : 1, c: '#ffffff', life: 700, sway: R() * 9 });
+  if (b === 2 && R() < 0.9) add({ x: camX + R() * (VW + 44) - 20, y: camY - 6, vx: -0.15 + R() * 0.1, vy: 0.35 + R() * 0.45, s: R() < 0.3 ? 2 : 1, c: '#ffffff', life: 700, sway: R() * 9 });
   if (b === 1) {
-    if (R() < 0.25) add({ x: camX + R() * 290, y: camY - 6, vx: 0.1, vy: 0.25 + R() * 0.2, s: 1, c: '#9a8a80', life: 700, sway: R() * 9 });
-    if (R() < 0.14) add({ x: camX + R() * 256, y: camY + 196, vx: (R() - 0.5) * 0.3, vy: -0.4 - R() * 0.5, s: 1, c: R() < 0.5 ? '#f8a040' : '#ffd060', life: 320, glow: 1, flick: 1 });
+    if (R() < 0.25) add({ x: camX + R() * (VW + 34), y: camY - 6, vx: 0.1, vy: 0.25 + R() * 0.2, s: 1, c: '#9a8a80', life: 700, sway: R() * 9 });
+    if (R() < 0.14) add({ x: camX + R() * VW, y: camY + VH + 4, vx: (R() - 0.5) * 0.3, vy: -0.4 - R() * 0.5, s: 1, c: R() < 0.5 ? '#f8a040' : '#ffd060', life: 320, glow: 1, flick: 1 });
   }
-  if ((b === 4 || (b === 0 && dark)) && parts.filter(p => p.fly && !p.bfly).length < (dark ? 40 : 16) && R() < 0.06) add({ x: camX + R() * 256, y: camY + R() * 192, vx: 0, vy: 0, s: 1, c: '#e0f878', life: 500, glow: 1, fly: 1, ph: R() * 6 });
-  if (b === 3 && R() < 0.22) add({ x: camX - 10, y: camY + R() * 192, vx: 2 + R() * 1.5, vy: 0.1, s: 1, w: 3, c: '#f4e2b4', life: 200 });
-  if (b === 0 && !dark && R() < 0.035) add({ x: camX + R() * 300 - 20, y: camY - 6, vx: 0.2, vy: 0.4 + R() * 0.2, s: 2, c: R() < 0.5 ? '#7ac050' : '#d8c048', life: 700, sway: R() * 9 });
+  if ((b === 4 || (b === 0 && dark)) && parts.filter(p => p.fly && !p.bfly).length < (dark ? 40 : 16) && R() < 0.06) add({ x: camX + R() * VW, y: camY + R() * VH, vx: 0, vy: 0, s: 1, c: '#e0f878', life: 500, glow: 1, fly: 1, ph: R() * 6 });
+  if (b === 3 && R() < 0.22) add({ x: camX - 10, y: camY + R() * VH, vx: 2 + R() * 1.5, vy: 0.1, s: 1, w: 3, c: '#f4e2b4', life: 200 });
+  if (b === 0 && !dark && R() < 0.035) add({ x: camX + R() * (VW + 44) - 20, y: camY - 6, vx: 0.2, vy: 0.4 + R() * 0.2, s: 2, c: R() < 0.5 ? '#7ac050' : '#d8c048', life: 700, sway: R() * 9 });
   // Schmetterlinge im Urwald am Tag
-  if (b === 0 && !dark && parts.filter(p => p.bfly).length < 6 && R() < 0.02) add({ x: camX + R() * 256, y: camY + R() * 192, vx: 0, vy: 0, s: 2, c: ['#f8a0c8', '#f8e070', '#a0d0f8', '#ffffff'][Math.floor(R() * 4)], life: 700, fly: 1, bfly: 1, ph: R() * 6 });
+  if (b === 0 && !dark && parts.filter(p => p.bfly).length < 6 && R() < 0.02) add({ x: camX + R() * VW, y: camY + R() * VH, vx: 0, vy: 0, s: 2, c: ['#f8a0c8', '#f8e070', '#a0d0f8', '#ffffff'][Math.floor(R() * 4)], life: 700, fly: 1, bfly: 1, ph: R() * 6 });
   // Ringe auf dem Wasser, Blasen auf der Lava
   if (R() < 0.08) {
     const tx = Math.floor((camX + R() * VW) / TS), ty = Math.floor((camY + R() * VH) / TS);
@@ -2304,17 +2284,17 @@ function weatherStep() {
     if (p.fly) { const k = p.bfly ? 0.16 : 0.08; p.vx = (p.vx + (R() - 0.5) * k) * 0.96; p.vy = (p.vy + (R() - 0.5) * k) * 0.96; }
     if (p.g) p.vy += p.g;
     p.x += p.vx + (p.sway !== undefined ? Math.sin((tick + p.sway * 20) / 30) * 0.3 : 0); p.y += p.vy;
-    if (--p.life <= 0 || p.y > camY + 220 || p.y < camY - 40 || p.x < camX - 40 || p.x > camX + 300) parts.splice(i, 1);
+    if (--p.life <= 0 || p.y > camY + VH + 28 || p.y < camY - 40 || p.x < camX - 40 || p.x > camX + VW + 44) parts.splice(i, 1);
   }
   // Wolkenschatten ziehen über das Land
   if (!clouds) clouds = Array.from({ length: 6 }, (_, i) => ({ x: camX - 200 + i * 130 + R() * 60, y: camY - 120 + R() * 400, k: i % 3 }));
   for (const c of clouds) {
     c.x += 0.14; c.y += 0.04;
-    if (c.x - camX > 420) c.x -= 760; if (c.x - camX < -340) c.x += 760;
-    if (c.y - camY > 300) c.y -= 520; if (c.y - camY < -220) c.y += 520;
+    if (c.x - camX > VW + 164) c.x -= VW + 504; if (c.x - camX < -340) c.x += VW + 504;
+    if (c.y - camY > VH + 108) c.y -= VH + 328; if (c.y - camY < -220) c.y += VH + 328;
   }
   // Ab und zu zieht ein Schwarm Flugsaurier über die Welt
-  if (!flock && !dark && gfx(1) && --flockT <= 0) { flock = { x: camX + 300, y: camY + 10 + R() * 70, vx: -1.1 - R() * 0.4 }; flockT = 1500 + Math.floor(R() * 2400); }
+  if (!flock && !dark && gfx(1) && --flockT <= 0) { flock = { x: camX + VW + 44, y: camY + 10 + R() * 70, vx: -1.1 - R() * 0.4 }; flockT = 1500 + Math.floor(R() * 2400); }
   if (flock) { flock.x += flock.vx; flock.y += Math.sin(tick / 40) * 0.15; if (flock.x < camX - 160) flock = null; }
 }
 function rustleAt(x, y) {
@@ -2381,11 +2361,11 @@ function drawTile(tx, ty, sx, sy, f) {
   }
 }
 function drawWorld() {
-  const camX = Math.round(player.px) - 120, camY = Math.round(player.py) - 88;
+  const camX = Math.round(player.px) + 8 - (VW >> 1), camY = Math.round(player.py) + 6 - (VH >> 1);
   const x0 = Math.floor(camX / TS), y0 = Math.floor(camY / TS);
   const f = (tick >> 4) & 3;
   const ph = dayPhase(), fancy = cur.outdoor && OPTS.gfx !== 2;
-  for (let ty = y0; ty <= y0 + 12; ty++) for (let tx = x0; tx <= x0 + 16; tx++) drawTile(tx, ty, tx * TS - camX, ty * TS - camY, f);
+  for (let ty = y0; ty <= y0 + Math.ceil(VH / TS); ty++) for (let tx = x0; tx <= x0 + Math.ceil(VW / TS); tx++) drawTile(tx, ty, tx * TS - camX, ty * TS - camY, f);
   if (fancy) { drawPrints(camX, camY); drawRipples(camX, camY); drawFlock(camX, camY, true); }
   const actors = cur.npcs.filter(n => n.visible()).concat(player).sort((a, b) => a.py - b.py);
   for (const a of actors) {
@@ -2416,7 +2396,7 @@ function drawWorld() {
     if (ph === 'nacht' || ph === 'abend') {
       ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = ph === 'nacht' ? 0.9 : 0.45;
       const flick = 1 + Math.sin(tick / 7) * 0.06;
-      for (let ty = y0; ty <= y0 + 12; ty++) for (let tx = x0; tx <= x0 + 16; tx++) {
+      for (let ty = y0; ty <= y0 + Math.ceil(VH / TS); ty++) for (let tx = x0; tx <= x0 + Math.ceil(VW / TS); tx++) {
         const t = tget(cur, tx, ty);
         const lava = t === T.WATER && bget(cur, tx, ty) === 1 && (tx + ty) % 2 === 0;
         if (!GLOWS.has(t) && !lava) continue;
@@ -2437,13 +2417,20 @@ function drawWorld() {
   }
   if (noclip) text('NOCLIP', 200, 2, '#ffffff', '#000000');
 }
+function drawFull(l) {
+  // Menübildschirme sind für 256x192 gebaut: mittig zeichnen, Hintergrund füllt den Rest
+  const w = VW, h = VH; RW = w; RH = h; OX = Math.floor((w - 256) / 2); OY = Math.floor((h - 192) / 2);
+  ctx.save(); ctx.translate(OX, OY); VW = 256; VH = 192;
+  try { l.draw(); } finally { VW = w; VH = h; ctx.restore(); OX = OY = 0; }
+}
 function render() {
+  ctx.setTransform(SC, 0, 0, SC, 0, 0); ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = '#101418'; ctx.fillRect(0, 0, VW, VH);
   if (cur && mode === 'world') drawWorld();
-  for (const l of layers) l.draw();
+  for (const l of layers) { if (l.full) drawFull(l); else l.draw(); }
   if (fade > 0) { ctx.globalAlpha = Math.min(1, fade / 4); ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, VW, VH); ctx.globalAlpha = 1; }
   if (flashT > 0 && (flashT >> 2) % 2) { ctx.fillStyle = (flashT >> 3) % 2 ? '#000000' : '#ffffff'; ctx.fillRect(0, 0, VW, VH); }
-  if (updateT) { const s = 'Neue Version! Spiel wird aktualisiert...'; box(16, 80, VW - 32, 30); text(s, 128 - measure(s) / 2, 86); }
+  if (updateT) { const s = 'Neue Version! Spiel wird aktualisiert...'; box(VW / 2 - 112, VH / 2 - 15, 224, 30); text(s, VW / 2 - measure(s) / 2, VH / 2 - 9); }
 }
 function step() {
   tick++;
@@ -2560,6 +2547,7 @@ async function profileFlow() {
 }
 async function boot() {
   try { await Promise.race([Promise.all([document.fonts.load(fontOf(16)), document.fonts.load(fontOf(40))]), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
+  layout();
   buildAtlas();
   buildOverlays();
   buildGlow();
@@ -2588,6 +2576,34 @@ async function boot() {
     return;
   }
 }
+/* --- Bildgröße an den Bildschirm anpassen --- */
+const gameEl = document.getElementById('game');
+const CONTROLS_H = 216;
+function layout() {
+  const touch = matchMedia('(pointer: coarse)').matches || (navigator.maxTouchPoints > 0 && matchMedia('(hover: none)').matches);
+  const W = gameEl.clientWidth, H = gameEl.clientHeight;
+  if (!W || !H || (W === layout.w && H === layout.h && !layout.force)) return;
+  layout.w = W; layout.h = H; layout.force = false;
+  const portrait = H > W * 1.05;
+  const availH = touch && portrait ? Math.max(160, H - CONTROLS_H) : H;
+  let k;
+  if (W / availH < 256 / 192) { k = W / 256; VW = 256; VH = Math.max(192, Math.min(400, Math.floor(availH / k))); }
+  else { k = availH / 192; VH = 192; VW = Math.max(256, Math.min(432, Math.floor(W / k))); }
+  cv.width = VW * SC; cv.height = VH * SC;
+  const cw = VW * k, ch = VH * k;
+  Object.assign(cv.style, { width: cw + 'px', height: ch + 'px', left: (W - cw) / 2 + 'px', top: (touch && portrait ? 0 : (availH - ch) / 2) + 'px' });
+  const b = document.body.classList;
+  b.toggle('touch', touch); b.toggle('portrait', portrait); b.toggle('landscape', !portrait);
+  b.toggle('standalone', matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches);
+  // Textbox: im Querformat Platz für die Tasten links und rechts lassen
+  const side = touch && !portrait ? Math.ceil(150 / k) : 2;
+  DLG.w = Math.max(240, Math.min(360, VW - side * 2)); DLG.x = Math.floor((VW - DLG.w) / 2); DLG.y = VH - 48;
+  ctx.imageSmoothingEnabled = false;
+  if (VIGNETTE) buildVignette();
+}
+addEventListener('resize', layout);
+document.addEventListener('fullscreenchange', layout);
+
 let last = performance.now(), acc = 0;
 function loop(now) {
   acc += Math.min(100, now - last); last = now;
