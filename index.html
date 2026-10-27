@@ -64,7 +64,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 'use strict';
 /* =====================================================================
    WESENWELT – URZEIT
-   Grundgerüst: Welt, Bewegung, Städte, Arenen, Orden, 65 Urzeit-Wesen,
+   Grundgerüst: Welt, Bewegung, Städte, Arenen, Orden, 80 Urzeit-Wesen,
    Urdex, Starter-Wahl, Team. Kämpfe sind als Hooks angelegt ("HOOKS").
    ===================================================================== */
 
@@ -103,7 +103,7 @@ const UI = {
 const TYPES = {
   NORMAL: '#a8a878', FEUER: '#f08030', WASSER: '#6890f0', PFLANZE: '#78c850', ELEKTRO: '#e8c020', EIS: '#78c8c8',
   KAMPF: '#c03028', GIFT: '#a040a0', BODEN: '#d8b058', FLUG: '#a890f0', PSYCHO: '#f85888', KÄFER: '#a8b820',
-  GESTEIN: '#b8a038', GEIST: '#705898', DRACHE: '#7038f8', STAHL: '#a8a8c0', WIND: '#58b8b0',
+  GESTEIN: '#b8a038', GEIST: '#705898', DRACHE: '#7038f8', STAHL: '#a8a8c0', WIND: '#58b8b0', FEE: '#e888c0',
 };
 
 /* ---------------------------------------------------------------------
@@ -168,20 +168,22 @@ const T = {
   WALL_CENTER: 29, WALL_SHOP: 30, WALL_GYM: 31, FERN: 32, BONES: 33, PAVE: 34, TALL_RUSTLE: 35, TORCH: 36,
   LAB_FLOOR: 37, LAB_WALL: 38, LAB_MACHINE: 39, LAB_TANK: 40, LAB_BENCH: 41, CAPSULE_TABLE: 42,
   CLIFF_TOP: 43, CLIFF: 44, CAVE_DOOR: 45, CAVE_WINDOW: 46, CAMPFIRE: 47,
+  STAIRS: 48, ROOF_THATCH: 49, ROOF_SLATE: 50, ROOF_HIDE: 51, WALL_STONE: 52, WINDOW_STONE: 53, DOOR_STONE: 54,
 };
 const TREE_Q = 60, NT = 64;
 const SOLID = new Set([T.TREE, T.WATER, T.ROOF, T.WALL, T.WINDOW, T.SIGN, T.FENCE, T.IWALL, T.COUNTER,
   T.SHELF, T.TABLE, T.PLANT, T.ROOF_GYM, T.ROOF_CENTER, T.ROOF_SHOP, T.ROCK, T.PC, T.STATUE, T.VOID,
   T.WALL_CENTER, T.WALL_SHOP, T.WALL_GYM, T.FERN, T.BONES, T.TORCH,
-  T.LAB_WALL, T.LAB_MACHINE, T.LAB_TANK, T.LAB_BENCH, T.CAPSULE_TABLE, T.CLIFF_TOP, T.CLIFF, T.CAVE_WINDOW, T.CAMPFIRE]);
+  T.LAB_WALL, T.LAB_MACHINE, T.LAB_TANK, T.LAB_BENCH, T.CAPSULE_TABLE, T.CLIFF_TOP, T.CLIFF, T.CAVE_WINDOW, T.CAMPFIRE,
+  T.ROOF_THATCH, T.ROOF_SLATE, T.ROOF_HIDE, T.WALL_STONE, T.WINDOW_STONE]);
 // Nachbarschafts-Klassen für Übergänge und Schatten
 const GROUNDY = new Set([T.GRASS, T.TALL, T.FLOWER, T.FERN, T.ROCK, T.BONES, T.SIGN, T.FENCE, T.TREE, T.TORCH]);
-const EDGE_RECV = new Set([T.PATH, T.SAND, T.PAVE]);
-const ROOFS = new Set([T.ROOF, T.ROOF_CENTER, T.ROOF_SHOP, T.ROOF_GYM, T.CLIFF_TOP]);
-const WALLS = new Set([T.WALL, T.WINDOW, T.DOOR, T.WALL_CENTER, T.WALL_SHOP, T.WALL_GYM, T.CLIFF, T.CAVE_DOOR, T.CAVE_WINDOW]);
+const EDGE_RECV = new Set([T.PATH, T.SAND, T.PAVE, T.STAIRS]);
+const ROOFS = new Set([T.ROOF, T.ROOF_CENTER, T.ROOF_SHOP, T.ROOF_GYM, T.CLIFF_TOP, T.ROOF_THATCH, T.ROOF_SLATE, T.ROOF_HIDE]);
+const WALLS = new Set([T.WALL, T.WINDOW, T.DOOR, T.WALL_CENTER, T.WALL_SHOP, T.WALL_GYM, T.CLIFF, T.CAVE_DOOR, T.CAVE_WINDOW, T.WALL_STONE, T.WINDOW_STONE, T.DOOR_STONE]);
 const SHADOW_RECV = new Set([T.GRASS, T.PATH, T.SAND, T.TALL, T.FLOWER, T.PAVE, T.FLOOR, T.GYMFLOOR, T.LAB_FLOOR]);
 const TOP_CASTERS = new Set([T.TREE, T.IWALL, T.SHELF, T.PC, T.LAB_WALL, T.LAB_MACHINE, T.LAB_TANK]);
-const GLOWS = new Set([T.WINDOW, T.WALL_CENTER, T.WALL_SHOP, T.TORCH, T.CAVE_WINDOW, T.CAMPFIRE]);
+const GLOWS = new Set([T.WINDOW, T.WALL_CENTER, T.WALL_SHOP, T.TORCH, T.CAVE_WINDOW, T.CAMPFIRE, T.WINDOW_STONE]);
 
 let atlas = []; // atlas[gebiet][frame]
 function painter(g, ox) {
@@ -213,6 +215,8 @@ function blob(P, cx, cy, rFn, cols) {
     P.p(x, y, c);
   }
 }
+// Felsfarben: hell, Grund, Wand, Fuge, Riss, Kante (im Vulkangebiet dunkles Lavagestein)
+const cliffCols = b => b && b.name === 'Vulkan' ? ['#8a7a72', '#6a5a54', '#54443e', '#3a2e2a', '#2a201c', '#1c1412'] : ['#b8a888', '#9a8a72', '#7a6a58', '#5a4c3e', '#4a3e32', '#3a2e24'];
 function wallLogs(P) {
   P.r(0, 0, 16, 16, '#a8754a');
   for (let y = 0; y < 16; y += 5) { P.r(0, y, 16, 1, '#c8956a'); P.r(0, y + 4, 16, 1, '#7a4e30'); }
@@ -388,23 +392,58 @@ const TILE_ART = {
     pat(P, ['..oo..', '.oyyo.', 'oyhyyo', 'oyyyYo', '.oYYo.', '..oo..'], { o: '#6a3a10', y: '#f0a020', Y: '#c07010', h: '#fff0b0' }, 5, 3);
   },
   [T.CLIFF_TOP]: (P, f, b) => {
-    P.r(0, 0, 16, 16, '#9a8a72');
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const h = hash(x, y, 61); if (h < 0.12) P.p(x, y, '#b8a888'); else if (h > 0.9) P.p(x, y, '#7a6a56'); }
+    const C = cliffCols(b); P.r(0, 0, 16, 16, C[1]);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const h = hash(x, y, 61); if (h < 0.12) P.p(x, y, C[0]); else if (h > 0.9) P.p(x, y, C[2]); }
     for (const [x, y] of [[3, 3], [10, 9], [12, 2]]) { P.p(x, y, b.g[2]); P.p(x + 1, y - 1, b.g[3]); P.p(x + 2, y, b.g[2]); }
   },
-  [T.CLIFF]: P => {
-    P.r(0, 0, 16, 16, '#7a6a58');
-    for (let y = 0; y < 16; y += 4) { P.r(0, y, 16, 1, '#9a8a72'); P.r(0, y + 3, 16, 1, '#5a4c3e'); }
-    for (const [x, y] of [[4, 1], [11, 5], [7, 9], [2, 13]]) { P.p(x, y, '#4a3e32'); P.p(x + 1, y + 1, '#4a3e32'); }
-    P.r(0, 15, 16, 1, '#3a2e24');
+  [T.CLIFF]: (P, f, b) => {
+    const C = cliffCols(b); P.r(0, 0, 16, 16, C[2]);
+    for (let y = 0; y < 16; y += 4) { P.r(0, y, 16, 1, C[1]); P.r(0, y + 3, 16, 1, C[3]); }
+    for (const [x, y] of [[4, 1], [11, 5], [7, 9], [2, 13]]) { P.p(x, y, C[4]); P.p(x + 1, y + 1, C[4]); }
+    P.r(0, 15, 16, 1, C[5]);
   },
-  [T.CAVE_DOOR]: P => {
-    TILE_ART[T.CLIFF](P);
+  [T.STAIRS]: (P, f, b) => {
+    const C = cliffCols(b); P.r(0, 0, 16, 16, C[3]);
+    for (let y = 0; y < 16; y += 4) { P.r(1, y, 14, 3, C[1]); P.r(1, y, 14, 1, C[0]); P.r(1, y + 3, 14, 1, C[4]); }
+    P.r(0, 0, 1, 16, C[5]); P.r(15, 0, 1, 16, C[5]);
+  },
+  [T.ROOF_THATCH]: P => {
+    // Strohdach aus Farnbündeln
+    P.r(0, 0, 16, 16, '#b89048');
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { if ((x + y * 2) % 5 === 0) P.p(x, y, '#d8b868'); else if (hash(x, y, 71) < 0.12) P.p(x, y, '#8a6a30'); }
+    for (let y = 5; y < 16; y += 6) { P.r(0, y, 16, 1, '#6a4c20'); for (let x = 0; x < 16; x += 2) P.p(x + (y % 2), y + 1, '#e0c070'); }
+  },
+  [T.ROOF_SLATE]: P => {
+    // Schieferplatten aus Vulkangestein
+    P.r(0, 0, 16, 16, '#545866');
+    for (let y = 0; y < 16; y += 4) { P.r(0, y, 16, 1, '#727684'); P.r(0, y + 3, 16, 1, '#2e303a'); for (let x = (y % 8 ? 0 : 4); x < 16; x += 8) P.r(x, y, 1, 4, '#2e303a'); }
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (hash(x, y, 72) < 0.05) P.p(x, y, '#626674');
+  },
+  [T.ROOF_HIDE]: P => {
+    // Zelt aus Fellen, vernäht, mit Farbband
+    P.r(0, 0, 16, 16, '#c09468');
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (hash(x, y, 73) < 0.06) P.p(x, y, '#a07a50');
+    for (let x = 0; x < 16; x += 5) { P.r(x, 0, 1, 16, '#7a5634'); for (let y = 1; y < 16; y += 3) P.p(x + 1, y, '#e8c8a0'); }
+    P.r(0, 7, 16, 2, '#8a3a28'); P.r(0, 7, 16, 1, '#b85840');
+  },
+  [T.WALL_STONE]: P => wallStone(P),
+  [T.WINDOW_STONE]: P => {
+    wallStone(P);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = ((x - 7.5) / 4.5) ** 2 + ((y - 8) / 5.5) ** 2; if (d < 1 && y <= 12) P.p(x, y, d > 0.7 ? '#3e3a32' : y < 6 ? '#ffe090' : '#f8a840'); }
+    P.r(3, 12, 10, 1, '#c0b8a8'); P.r(7, 4, 2, 8, '#3e3a32');
+  },
+  [T.DOOR_STONE]: P => {
+    wallStone(P);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = ((x - 7.5) / 5.5) ** 2 + ((y - 15) / 13) ** 2; if (d < 1) P.p(x, y, d > 0.75 ? '#3e3a32' : '#6a4428'); }
+    for (let x = 5; x < 11; x += 2) P.r(x, 4, 1, 12, '#4a2c18'); P.r(9, 10, 1, 1, '#e0c070');
+  },
+  [T.CAVE_DOOR]: (P, f, b) => {
+    TILE_ART[T.CLIFF](P, f, b);
     for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = ((x - 7.5) / 6) ** 2 + ((y - 14) / 13) ** 2; if (d < 1) P.p(x, y, d > 0.78 ? '#b8a888' : d > 0.62 ? '#4a3e32' : '#140e0a'); }
     P.r(4, 5, 8, 11, '#a87848'); for (let y = 6; y < 16; y += 3) P.r(5, y, 6, 1, '#7a5030'); P.r(7, 5, 2, 11, '#140e0a');
   },
-  [T.CAVE_WINDOW]: P => {
-    TILE_ART[T.CLIFF](P);
+  [T.CAVE_WINDOW]: (P, f, b) => {
+    TILE_ART[T.CLIFF](P, f, b);
     for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = Math.hypot(x - 7.5, y - 7); if (d < 4.6) P.p(x, y, d > 3.6 ? '#4a3e32' : d > 2.2 ? '#f8a040' : '#ffd878'); }
   },
   [T.CAMPFIRE]: (P, f, b) => {
@@ -499,21 +538,22 @@ const VARIANTS = [
 const mirror = rows => rows.map(r => r.split('').reverse().join(''));
 const sym = half => half.map(r => r + r.split('').reverse().join(''));
 // Figuren 16x24: runder Kopf mit Augenweiß und Wangen, abgesetzte Arme, Gurte, Stiefel
-const HAT = ['......oo', '....oohh', '...ohhhh', '..ohhhhh', '..ohhhhh', '.oHHHHHH', 'oHHHHHHH'];
-const HEAD_D = sym([...HAT, '.okkkkkk', '.okkssss', '.okswess', '.okswess', '.oscssss', '..osssss', '...ooSSS']);
-const BODY_D = sym(['..orrrrr', '.orrryrr', 'oRorryrr', 'oRorrrrr', 'osoRRRRR', '.ooppppp']);
-const HEAD_U = sym([...HAT, '.okkkkkk', '.okkkkkk', '.okkkkkk', '.okkkkkk', '.okkkkkk', '..okkkkk', '...ooooo']);
-const BODY_U = sym(['..oryyyy', '.oryyyyy', 'oRoyYyyy', 'oRoyyyyy', 'osoYYYYY', '.ooppppp']);
+const HAT = ['.......o', '.....ooh', '....ohhh', '...ohhhh', '...ohhhh', '..oHHHHH', '.oHHHHHH'];
+const HEAD_D = sym([...HAT, '..okkkkk', '..okssss', '..oswess', '..oswess', '..oscsss', '...ossss', '....ooSS']);
+const BODY_D = sym(['...orrrr', '..orryrr', '.oRoryrr', '.oRorrrr', '.osoRRRR', '..oopppp']);
+const HEAD_U = sym([...HAT, '..okkkkk', '..okkkkk', '..okkkkk', '..okkkkk', '..okkkkk', '...okkkk', '....oooo']);
+const BODY_U = sym(['...oryyy', '..oryyyy', '.oRoyYyy', '.oRoyyyy', '.osoYYYY', '..oopppp']);
 // Frisur ohne Hut (für „Kurz“ und „Lang“)
-const HAIR_TOP = sym(['......oo', '....ookk', '...okkhh', '..okkkhk', '..okkkkk', '.okkkkkk', '.okkkkkk']);
+const HAIR_TOP = sym(['.......o', '.....ook', '....okkh', '...okkkh', '...okkkk', '..okkkkk', '..okkkkk']);
 const HAIR_TOP_S = ['......ooo.......', '....ookkkoo.....', '...okkhhkkko....', '..okkkhkkkkko...', '..okkkkkkkkko...', '..okkkkkkkkko...', '..okkkkkkkkko...'];
-const LEG_S = ['...opppPPpppo...', '...oppo..oppo...', '...obbo..obbo...', '...oooo..oooo...'];
-const LEG_W = ['...opppPPpppo...', '...oppo..oppo...', '...obbo..oooo...', '...oooo.........'];
+const LEG_S = ['....oppPPppo....', '....opo..opo....', '....obo..obo....', '....ooo..ooo....'];
+const LEG_W = ['....oppPPppo....', '....opo..opo....', '....obo..ooo....', '....ooo.........'];
+// Seitenansicht: Körper so breit wie in der Vorderansicht, Rucksack hinten
 const SIDE = ['......ooo.......', '....oohhhoo.....', '...ohhhhhhho....', '..ohhhhhhhhho...', '..ohhhhhhhhho...', '.oHHHHHHHHHHo...', 'oHHHHHHHHHHHo...',
-  '..okkkkkkkkko...', '..osskkkkkkko...', '.osewsskkkkko...', '.osewsskkkkko...', '..osscsskkko....', '...osssskko.....', '....ooSSoo......',
-  '....orrryyo.....', '...orrrryyyo....', '...oRrrryyyo....', '...oRrrryyyo....', '...osRRRyyo.....', '....oppppo......'];
-const SIDE_S = ['....oppPpo......', '.....oppo.......', '.....obbo.......', '.....oooo.......'];
-const SIDE_W = ['....oppPpo......', '...oppo.opo.....', '..obbo...obo....', '..ooo.....oo....'];
+  '..okkkkkkkkko...', '..osskkkkkkko...', '.osewsskkkkko...', '.osewsskkkkko...', '..osscsskkko....', '...osssskko.....', '....ooSSooo.....',
+  '...oorrrryyo....', '..orrrrrryyyo...', '..oRrrrrryyyo...', '..oRsrrrryyyo...', '...osRRRRyyo....', '...opppppppo.....'];
+const SIDE_S = ['...oppPPppo.....', '....oppppo......', '...obbbbbo......', '...oooooo.......'];
+const SIDE_W = ['...oppPPppo.....', '..oppo..oppo....', '.obbo....obbo...', '.ooo......ooo...'];
 const ITEM_ART = ['................', '................', '................', '................', '......oooo......', '.....oyyyyo.....', '....oyhwyyYo....',
   '....oyhyyyYo....', '...oyyyyyyYYo...', '...oyyyyyyYYo...', '...oYyyyyYYYo...', '....oYYYYYYo....', '.....oooooo.....', '................', '...SSSSSSSSSS...', '................'];
 
@@ -563,14 +603,14 @@ function charRows(view, frame) {
 function longHair(rows, view) {
   const set = (x, y, ch) => { if (y >= 0 && y < rows.length) rows[y] = rows[y].slice(0, x) + ch + rows[y].slice(x + 1); };
   if (view === 'down') {
-    for (let y = 8; y <= 14; y++) { set(1, y, 'k'); set(14, y, 'k'); set(0, y, 'o'); set(15, y, 'o'); }
-    set(1, 15, 'o'); set(14, 15, 'o');
+    for (let y = 8; y <= 14; y++) { set(2, y, 'k'); set(13, y, 'k'); set(1, y, 'o'); set(14, y, 'o'); }
+    set(2, 15, 'o'); set(13, 15, 'o');
   } else if (view === 'up') {
-    for (let y = 13; y <= 17; y++) { for (let x = 3; x <= 12; x++) set(x, y, 'k'); set(2, y, 'o'); set(13, y, 'o'); }
-    for (let x = 3; x <= 12; x++) set(x, 18, 'o');
+    for (let y = 13; y <= 17; y++) { for (let x = 4; x <= 11; x++) set(x, y, 'k'); set(3, y, 'o'); set(12, y, 'o'); }
+    for (let x = 4; x <= 11; x++) set(x, 18, 'o');
   } else {
-    for (let y = 12; y <= 16; y++) { set(9, y, 'k'); set(10, y, 'k'); set(11, y, 'k'); set(12, y, 'o'); }
-    for (let x = 9; x <= 11; x++) set(x, 17, 'o');
+    for (let y = 12; y <= 15; y++) { set(9, y, 'k'); set(10, y, 'k'); set(11, y, 'k'); set(12, y, 'o'); }
+    for (let x = 9; x <= 11; x++) set(x, 16, 'o');
   }
 }
 const PCHAR = new Map();
@@ -606,22 +646,23 @@ function getChar(kind, variant, dir, frame) {
 }
 
 /* ---------------------------------------------------------------------
-   WESEN (65 Urzeit-Arten)
+   WESEN (80 Urzeit-Arten)
    S(Name, Typen, Basiswerte [KP, ANG, VER, SP.ANG, SP.VER, INIT], Entwicklungslevel → nächster Eintrag, Kategorie, Text, Grafik)
    --------------------------------------------------------------------- */
 const STAT_NAMES = ['KP', 'ANGRIFF', 'VERTEID.', 'SP.-ANG.', 'SP.-VER.', 'INIT.'];
 const SPECIES = [];
 function S(name, types, base, evo, cat, dex, art) { SPECIES.push({ id: SPECIES.length + 1, name, types, base, evo, cat, dex, art }); }
-// Die drei Starter (angelehnt an die Dino-Partner aus „Dinosaurier King“): Wind, Blitz und Pflanze
-S('Karnokid', ['WIND'], [45, 60, 40, 55, 45, 65], 16, 'Wirbelhorn', 'Mutig und blitzschnell. Mit seinen kleinen Hörnern wirbelt es kräftige Windstöße auf.', { k: 'bi', h: 'carno', s: .58, c: ['#d84a30', '#f4cca0', '#f4ead8'], wind: 1 });
-S('Karnotaurus', ['WIND'], [60, 80, 55, 70, 55, 85], 36, 'Wirbelhorn', 'Rennt so schnell, dass hinter ihm ein kleiner Wirbelsturm entsteht.', { k: 'bi', h: 'carno', s: .8, c: ['#c83c24', '#f4cca0', '#f4ead8'], wind: 1, pose: 'horiz' });
-S('Sturmtaurus', ['WIND', 'KAMPF'], [80, 110, 75, 90, 70, 105], 0, 'Sturmhorn', 'Sein Brüllen entfacht einen Orkan. Für seine Freunde stellt es sich jedem Gegner.', { k: 'bi', h: 'carno', s: 1.02, c: ['#b8301c', '#f4cca0', '#f8f0e0'], wind: 1, spines: 1 });
-S('Funkhorn', ['ELEKTRO'], [50, 55, 60, 50, 50, 40], 16, 'Donnerhorn', 'Gutmütig und verfressen. Wird es wütend, knistern Funken zwischen seinen Hörnern.', { k: 'quad', h: 'cerato', s: .56, c: ['#d8b038', '#fff0b8', '#4a6ad0'], horns: 1, bolt: 1 });
-S('Donnerhorn', ['ELEKTRO'], [70, 75, 85, 65, 65, 50], 36, 'Donnerhorn', 'Senkt es den Kopf, schlagen Blitze in seine drei Hörner ein. Dann gibt es kein Halten mehr.', { k: 'quad', h: 'cerato', s: .78, c: ['#c8a028', '#fff0b8', '#3a58c0'], horns: 3, bolt: 1 });
-S('Blitzeratops', ['ELEKTRO', 'BODEN'], [95, 105, 110, 80, 85, 55], 0, 'Gewitterhorn', 'Sein Ansturm klingt wie Donnergrollen. Selbst Felswände zerspringen unter seinen Hörnern.', { k: 'quad', h: 'cerato', s: 1, c: ['#b89020', '#fff0b8', '#2a48b0'], horns: 3, bolt: 1, armor: 1 });
-S('Paraspross', ['PFLANZE'], [50, 40, 45, 60, 60, 50], 16, 'Blütenkamm', 'Freundlich und neugierig. Die sanften Töne aus seinem Kamm lassen Pflanzen wachsen.', { k: 'bi', h: 'duck', s: .58, c: ['#e890b0', '#fae4ec', '#58a848'], crest: 'hadro', leaves: 1 });
-S('Parablatt', ['PFLANZE'], [65, 55, 60, 80, 80, 65], 36, 'Blütenkamm', 'Sein Lied beruhigt wilde Wesen. Auf seinem Rücken blühen Farne und Blumen.', { k: 'bi', h: 'duck', s: .8, c: ['#e07ca0', '#fae4ec', '#48a040'], crest: 'hadro', leaves: 1 });
-S('Paraflora', ['PFLANZE', 'PSYCHO'], [85, 70, 80, 110, 105, 80], 0, 'Waldsängerin', 'Ihr Gesang hallt durch den ganzen Urwald. Wo sie singt, wachsen über Nacht neue Bäume.', { k: 'bi', h: 'duck', s: 1, c: ['#d06890', '#fae4ec', '#3a9838'], crest: 'hadro', leaves: 2 });
+// Die drei Starter: Boden (Ankylosaurus), Gift (Dilophosaurus), Pflanze (Parasaurolophus).
+// Dreieck: Pflanze > Boden > Gift > Pflanze. In der 3. Stufe kommt ein Zweittyp dazu (Fee, Kampf, Stahl), der das Dreieck erhält.
+S('Ankylino', ['BODEN'], [55, 55, 70, 40, 50, 35], 16, 'Panzerkeule', 'Gräbt sich bei Gefahr in den Boden ein, bis nur noch sein Panzer herausschaut.', { k: 'quad', h: 'ankylo', s: .66, c: ['#c89a5a', '#f0dcb0', '#8a5a30'], armor: 1, club: 1 });
+S('Ankylodon', ['BODEN'], [70, 75, 95, 50, 65, 45], 36, 'Panzerkeule', 'Ein Schlag mit seiner Schwanzkeule lässt den Boden beben. Felsen zerspringen wie Glas.', { k: 'quad', h: 'ankylo', s: .84, c: ['#b8884a', '#f0dcb0', '#7a4a24'], armor: 1, club: 1, spikesSide: 1 });
+S('Juwelkylos', ['BODEN', 'FEE'], [95, 90, 120, 75, 95, 50], 0, 'Juwelpanzer', 'Auf seinem Panzer wachsen funkelnde Kristalle. Wer eines davon findet, hat ein Jahr lang Glück.', { k: 'quad', h: 'ankylo', s: .93, c: ['#a8784a', '#f0dcb0', '#e870c0'], armor: 1, club: 1, gems: 1 });
+S('Dilospritz', ['GIFT'], [45, 60, 40, 55, 40, 65], 16, 'Doppelkamm', 'Spuckt zum Spaß kleine Giftblasen. An seinem Doppelkamm sieht man, wie es sich fühlt.', { k: 'bi', h: 'small', s: .55, c: ['#78b850', '#f0f0b8', '#a848c0'], crest: 'dilo' });
+S('Dilotox', ['GIFT'], [60, 80, 55, 65, 55, 85], 36, 'Doppelkamm', 'Spreizt seinen Halskragen, bevor es zielgenau Gift spuckt. Es trifft auf zehn Schritte.', { k: 'bi', h: 'raptor', s: .8, c: ['#62a442', '#f0f0b8', '#9a38b8'], crest: 'dilo', frill: 1, pose: 'horiz' });
+S('Dilofaust', ['GIFT', 'KAMPF'], [80, 115, 70, 80, 70, 110], 0, 'Giftkämpfer', 'Kämpft mit Krallen, Tritten und Giftspucke. Es trainiert jeden Morgen, um noch stärker zu werden.', { k: 'bi', h: 'raptor', s: 1.02, c: ['#4a8a38', '#f0f0b8', '#8a28a8'], crest: 'dilo', frill: 1, spines: 1 });
+S('Paraspross', ['PFLANZE'], [50, 45, 55, 55, 60, 40], 16, 'Blütenkamm', 'Freundlich und neugierig. Die sanften Töne aus seinem Kamm lassen Pflanzen wachsen.', { k: 'bi', h: 'duck', s: .58, c: ['#e890b0', '#fae4ec', '#58a848'], crest: 'hadro', leaves: 1 });
+S('Parablatt', ['PFLANZE'], [65, 60, 70, 75, 75, 55], 36, 'Blütenkamm', 'Sein Lied beruhigt wilde Wesen. Auf seinem Rücken blühen Farne und Blumen.', { k: 'bi', h: 'duck', s: .8, c: ['#e07ca0', '#fae4ec', '#48a040'], crest: 'hadro', leaves: 1 });
+S('Paraferro', ['PFLANZE', 'STAHL'], [85, 80, 110, 95, 100, 55], 0, 'Stahlkamm', 'Sein Kamm ist hart wie Stahl. Bläst es hinein, schallt eine Fanfare durch den ganzen Urwald.', { k: 'bi', h: 'duck', s: 1, c: ['#4a9848', '#e8f0d8', '#9aa8bc'], crest: 'hadro', leaves: 2 });
 S('Farnodon', ['PFLANZE'], [45, 49, 49, 65, 65, 45], 16, 'Farnhals', 'Knabbert am liebsten junge Farnspitzen. Auf seinem Rücken wachsen kleine Blätter.', { k: 'quad', h: 'sauro', neck: .55, s: .55, c: ['#68b848', '#e8e8a0', '#2f8a3a'], leaves: 1 });
 S('Zykadon', ['PFLANZE'], [60, 62, 63, 80, 80, 60], 36, 'Farnhals', 'Sein Hals ist so lang, dass es Früchte aus den höchsten Baumkronen pflückt.', { k: 'quad', h: 'sauro', neck: .8, s: .75, c: ['#58a840', '#e8e8a0', '#2f8a3a'], leaves: 1 });
 S('Gigafarnus', ['PFLANZE', 'BODEN'], [80, 82, 83, 100, 100, 80], 0, 'Urriese', 'Zieht es über die Ebene, bebt der Boden meilenweit. Auf seinem Rücken wächst ein ganzer Wald.', { k: 'quad', h: 'sauro', neck: 1, s: 1, c: ['#4a9038', '#e0dca0', '#2f7a2a'], leaves: 2 });
@@ -647,8 +688,8 @@ S('Archi', ['FLUG', 'NORMAL'], [45, 50, 40, 40, 40, 60], 25, 'Urvogel', 'Halb Ec
 S('Archaeox', ['FLUG', 'NORMAL'], [75, 90, 65, 55, 60, 95], 0, 'Urvogel', 'Sein prächtiges Gefieder schützt es vor Regen und Kälte.', { k: 'fly', h: 'bird', s: .9, c: ['#4a7a48', '#f0e0a8', '#d04030'] });
 S('Spiralit', ['GESTEIN', 'WASSER'], [35, 40, 100, 90, 55, 35], 30, 'Spirale', 'Treibt mit seinem Schneckenhaus durch die Urmeere. Fossilien davon findet man überall.', { k: 'ammo', s: .6, c: ['#d0a868', '#f0e0c0', '#e07850'] });
 S('Ammoniton', ['GESTEIN', 'WASSER'], [70, 60, 125, 115, 70, 55], 0, 'Spirale', 'Mit seinen Tentakeln fängt es Beute, ohne sein Haus je zu verlassen.', { k: 'ammo', s: .95, c: ['#c09050', '#f0e0c0', '#d05840'] });
-S('Panzerling', ['GESTEIN'], [50, 60, 95, 30, 45, 25], 32, 'Panzer', 'Seine Haut ist hart wie Fels. Es schläft am liebsten zwischen Geröll.', { k: 'quad', h: 'ankylo', s: .55, c: ['#8a8070', '#c8c0a8', '#5a5040'], armor: 1, club: 1, low: 1 });
-S('Ankylator', ['GESTEIN'], [80, 100, 140, 45, 70, 35], 0, 'Panzer', 'Ein Schlag mit seiner Schwanzkeule zertrümmert Felsblöcke.', { k: 'quad', h: 'ankylo', s: .95, c: ['#7a7060', '#c8c0a8', '#4a4030'], armor: 1, club: 1, low: 1 });
+S('Panzerling', ['GESTEIN'], [50, 60, 95, 30, 45, 25], 32, 'Stachelpanzer', 'Seine Haut ist hart wie Fels. Es schläft am liebsten zwischen Geröll.', { k: 'quad', h: 'ankylo', s: .55, c: ['#8a8070', '#c8c0a8', '#5a5040'], armor: 1, nodo: 1, low: 1 });
+S('Nodopanzer', ['GESTEIN'], [80, 100, 140, 45, 70, 35], 0, 'Stachelpanzer', 'Statt einer Keule trägt es lange Stacheln an den Schultern. Damit schiebt es Felsblöcke beiseite.', { k: 'quad', h: 'ankylo', s: .95, c: ['#7a7060', '#c8c0a8', '#4a4030'], armor: 1, nodo: 1, low: 1 });
 S('Plattling', ['NORMAL'], [50, 65, 70, 40, 50, 40], 30, 'Plattenrücken', 'Die Platten auf seinem Rücken wechseln die Farbe, wenn es sich freut.', { k: 'quad', h: 'small', s: .55, c: ['#7a9a50', '#d8d8a0', '#d06030'], plates: 1, spikesTail: 1 });
 S('Stegodorn', ['NORMAL', 'GESTEIN'], [85, 105, 100, 55, 75, 50], 0, 'Plattenrücken', 'Mit seinen Schwanzstacheln wehrt es sogar große Räuber ab.', { k: 'quad', h: 'small', s: .95, c: ['#6a8a48', '#d8d8a0', '#d05028'], plates: 1, spikesTail: 1 });
 S('Hornix', ['NORMAL'], [55, 65, 60, 35, 50, 45], 28, 'Dreihorn', 'Stupst zur Begrüßung mit seinem Nasenhorn. Es ist sehr anhänglich.', { k: 'quad', h: 'cerato', s: .55, c: ['#a07850', '#e8d0a0', '#d8a040'], horns: 1 });
@@ -667,8 +708,8 @@ S('Mammilo', ['EIS', 'BODEN'], [60, 70, 50, 40, 40, 40], 34, 'Wollrüssel', 'Sei
 S('Mammutan', ['EIS', 'BODEN'], [110, 120, 85, 60, 70, 50], 0, 'Wollrüssel', 'Mit seinen Stoßzähnen räumt es Gletscher beiseite.', { k: 'quad', h: 'mammoth', s: 1, c: ['#7a4a2a', '#b88060', '#f8f8f0'] });
 S('Säbelino', ['EIS', 'KAMPF'], [45, 65, 40, 35, 40, 70], 32, 'Säbelzahn', 'Übt mit seinen langen Eckzähnen an Eiszapfen.', { k: 'quad', h: 'cat', s: .55, c: ['#d8b070', '#f8e8c8', '#8a5a30'] });
 S('Smilodor', ['EIS', 'KAMPF'], [75, 115, 65, 50, 60, 105], 0, 'Säbelzahn', 'Lauert auf verschneiten Felsen. Sein Biss durchdringt jeden Panzer.', { k: 'quad', h: 'cat', s: .9, c: ['#c89858', '#f8e8c8', '#6a4020'] });
-S('Dilopho', ['GIFT'], [45, 55, 40, 50, 40, 60], 30, 'Giftspucker', 'Spuckt Gift, wenn es sich bedroht fühlt. Sein Kamm zittert vor Wut.', { k: 'bi', h: 'small', s: .55, c: ['#8ab040', '#e8f0a0', '#d04080'], crest: 'dilo' });
-S('Dilophorex', ['GIFT'], [75, 90, 65, 80, 65, 90], 0, 'Giftspucker', 'Spreizt einen leuchtenden Halskragen, bevor es seinen Giftstrahl abfeuert.', { k: 'bi', h: 'raptor', s: .9, c: ['#6a9a30', '#e8f0a0', '#e04090'], crest: 'dilo', pose: 'horiz' });
+S('Koelo', ['GIFT'], [45, 55, 40, 50, 40, 60], 30, 'Hohlknochen', 'Flink und federleicht. Es jagt in Gruppen und hat einen leicht giftigen Biss.', { k: 'bi', h: 'raptor', s: .5, c: ['#c89048', '#f0e0b0', '#8a4aa0'], pose: 'horiz' });
+S('Koelophyx', ['GIFT'], [75, 90, 65, 80, 65, 90], 0, 'Hohlknochen', 'Rennt schneller als fast alle Urzeitwesen. Sein Biss lähmt die Beute mit Gift.', { k: 'bi', h: 'raptor', s: .85, c: ['#b07838', '#f0e0b0', '#8a3aa0'], feathers: 1, pose: 'horiz' });
 S('Sumpfkrok', ['GIFT', 'WASSER'], [55, 60, 60, 35, 45, 35], 32, 'Sumpfechse', 'Liegt reglos im Sumpf. Nur seine Augen schauen aus dem Wasser.', { k: 'quad', h: 'croc', s: .6, c: ['#5a7040', '#c8c890', '#3a4a28'], low: 1, armor: 1 });
 S('Sarkosuchus', ['GIFT', 'WASSER'], [90, 105, 95, 55, 70, 50], 0, 'Sumpfechse', 'Das größte Krokodil der Urzeit. Es fängt sogar kleine Dinos.', { k: 'quad', h: 'croc', s: 1, c: ['#4a6034', '#c8c890', '#2a3a1c'], low: 1, armor: 1 });
 S('Dünenläufer', ['BODEN'], [45, 60, 45, 30, 40, 65], 34, 'Wüstenläufer', 'Rennt über heiße Dünen, ohne sich die Füße zu verbrennen.', { k: 'bi', h: 'raptor', s: .6, c: ['#d0a060', '#f8e0b0', '#a06030'], pose: 'horiz' });
@@ -687,18 +728,67 @@ S('Drakodon', ['DRACHE'], [61, 84, 65, 70, 70, 70], 55, 'Urdrache', 'Kleine Flü
 S('Tyrannodrak', ['DRACHE', 'BODEN'], [91, 134, 95, 100, 100, 80], 0, 'Tyrannenechse', 'Der König aller Drachen. Sein Schritt lässt die Erde erzittern.', { k: 'bi', h: 'dragon', s: 1.05, c: ['#4a30a0', '#d8c8f0', '#f0a020'], wings: 1, spines: 1 });
 S('Magmator', ['FEUER', 'GESTEIN'], [100, 120, 110, 130, 90, 80], 0, 'Vulkan', 'Schlief im Herzen des größten Vulkans. Sein Erwachen veränderte die Welt.', { k: 'quad', h: 'boxy', s: 1.05, c: ['#4a3a3a', '#e86020', '#f8d040'], lava: 1, plates: 1 });
 S('Chronodon', ['PSYCHO', 'DRACHE'], [100, 120, 100, 150, 100, 90], 0, 'Zeit', 'Es heißt, Chronodon hüte den Fluss der Zeit seit dem ersten Tag der Urzeit.', { k: 'bi', h: 'rex', s: 1.05, c: ['#3a5ab0', '#c8d8f8', '#f0d050'], wings: 1, rings: 1 });
+// Frühere Starter (Wind und Elektro) leben jetzt wild in der Welt
+S('Karnokid', ['WIND'], [45, 60, 40, 55, 45, 65], 16, 'Wirbelhorn', 'Mutig und blitzschnell. Mit seinen kleinen Hörnern wirbelt es kräftige Windstöße auf.', { k: 'bi', h: 'carno', s: .58, c: ['#d84a30', '#f4cca0', '#f4ead8'], wind: 1 });
+S('Karnotaurus', ['WIND'], [60, 80, 55, 70, 55, 85], 36, 'Wirbelhorn', 'Rennt so schnell, dass hinter ihm ein kleiner Wirbelsturm entsteht.', { k: 'bi', h: 'carno', s: .8, c: ['#c83c24', '#f4cca0', '#f4ead8'], wind: 1, pose: 'horiz' });
+S('Sturmtaurus', ['WIND', 'KAMPF'], [80, 110, 75, 90, 70, 105], 0, 'Sturmhorn', 'Sein Brüllen entfacht einen Orkan. Für seine Freunde stellt es sich jedem Gegner.', { k: 'bi', h: 'carno', s: 1.02, c: ['#b8301c', '#f4cca0', '#f8f0e0'], wind: 1, spines: 1 });
+S('Funkhorn', ['ELEKTRO'], [50, 55, 60, 50, 50, 40], 16, 'Donnerhorn', 'Gutmütig und verfressen. Wird es wütend, knistern Funken zwischen seinen Hörnern.', { k: 'quad', h: 'cerato', s: .56, c: ['#d8b038', '#fff0b8', '#4a6ad0'], horns: 1, bolt: 1 });
+S('Donnerhorn', ['ELEKTRO'], [70, 75, 85, 65, 65, 50], 36, 'Donnerhorn', 'Senkt es den Kopf, schlagen Blitze in seine drei Hörner ein. Dann gibt es kein Halten mehr.', { k: 'quad', h: 'cerato', s: .78, c: ['#c8a028', '#fff0b8', '#3a58c0'], horns: 3, bolt: 1 });
+S('Blitzeratops', ['ELEKTRO', 'BODEN'], [95, 105, 110, 80, 85, 55], 0, 'Gewitterhorn', 'Sein Ansturm klingt wie Donnergrollen. Selbst Felswände zerspringen unter seinen Hörnern.', { k: 'quad', h: 'cerato', s: 1, c: ['#b89020', '#fff0b8', '#2a48b0'], horns: 3, bolt: 1, armor: 1 });
+// Urzeit-Lexikon: auf welchem echten Tier (oder Ding) jedes Wesen beruht. [Vorbild, Zeit, Größe, Wissenswertes]
+const REAL_GROUPS = [
+  [['Ankylino', 'Ankylodon', 'Juwelkylos'], 'Ankylosaurus', 'Oberkreide, vor etwa 68 bis 66 Mio. Jahren', 'bis etwa 8 m lang', 'Sein Körper war mit Knochenplatten gepanzert. Mit der schweren Keule am Schwanz konnte er sich gegen Raubsaurier wehren.'],
+  [['Dilospritz', 'Dilotox', 'Dilofaust'], 'Dilophosaurus', 'Unterjura, vor etwa 193 Mio. Jahren', 'etwa 7 m lang', 'Er hatte zwei dünne Knochenkämme auf dem Kopf. Giftspucke und Halskragen gibt es nur im Kino, in den Fossilien findet man davon nichts.'],
+  [['Paraspross', 'Parablatt', 'Paraferro'], 'Parasaurolophus', 'Oberkreide, vor etwa 76 bis 74 Mio. Jahren', 'etwa 9,5 m lang', 'Sein langer, hohler Knochenkamm war innen wie ein Rohr gebaut. Vermutlich konnte er damit laute, tiefe Töne erzeugen.'],
+  [['Farnodon', 'Zykadon', 'Gigafarnus'], 'Brachiosaurus', 'Oberjura, vor etwa 154 bis 150 Mio. Jahren', 'über 20 m lang', 'Ein Langhals-Pflanzenfresser. Seine Vorderbeine waren länger als die Hinterbeine, so kam er an die höchsten Baumkronen.'],
+  [['Funkiraptor', 'Flammraptor'], 'Velociraptor', 'Oberkreide, vor etwa 75 bis 71 Mio. Jahren', 'etwa 2 m lang', 'Er trug Federn und war nur so groß wie ein Truthahn, viel kleiner als im Film. An jedem Fuß hatte er eine Sichelkralle.'],
+  [['Infernorex'], 'Tyrannosaurus rex', 'Oberkreide, vor etwa 68 bis 66 Mio. Jahren', 'bis etwa 12 m lang', 'Einer der größten Raubdinosaurier. Sein Biss war so stark, dass er Knochen zerbeißen konnte.'],
+  [['Plesiplitsch', 'Plesiwoge', 'Leviathos'], 'Plesiosaurus', 'Unterjura, vor etwa 199 bis 183 Mio. Jahren', 'etwa 3,5 m lang', 'Ein Meeresreptil, kein Dinosaurier. Es ruderte mit vier großen Flossen durch das Wasser.'],
+  [['Kompso', 'Kompsorex'], 'Compsognathus', 'Oberjura, vor etwa 150 Mio. Jahren', 'etwa 1 m lang', 'Einer der kleinsten bekannten Dinosaurier, kaum schwerer als ein Huhn. Er jagte Eidechsen.'],
+  [['Pteri', 'Pterafalk'], 'Pteranodon', 'Oberkreide, vor etwa 86 bis 84 Mio. Jahren', 'Flügelspannweite bis etwa 7 m', 'Ein Flugsaurier, kein Dinosaurier. Er hatte keine Zähne und einen langen Knochenkamm am Hinterkopf.'],
+  [['Libellux', 'Meganox'], 'Meganeura', 'Oberkarbon, vor etwa 300 Mio. Jahren', 'Flügelspannweite etwa 70 cm', 'Eine Riesenlibelle, viel größer als jede heutige Libelle. Damals gab es mehr Sauerstoff in der Luft.'],
+  [['Trilobix', 'Trilokrabb'], 'Trilobiten', 'Kambrium bis Perm, vor etwa 520 bis 252 Mio. Jahren', 'meist wenige Zentimeter', 'Sie gehörten zu den ersten Tieren mit richtigen Augen und konnten sich wie Asseln einrollen.'],
+  [['Halmi', 'Halmora'], 'Calamites (Riesen-Schachtelhalm)', 'Karbon, vor etwa 360 bis 300 Mio. Jahren', 'bis etwa 20 m hoch', 'Urzeitliche Schachtelhalme wuchsen hoch wie Bäume. Aus ihren Wäldern entstand später die Steinkohle.'],
+  [['Zappraptor', 'Blitzraptor'], 'Utahraptor', 'Unterkreide, vor etwa 135 Mio. Jahren', 'bis etwa 6 m lang', 'Der größte bekannte Raptor. Seine Sichelkralle war über 20 cm lang.'],
+  [['Archi', 'Archaeox'], 'Archaeopteryx', 'Oberjura, vor etwa 150 Mio. Jahren', 'etwa 50 cm lang', 'Halb Vogel, halb Dinosaurier: Er hatte Federn, aber auch Zähne und Krallen an den Flügeln. Gefunden wurde er in Bayern.'],
+  [['Spiralit', 'Ammoniton'], 'Ammoniten', 'Devon bis Kreide, vor etwa 400 bis 66 Mio. Jahren', 'meist handgroß, manche fast 2 m', 'Verwandte der Tintenfische mit einem spiralförmigen Gehäuse. Ihre Fossilien findet man fast überall auf der Welt.'],
+  [['Panzerling', 'Nodopanzer'], 'Edmontonia (ein Nodosaurier)', 'Oberkreide, vor etwa 76 bis 68 Mio. Jahren', 'etwa 6 m lang', 'Ein Verwandter des Ankylosaurus, aber ohne Schwanzkeule. Dafür trug er lange Stacheln an den Schultern.'],
+  [['Plattling', 'Stegodorn'], 'Stegosaurus', 'Oberjura, vor etwa 155 bis 150 Mio. Jahren', 'etwa 9 m lang', 'Er trug große Knochenplatten auf dem Rücken und vier Stacheln am Schwanz. Sein Gehirn war erstaunlich klein.'],
+  [['Hornix', 'Trizeros'], 'Triceratops', 'Oberkreide, vor etwa 68 bis 66 Mio. Jahren', 'etwa 9 m lang', 'Drei Hörner und ein riesiger Nackenschild schützten ihn sogar vor dem Tyrannosaurus.'],
+  [['Kopfnuss', 'Dickschädel'], 'Pachycephalosaurus', 'Oberkreide, vor etwa 70 bis 66 Mio. Jahren', 'etwa 4,5 m lang', 'Sein Schädeldach war über 20 cm dick. Ob er damit wirklich Kopfstöße verteilte, wird noch erforscht.'],
+  [['Tröti', 'Parasonar'], 'Corythosaurus', 'Oberkreide, vor etwa 77 bis 75 Mio. Jahren', 'etwa 9 m lang', 'Ein Entenschnabelsaurier mit einem hohlen Kamm, der aussieht wie ein halber Helm.'],
+  [['Segelglut', 'Dimetrox'], 'Dimetrodon', 'Unterperm, vor etwa 295 bis 272 Mio. Jahren', 'bis etwa 4,5 m lang', 'Kein Dinosaurier: Er lebte lange vor ihnen und ist näher mit den Säugetieren verwandt. Sein Segel half ihm wohl, sich zu wärmen.'],
+  [['Teerling', 'Teermahr'], 'Teergruben von La Brea', 'Eiszeit, vor etwa 50.000 bis 10.000 Jahren', 'eine Fundstelle in Los Angeles', 'In den klebrigen Asphaltgruben blieben unzählige Eiszeit-Tiere stecken. Heute gräbt man dort Millionen Fossilien aus.'],
+  [['Knochling', 'Fossilgeist'], 'Fossilien', 'alle Erdzeitalter', 'vom Zahn bis zum Riesenskelett', 'Fossilien entstehen, wenn Knochen schnell zugedeckt werden und sich über Jahrmillionen in Stein verwandeln.'],
+  [['Mammilo', 'Mammutan'], 'Wollhaarmammut', 'Eiszeit, ausgestorben vor etwa 4.000 Jahren', 'etwa 3 m Schulterhöhe', 'Die letzten Mammuts lebten auf einer Insel im Nordpolarmeer, als in Ägypten schon die Pyramiden standen.'],
+  [['Säbelino', 'Smilodor'], 'Smilodon (Säbelzahnkatze)', 'Eiszeit, vor etwa 2,5 Mio. bis 10.000 Jahren', 'etwa so groß wie ein Löwe, nur kräftiger', 'Seine oberen Eckzähne wurden über 20 cm lang. Trotzdem war sein Biss eher schwach, er setzte auf Kraft in den Armen.'],
+  [['Koelo', 'Koelophyx'], 'Coelophysis', 'Obertrias, vor etwa 215 bis 200 Mio. Jahren', 'etwa 3 m lang', 'Einer der frühesten Dinosaurier, leicht gebaut mit hohlen Knochen. Den Giftbiss haben wir dazuerfunden.'],
+  [['Sumpfkrok', 'Sarkosuchus'], 'Sarcosuchus', 'Unterkreide, vor etwa 112 Mio. Jahren', 'etwa 9 m lang', 'Ein Riesenkrokodil, so lang wie ein Bus. Es lebte in Flüssen im heutigen Afrika.'],
+  [['Dünenläufer', 'Sandrex'], 'Gallimimus', 'Oberkreide, vor etwa 70 Mio. Jahren', 'etwa 6 m lang', 'Ein straußenähnlicher Dinosaurier aus der Wüste Gobi. Mit seinen langen Beinen war er ein sehr schneller Läufer.'],
+  [['Ferrodon', 'Ferrosaurus'], 'Scutosaurus', 'Oberperm, vor etwa 260 Mio. Jahren', 'etwa 2,5 m lang', 'Kein Dinosaurier, sondern ein Pareiasaurier. Seine Haut steckte voller Knochenplatten wie eine Rüstung.'],
+  [['Mosa', 'Mosarok'], 'Mosasaurus', 'Oberkreide, vor etwa 82 bis 66 Mio. Jahren', 'bis etwa 13 m lang', 'Eine riesige Meeresechse, verwandt mit Waranen und Schlangen. Der erste Fund kam aus den Niederlanden.'],
+  [['Panzerfisch'], 'Dunkleosteus', 'Oberdevon, vor etwa 380 bis 360 Mio. Jahren', 'mehrere Meter lang', 'Ein Panzerfisch: Statt Zähnen hatte er scharfe Knochenplatten im Maul, die wie eine Schere schnitten.'],
+  [['Quastoflos'], 'Quastenflosser', 'seit dem Devon, also über 400 Mio. Jahre', 'bis etwa 2 m lang', 'Man hielt ihn für ausgestorben, bis 1938 ein lebender Quastenflosser gefangen wurde. Ein echtes lebendes Fossil!'],
+  [['Bernsteinwanze'], 'Insekten im Bernstein', 'meist Kreide und Tertiär', 'wenige Millimeter', 'Bernstein ist versteinertes Baumharz. Darin bleiben Insekten Millionen Jahre lang mit jedem Härchen erhalten.'],
+  [['Meteorlein', 'Meteoros'], 'Chicxulub-Asteroid', 'Ende der Kreidezeit, vor 66 Mio. Jahren', 'etwa 10 km Durchmesser', 'Sein Einschlag im heutigen Mexiko löste das große Artensterben aus. Nur die Vögel überlebten von den Dinosauriern.'],
+  [['Draki', 'Drakodon', 'Tyrannodrak'], 'Dracorex', 'Oberkreide, vor etwa 66 Mio. Jahren', 'etwa 2,5 m lang', 'Ein Dickkopfsaurier mit stacheligem Kopf. Sein ganzer Name lautet Dracorex hogwartsia: Drachenkönig von Hogwarts!'],
+  [['Magmator'], 'Dekkan-Trapp (Vulkane in Indien)', 'Ende der Kreidezeit, vor etwa 66 Mio. Jahren', 'Lavafelder größer als Deutschland', 'Gewaltige Vulkanausbrüche über Hunderttausende Jahre veränderten das Klima der ganzen Erde.'],
+  [['Chronodon'], 'die Erdzeitalter', 'vor 252 bis 66 Mio. Jahren: das Erdmittelalter', 'Trias, Jura und Kreide', 'Die Dinosaurier lebten über 160 Millionen Jahre lang. Wir Menschen gibt es erst seit etwa 300.000 Jahren.'],
+  [['Karnokid', 'Karnotaurus', 'Sturmtaurus'], 'Carnotaurus', 'Oberkreide, vor etwa 72 bis 69 Mio. Jahren', 'etwa 8 m lang', 'Er hatte zwei Hörner über den Augen und winzige Ärmchen, noch kleiner als die des Tyrannosaurus. Ein schneller Läufer.'],
+  [['Funkhorn', 'Donnerhorn', 'Blitzeratops'], 'Styracosaurus', 'Oberkreide, vor etwa 75 Mio. Jahren', 'etwa 5,5 m lang', 'Ein Horngesicht-Dinosaurier mit einem langen Nasenhorn und vielen Stacheln am Nackenschild.'],
+];
+const REAL = {}; for (const [names, ...info] of REAL_GROUPS) for (const n of names) REAL[n] = info;
 const SPID = Object.fromEntries(SPECIES.map(s => [s.name, s.id]));
-const STARTERS = [SPID.Karnokid, SPID.Funkhorn, SPID.Paraspross];
-const STARTER_NICKS = ['Ace', 'Chomp', 'Paris'];
-const DEX_VERSION = 2; // Version 2: die 9 neuen Starter-Arten stehen vorn im Urdex
+const STARTERS = [SPID.Paraspross, SPID.Ankylino, SPID.Dilospritz];
+const DEX_VERSION = 3; // 2: Starter-Arten vorn im Urdex · 3: neue Boden/Gift-Starter, frühere Starter ans Ende
 const wName = w => w.nick || SPECIES[w.sp - 1].name;
 // Wilde Wesen je Gebiet (für das kommende Kampfsystem)
 const BIOME_POOL = [
-  ['Kompso', 'Pteri', 'Libellux', 'Halmi', 'Archi', 'Plattling', 'Hornix', 'Trilobix'],
+  ['Kompso', 'Pteri', 'Libellux', 'Halmi', 'Archi', 'Plattling', 'Hornix', 'Trilobix', 'Funkhorn'],
   ['Segelglut', 'Kopfnuss', 'Panzerling', 'Meteorlein', 'Draki'],
   ['Mammilo', 'Säbelino', 'Ferrodon', 'Pteri'],
-  ['Dünenläufer', 'Panzerling', 'Kompso', 'Zappraptor'],
-  ['Teerling', 'Dilopho', 'Sumpfkrok', 'Knochling', 'Tröti'],
+  ['Dünenläufer', 'Panzerling', 'Kompso', 'Zappraptor', 'Karnokid'],
+  ['Teerling', 'Koelo', 'Sumpfkrok', 'Knochling', 'Tröti'],
 ];
 
 /* --- Typ-Merkmale: jedes Wesen trägt sichtbare Zeichen seines Typs (Blitzhörner, Flammen, Flossen …) --- */
@@ -856,6 +946,19 @@ const DECOR = {
       }
     },
   },
+  FEE: {
+    head(D, an, z) {
+      const [x, y, r] = an.head, bx = x + r * 0.35, by = y - r * 0.85;
+      D.E(bx - 2.2 * z, by, 2.4 * z, 1.6 * z, '#f878b8', 0.4); D.E(bx + 2.2 * z, by, 2.4 * z, 1.6 * z, '#f878b8', -0.4); D.C(bx, by, 1.1 * z, '#ffd0e8');
+    },
+    body(D, an, z) {
+      const [cx, cy, rx, ry] = an.body;
+      for (const [u, v, rr] of [[1.15, -1.1, 3], [-0.2, -1.6, 2.2], [1.45, 0.1, 2]]) {
+        const x = cx + u * rx, y = cy + v * ry, R = rr * z, q = R * 0.3;
+        D.P([[x, y - R], [x + q, y - q], [x + R, y], [x + q, y + q], [x, y + R], [x - q, y + q], [x - R, y], [x - q, y - q]], u > 1.3 ? '#fff0a8' : '#f8b8e0', false);
+      }
+    },
+  },
   NORMAL: {
     head() {},
     body(D, an, z, k) { for (const [x, y] of backPts(an, 3)) D.L(x, y - 0.5, x - 1.5 * z, y + 4 * z, 1.6 * z, k.d1); },
@@ -988,6 +1091,7 @@ const ARCH = {
     D.T([[39, 49], [38, 54], [40, 57]], 4.5, 3.5, k.c1); D.E(37.5, 57, 5, 1.8, k.c1);
     const hx = hz ? 15 : 19, hy = hz ? 27 : 17;
     D.T([[27, 34], [hx + 6, hy + 4]], 8, 7, k.c1);
+    if (a.frill) { D.E(hx + 7, hy + 5, 7, 9, k.c3, 0.3); for (let i = 0; i < 5; i++) { const an = -2.3 + i * 0.75; D.L(hx + 7, hy + 5, hx + 7 + Math.cos(an) * 6, hy + 5 + Math.sin(an) * 8, 0.9, k.d3); } }
     switch (a.h) {
       case 'rex':
         D.E(hx, hy, 11, 7, k.c1, -0.1); D.E(hx - 2, hy + 5.5, 8.5, 2.6, k.c2, -0.1);
@@ -1037,6 +1141,8 @@ const ARCH = {
     if (a.leaves) for (let i = 0; i < 4 + a.leaves; i++) D.E(28 + i * 5, by - bry + 1, 3.5, 1.7, k.c3, -0.6 + (i % 2) * 1.2);
     if (a.bolt) D.P([[30, by - 7], [38, by - 3], [34, by - 2], [43, by + 4], [31, by], [35, by - 1]], k.c3, false);
     if (a.armor) for (let r = 0; r < 2; r++) for (let i = 0; i < 5; i++) D.C(27 + i * 5 + r * 2.5, by - bry * 0.55 + r * 4, 1.3, k.c3, false);
+    if (a.nodo) for (let i = 0; i < 3; i++) D.P([[21 + i * 4, by - 1], [15 + i * 3.5, by - bry - 6 + i * 2], [25 + i * 4, by - 4]], k.c2);
+    if (a.gems) for (let i = 0; i < 4; i++) { const x = 28 + i * 6, y = by - bry + 2; D.P([[x - 2.6, y + 1], [x - 1, y - 5], [x, y - 7], [x + 1, y - 5], [x + 2.6, y + 1]], i % 2 ? '#f8b8ec' : '#b8e8f8'); }
     if (a.lava) { D.L(27, by - 3, 33, by + 2, 1.5, k.c3); D.L(33, by + 2, 40, by - 2, 1.5, k.c3); D.L(42, by + 3, 48, by - 1, 1.5, k.c3); }
     if (a.h === 'mammoth') for (let i = 0; i < 9; i++) D.L(24 + i * 3.4, by - 6 + (i % 3), 23 + i * 3.4, by + 4 + (i % 2) * 2, 1, k.d1);
     D.T([[23, ly - 2], [23, 57]], 6.5, 6, k.c1); D.T([[45, ly - 2], [45, 57]], 7.5, 7, k.c1);
@@ -1056,10 +1162,12 @@ const ARCH = {
         D.P([[8, 35], [3, 31], [9, 33]], k.white);
         if (a.horns >= 3) { D.P([[12, 33], [1, 24], [14, 30]], k.white); D.P([[16, 32], [6, 21], [17, 29]], k.white); }
         D.eye(13, 35.5); D.an.head = [17, 31, 9]; break;
-      case 'ankylo':
-        D.E(14, 45, 7.5, 5.5, k.c1); D.P([[10, 41], [13, 37], [17, 41]], k.c3); D.P([[17, 41], [21, 37], [22, 43]], k.c3);
+      case 'ankylo': {
+        const hy = low ? 45 : by + 3;
+        D.E(14, hy, 7.5, 5.5, k.c1); D.E(10, hy + 3, 4, 1.6, k.c2, 0, false); D.P([[10, hy - 4], [13, hy - 8], [17, hy - 4]], k.c3); D.P([[17, hy - 4], [21, hy - 8], [22, hy - 2]], k.c3);
         for (let i = 0; i < 4; i++) D.P([[24 + i * 7, by + 4], [21 + i * 7, by + 9], [27 + i * 7, by + 5]], k.c3);
-        D.eye(13, 43.5); D.an.head = [14, 44, 6]; break;
+        D.eye(13, hy - 1.5); D.an.head = [14, hy - 1, 6]; break;
+      }
       case 'mammoth':
         D.E(26, by - 9, 9, 6, k.c1); D.C(15, 31, 9, k.c1);
         D.T([[10, 35], [7, 45], [10, 54]], 5.5, 3, k.c1);
@@ -1255,16 +1363,23 @@ function aset(m, x, y, a) { if (x < 0 || y < 0 || x >= m.w || y >= m.h) return; 
 function aget(m, x, y) { if (x < 0 || y < 0 || x >= m.w || y >= m.h) return 0; return m.area[y * m.w + x]; }
 function bget(m, x, y) { if (!m.biome) return m.biomeId; x = Math.max(0, Math.min(m.w - 1, x)); y = Math.max(0, Math.min(m.h - 1, y)); return m.biome[y * m.w + x]; }
 
-function building(m, x, y, w, h, roof, doorX, emblem, cave) {
-  // cave: Höhlenwohnung im Fels statt Holzhaus
-  const WALL = cave ? T.CLIFF : T.WALL, WIN = cave ? T.CAVE_WINDOW : T.WINDOW;
+// Bauweisen: Holzhaus, Höhle im Fels, Steinhaus, Hütte mit Strohdach, Fellzelt
+const STYLES = {
+  wood: { wall: T.WALL, win: T.WINDOW, door: T.DOOR },
+  cave: { wall: T.CLIFF, win: T.CAVE_WINDOW, door: T.CAVE_DOOR, roof: T.CLIFF_TOP },
+  stone: { wall: T.WALL_STONE, win: T.WINDOW_STONE, door: T.DOOR_STONE, roof: T.ROOF_SLATE },
+  hut: { wall: T.WALL, win: T.WINDOW, door: T.DOOR, roof: T.ROOF_THATCH },
+  tent: { wall: T.WALL, win: T.WINDOW, door: T.DOOR, roof: T.ROOF_HIDE },
+};
+function building(m, x, y, w, h, roof, doorX, emblem, style = 'wood') {
+  const S = STYLES[style] || STYLES.wood, R = S.roof || roof;
   for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
-    let t = WALL;
-    if (j < h - 2) t = cave ? T.CLIFF_TOP : roof; else if (j === h - 2 && i % 2 === 1) t = WIN;
+    let t = S.wall;
+    if (j < h - 2) t = R; else if (j === h - 2 && i % 2 === 1) t = S.win;
     tset(m, x + i, y + j, t);
   }
-  tset(m, x + doorX, y + h - 1, cave ? T.CAVE_DOOR : T.DOOR);
-  tset(m, x + doorX, y + h - 2, emblem ?? WALL);
+  tset(m, x + doorX, y + h - 1, S.door);
+  tset(m, x + doorX, y + h - 2, emblem ?? S.wall);
   return { x: x + doorX, y: y + h - 1 };
 }
 
@@ -1495,7 +1610,8 @@ function buildTown(m, i, r) {
     tset(m, X + 6, Y + 14, T.BONES); m.objs.set(K(X + 6, Y + 14), { text: 'Ein riesiger Knochen. Die Kinder aus Farnweiler klettern gern darauf herum.' });
     m.objs.set(K(X + 8, Y + 14), { text: 'Das Lagerfeuer von Farnweiler. Abends erzählen sich hier alle Geschichten aus der Urzeit.' });
   }
-  const caveTown = t.start || t.biome === 1 || t.biome === 3;
+  if (t.name === 'Vulkanheim') return buildVolcanoTown(m, i, X, Y);
+  const style = t.start ? 'cave' : HOUSE_STYLE[i] || 'wood';
 
   const slots = {
     a: { x: 2, y: 4, w: 5, h: 4, door: 2 },
@@ -1510,15 +1626,55 @@ function buildTown(m, i, r) {
       : { a: ['center', T.ROOF_CENTER, T.WALL_CENTER], b: ['gym', T.ROOF_GYM, T.WALL_GYM], c: ['shop', T.ROOF_SHOP, T.WALL_SHOP], d: ['house', T.ROOF, null] };
   for (const key of Object.keys(plan)) {
     const s = slots[key]; const [kind, roof, emblem] = plan[key];
-    const door = building(m, X + s.x, Y + s.y, s.w, s.h, roof, s.door, emblem, caveTown && (kind === 'home' || kind === 'house' || kind === 'house2'));
-    const id = `${kind}:${i}`;
-    DOORS[id] = door;
-    m.warps.set(K(door.x, door.y), { to: id, x: 4, y: ROOM_H[kind] - 2, dir: 'up' });
+    placeBuilding(m, i, kind, X + s.x, Y + s.y, s.w, s.h, roof, s.door, emblem, ['home', 'house', 'house2'].includes(kind) ? style : 'wood');
   }
   tset(m, X + 13, Y + 11, T.SIGN);
   m.objs.set(K(X + 13, Y + 11), { text: `${t.name.toUpperCase()}\n${t.line}` });
   m.npcs.push(new Actor({ x: X + 8, y: Y + 10, dir: 'down', variant: 1, wander: true, id: `villager:${i}:0`, talk: t.line }));
   m.npcs.push(new Actor({ x: X + 18, y: Y + 9, dir: 'left', variant: 2, wander: true, id: `villager:${i}:1`, talk: HINTS[i % HINTS.length] }));
+}
+
+// Bauweise der Wohnhäuser je Stadt (Index wie TOWNS)
+const HOUSE_STYLE = ['cave', 'hut', 'stone', 'hut', 'wood', 'hut', 'stone', 'wood', 'stone', 'wood', 'tent', 'hut', 'cave', 'wood', 'hut', 'tent', 'cave', 'stone'];
+function placeBuilding(m, i, kind, x, y, w, h, roof, doorX, emblem, style) {
+  const door = building(m, x, y, w, h, roof, doorX, emblem, style), id = `${kind}:${i}`;
+  DOORS[id] = door;
+  m.warps.set(K(door.x, door.y), { to: id, x: 4, y: ROOM_H[kind] - 2, dir: 'up' });
+}
+/* Vulkanheim: zwei Terrassen am Hang, die Arena ganz oben, ein Lavastrom fließt mitten durch den Ort */
+function buildVolcanoTown(m, i, X, Y) {
+  const t = TOWNS[i], set = (x, y, tt) => tset(m, X + x, Y + y, tt);
+  for (let x = 0; x < TW; x++) { set(x, 0, T.CLIFF_TOP); set(x, 7, T.CLIFF_TOP); set(x, 8, T.CLIFF); }
+  for (const x of [0, 1, 20, 21]) set(x, 1, T.CLIFF_TOP);
+  for (const x of [0, 1, 20, 21]) set(x, 2, T.CLIFF);
+  // Wege: oben vor den Türen, Treppe durch die Felsstufe, unten die Hauptstraße
+  for (let x = 2; x <= 19; x++) set(x, 6, T.PAVE);
+  for (let y = 1; y <= 17; y++) { set(TCX, y, T.PAVE); set(TCX + 1, y, T.PAVE); }
+  for (const y of [7, 8]) { set(TCX, y, T.STAIRS); set(TCX + 1, y, T.STAIRS); }
+  for (let x = 0; x < TW; x++) { set(x, TCY, T.PAVE); set(x, TCY + 1, T.PAVE); }
+  for (let x = 2; x <= 19; x++) set(x, 16, T.PAVE);
+  // Lavastrom: vom Krater über die Felsstufe bis aus dem Ort hinaus, mit Brücken
+  for (let y = 0; y <= 8; y++) set(7, y, T.WATER);
+  set(8, 3, T.WATER); set(8, 4, T.WATER); set(6, 5, T.WATER);
+  for (let y = 9; y <= 17; y++) { set(7, y, T.WATER); set(8, y, T.WATER); }
+  for (const y of [6, 9, 10, 16]) { set(7, y, T.BRIDGE); if (y !== 6) set(8, y, T.BRIDGE); }
+  set(9, 12, T.WATER); set(9, 13, T.WATER); set(6, 13, T.WATER);
+  // Häuser: oben ein Steinhaus und die Arena, unten Center, Laden und ein zweites Steinhaus
+  placeBuilding(m, i, 'house', X + 2, Y + 2, 4, 4, T.ROOF, 1, null, 'stone');
+  placeBuilding(m, i, 'gym', X + 14, Y + 1, 6, 5, T.ROOF_GYM, 2, T.WALL_GYM, 'stone');
+  placeBuilding(m, i, 'center', X + 1, Y + 12, 5, 4, T.ROOF_CENTER, 2, T.WALL_CENTER, 'wood');
+  placeBuilding(m, i, 'shop', X + 14, Y + 12, 4, 4, T.ROOF_SHOP, 1, T.WALL_SHOP, 'wood');
+  placeBuilding(m, i, 'house2', X + 18, Y + 12, 4, 4, T.ROOF, 1, null, 'stone');
+  // Fackeln, Felsen, Knochen und Glutfarne
+  for (const [x, y] of [[10, 5], [13, 5], [10, 11], [13, 11], [1, 6], [20, 6]]) set(x, y, T.TORCH);
+  for (const [x, y] of [[9, 2], [21, 3], [10, 14], [3, 11], [12, 0]]) set(x, y, T.ROCK);
+  for (const [x, y] of [[9, 15], [16, 11]]) set(x, y, T.FERN);
+  set(9, 3, T.BONES); m.objs.set(K(X + 9, Y + 3), { text: 'Die Knochen eines riesigen Urwesens. Sie sind von der Hitze ganz schwarz geworden.' });
+  set(5, 11, T.SIGN); m.objs.set(K(X + 5, Y + 11), { text: `${t.name.toUpperCase()}\n${t.line} Die Arena liegt oben am Hang.` });
+  m.objs.set(K(X + 7, Y + 3), { text: 'Glühende Lava fließt vom Krater herab. Lieber nicht zu nah rangehen!' });
+  m.npcs.push(new Actor({ x: X + 4, y: Y + 10, dir: 'down', variant: 1, wander: true, id: `villager:${i}:0`, talk: t.line }));
+  m.npcs.push(new Actor({ x: X + 18, y: Y + 9, dir: 'left', variant: 2, wander: true, id: `villager:${i}:1`, talk: HINTS[i % HINTS.length] }));
+  m.npcs.push(new Actor({ x: X + 9, y: Y + 6, dir: 'down', variant: 4, id: `villager:${i}:2`, talk: 'Die Lava wärmt unsere Häuser. Im Winter ist es hier oben am gemütlichsten!' }));
 }
 
 /* ---------------------------------------------------------------------
@@ -1586,11 +1742,17 @@ function makeInterior(id) {
       for (const x of [1, 2, 3]) m.objs.set(K(x, 1), { text: 'Ein großer Rechner analysiert Bernsteinproben. Auf dem Bildschirm zucken grüne Kurven.' });
       for (const [x, y] of [[0, 2], [9, 2], [0, 3]]) m.objs.set(K(x, y), { text: 'Ein Glastank mit einer schwebenden Bernsteinprobe. Blubb, blubb.' });
       for (const [x, y] of [[3, 4], [0, 6], [0, 7]]) m.objs.set(K(x, y), { text: 'Reagenzgläser, ein Mikroskop und viele Notizen über Fossilien.' });
-      m.objs.set(K(9, 6), { text: 'Prof. Bernsteins Forschungsnotizen: Jedes Wesen, das du triffst, wird in deinem URDEX eingetragen.' });
+      const lexikon = async () => {
+        const c = await ask('LABOR-PC: Was möchtest du lesen?', ['URZEIT-LEXIKON', 'NOTIZEN', 'ZURÜCK']);
+        if (c === 0) await openScreen(new DexScreen(false, true));
+        if (c === 1) await say('Prof. Bernsteins Notizen: Jedes Wesen beruht auf einem echten Tier aus der Urzeit. Im LEXIKON steht, auf welchem.');
+      };
+      m.objs.set(K(9, 6), { fn: lexikon });
+      for (const x of [6, 7, 8]) m.objs.set(K(x, 1), { fn: async () => { await say('Das Fossil-Archiv des Professors. Hier steht, welche echten Urzeittiere hinter den Wesen stecken.'); await openScreen(new DexScreen(false, true)); } });
       for (const x of [4, 5, 6]) m.objs.set(K(x, 4), { fn: () => chooseStarter() });
       npc({ x: 5, y: 3, dir: 'down', variant: 3, id: 'prof', talk: async () => {
-        if (!state.team.length) { await say(`PROF. BERNSTEIN: Da bist du ja, ${PN()}! In diesen drei Bernsteinkapseln warten junge Dinos auf einen Partner.`); await say('Der flinke ACE, der starke CHOMP und die sanfte PARIS. Wen wählst du?'); await chooseStarter(); }
-        else await say(`PROF. BERNSTEIN: Wie geht es ${wName(state.team[0]).toUpperCase()}? Triff viele Wesen und fülle deinen URDEX!`);
+        if (!state.team.length) { await say(`PROF. BERNSTEIN: Da bist du ja, ${PN()}! In diesen drei Bernsteinkapseln warten junge Dinos auf einen Partner.`); await say('Das sanfte PARASPROSS vom Typ PFLANZE, das gepanzerte ANKYLINO vom Typ BODEN und das flinke DILOSPRITZ vom Typ GIFT. Wen wählst du?'); await chooseStarter(); }
+        else { await say(`PROF. BERNSTEIN: Wie geht es ${wName(state.team[0]).toUpperCase()}? Triff viele Wesen und fülle deinen URDEX!`); await say('Am PC und im Fossil-Archiv erfährst du, auf welchen echten Urzeittieren die Wesen beruhen.'); }
       } });
       npc({ x: 2, y: 7, dir: 'right', variant: 3, wander: true, talk: 'ASSISTENT: Der Professor erforscht, wie die Wesen die Urzeit überlebt haben.' });
       break;
@@ -2059,7 +2221,8 @@ class Menu {
 
 /* --- Urdex --- */
 class DexScreen {
-  constructor(all) { this.all = all; this.sel = 0; this.scroll = 0; }
+  // all: alle Arten zeigen (Entwickler) · lex: Urzeit-Lexikon im Labor (echte Vorbilder)
+  constructor(all, lex) { this.all = all; this.lex = lex; this.sel = 0; this.scroll = 0; }
   known(id) { return this.all || state.seen[id]; }
   update() {
     const n = SPECIES.length;
@@ -2070,12 +2233,16 @@ class DexScreen {
     if (this.sel < this.scroll) this.scroll = this.sel;
     if (this.sel >= this.scroll + 8) this.scroll = this.sel - 7;
     if (pressed.B || pressed.START) { pop(this); this.done(); return; }
-    if (pressed.A && this.known(this.sel + 1)) { const sp = SPECIES[this.sel]; run(() => say(`${sp.name.toUpperCase()}, das ${sp.cat}-Wesen. ${sp.dex}`)); }
+    if (pressed.A && this.known(this.sel + 1)) {
+      const sp = SPECIES[this.sel], r = REAL[sp.name];
+      if (this.lex && r) run(async () => { await say(`${sp.name.toUpperCase()} beruht auf: ${r[0]}.`); await say(`Zeit: ${r[1]}. Größe: ${r[2]}.`); await say(r[3]); });
+      else run(() => say(`${sp.name.toUpperCase()}, das ${sp.cat}-Wesen. ${sp.dex}`));
+    }
   }
   draw() {
     bgPattern('#d8e4f0', '#ccdaea');
     const seen = Object.keys(state.seen).length, caught = Object.keys(state.caught).length;
-    header(this.all ? 'URZEIT-DATENBANK' : 'URDEX', this.all ? `${SPECIES.length} ARTEN` : `GESEHEN ${seen} · GEFANGEN ${caught}`);
+    header(this.lex ? 'URZEIT-LEXIKON' : this.all ? 'URZEIT-DATENBANK' : 'URDEX', this.all ? `${SPECIES.length} ARTEN` : this.lex ? `${seen} BEKANNT` : `GESEHEN ${seen} · GEFANGEN ${caught}`);
     const sp = SPECIES[this.sel], known = this.known(sp.id);
     box(4, 24, 132, 120, UI.panel);
     ctx.fillStyle = '#c8d8e8'; ctx.beginPath(); ctx.ellipse(70, 124, 44, 9, 0, 0, 7); ctx.fill();
@@ -2094,10 +2261,13 @@ class DexScreen {
       text(nm, 176, y - 1, UI.text, null, 16, Math.min(measure(nm), 74));
     }
     box(2, 146, 252, 44);
-    if (known) {
+    if (known && this.lex && REAL[sp.name]) {
+      const v = `Vorbild: ${REAL[sp.name][0]}`; text(v, 12, 150, UI.text, null, 16, Math.min(measure(v), 232));
+      text('A: mehr erfahren   B: zurück', 12, 166, '#7888a0', null);
+    } else if (known) {
       text(`${sp.name.toUpperCase()}  ·  ${sp.cat}-Wesen`, 12, 150);
       text('A: Eintrag lesen   B: zurück', 12, 166, '#7888a0', null);
-    } else text('Dieses Wesen hast du noch nicht gesehen.', 12, 150);
+    } else text(this.lex ? 'Triff dieses Wesen, dann weiß der Professor mehr.' : 'Dieses Wesen hast du noch nicht gesehen.', 12, 150);
   }
 }
 
@@ -2197,13 +2367,14 @@ class StarterScreen {
       rr(x, y, 76, 112, 6, UI.dark); rr(x + 1, y + 1, 74, 110, 5, sel ? UI.red : '#a89878'); rr(x + 3, y + 3, 70, 106, 4, sel ? '#fff4e8' : '#f4ecdc');
       ctx.fillStyle = '#e0d4bc'; ctx.beginPath(); ctx.ellipse(x + 38, y + 72, 28, 6, 0, 0, 7); ctx.fill();
       drawWesen(id, x + 6, y + 10 + (sel && (tick >> 3) & 1 ? -2 : 0));
-      const nk = STARTER_NICKS[i]; text(nk, x + 38 - Math.floor(measure(nk) / 2), y + 76);
+      const nk = sp.name; text(nk, x + 38 - Math.floor(Math.min(measure(nk), 68) / 2), y + 76, UI.text, UI.shadow, 16, 68);
       typeChip(sp.types[0], x + 14, y + 94);
     });
     box(2, 146, 252, 44);
     const sp = SPECIES[STARTERS[this.sel] - 1];
-    text(`${STARTER_NICKS[this.sel].toUpperCase()} · ${sp.name} · ${sp.cat}`, 12, 150);
-    const dl = wrapW(sp.dex, 222); text(dl[0] + (dl.length > 1 ? ' …' : ''), 12, 166, '#7888a0', null);
+    const strong = SPECIES[STARTERS[(this.sel + 1) % 3] - 1].types[0], weak = SPECIES[STARTERS[(this.sel + 2) % 3] - 1].types[0];
+    text(`${sp.name.toUpperCase()} · ${sp.cat}-Wesen`, 12, 150);
+    text(`Stark: ${strong}  ·  Schwach: ${weak}`, 12, 166, '#7888a0', null);
   }
 }
 
@@ -2565,17 +2736,18 @@ const CHART = {
   PFLANZE: { s: ['WASSER', 'BODEN', 'GESTEIN', 'ELEKTRO'], w: ['FEUER', 'PFLANZE', 'GIFT', 'FLUG', 'KÄFER', 'DRACHE', 'STAHL', 'WIND'], i: [] },
   ELEKTRO: { s: ['WASSER', 'FLUG', 'WIND'], w: ['ELEKTRO', 'PFLANZE', 'DRACHE'], i: ['BODEN'] },
   EIS: { s: ['PFLANZE', 'BODEN', 'FLUG', 'DRACHE'], w: ['FEUER', 'WASSER', 'EIS', 'STAHL'], i: [] },
-  KAMPF: { s: ['NORMAL', 'EIS', 'GESTEIN', 'STAHL'], w: ['GIFT', 'FLUG', 'PSYCHO', 'KÄFER'], i: ['GEIST'] },
-  GIFT: { s: ['PFLANZE'], w: ['GIFT', 'BODEN', 'GESTEIN', 'GEIST'], i: ['STAHL'] },
+  KAMPF: { s: ['NORMAL', 'EIS', 'GESTEIN', 'STAHL'], w: ['GIFT', 'FLUG', 'PSYCHO', 'KÄFER', 'FEE'], i: ['GEIST'] },
+  GIFT: { s: ['PFLANZE', 'FEE'], w: ['GIFT', 'BODEN', 'GESTEIN', 'GEIST'], i: ['STAHL'] },
   BODEN: { s: ['FEUER', 'ELEKTRO', 'GIFT', 'GESTEIN', 'STAHL'], w: ['PFLANZE', 'KÄFER'], i: ['FLUG'] },
   FLUG: { s: ['PFLANZE', 'KAMPF', 'KÄFER'], w: ['ELEKTRO', 'GESTEIN', 'STAHL'], i: [] },
   PSYCHO: { s: ['KAMPF', 'GIFT'], w: ['PSYCHO', 'STAHL'], i: [] },
-  KÄFER: { s: ['PFLANZE', 'PSYCHO'], w: ['FEUER', 'KAMPF', 'GIFT', 'FLUG', 'GEIST', 'STAHL'], i: [] },
+  KÄFER: { s: ['PFLANZE', 'PSYCHO'], w: ['FEUER', 'KAMPF', 'GIFT', 'FLUG', 'GEIST', 'STAHL', 'FEE'], i: [] },
   GESTEIN: { s: ['FEUER', 'EIS', 'FLUG', 'KÄFER', 'WIND'], w: ['KAMPF', 'BODEN', 'STAHL'], i: [] },
   GEIST: { s: ['PSYCHO', 'GEIST'], w: ['STAHL'], i: ['NORMAL'] },
-  DRACHE: { s: ['DRACHE'], w: ['STAHL'], i: [] },
-  STAHL: { s: ['EIS', 'GESTEIN'], w: ['FEUER', 'WASSER', 'ELEKTRO', 'STAHL'], i: [] },
+  DRACHE: { s: ['DRACHE'], w: ['STAHL'], i: ['FEE'] },
+  STAHL: { s: ['EIS', 'GESTEIN', 'FEE'], w: ['FEUER', 'WASSER', 'ELEKTRO', 'STAHL'], i: [] },
   WIND: { s: ['PFLANZE', 'KÄFER'], w: ['ELEKTRO', 'GESTEIN', 'STAHL', 'WIND'], i: [] },
+  FEE: { s: ['KAMPF', 'DRACHE'], w: ['FEUER', 'GIFT', 'STAHL'], i: [] },
 };
 function typeEff(atk, defTypes) { const c = CHART[atk]; let m = 1; for (const d of defTypes) m *= c.i.includes(d) ? 0 : c.s.includes(d) ? 2 : c.w.includes(d) ? 0.5 : 1; return m; }
 
@@ -2601,6 +2773,7 @@ const TIER_MOVES = {
   DRACHE: ['Drachenwut', 'Drachenklaue', 'Drachenpuls', 'Urzorn'],
   STAHL: ['Metallklaue', 'Eisenschädel', 'Eisenschweif', 'Meteorhammer'],
   WIND: ['Windstoß', 'Wirbelklinge', 'Sturmschnitt', 'Orkan'],
+  FEE: ['Feenstaub', 'Zauberschein', 'Mondgewalt', 'Sternenregen'],
 };
 const SIDE_FX = { FEUER: ['BRN', [10, 10, 10, 20]], ELEKTRO: ['PAR', [10, 10, 10, 20]], GIFT: ['PSN', [30, 30, 20, 30]] };
 for (const [type, names] of Object.entries(TIER_MOVES)) names.forEach((n, t) => {
@@ -2619,7 +2792,8 @@ M('Donnerwelle', 'ELEKTRO', 0, 90, 20, { status: 'PAR', chance: 100 });
 M('Schlafgesang', 'PSYCHO', 0, 60, 15, { status: 'SLP', chance: 100 });
 M('Sporenwolke', 'PFLANZE', 0, 75, 15, { status: 'SLP', chance: 100 });
 M('Irrlicht', 'FEUER', 0, 85, 15, { status: 'BRN', chance: 100 });
-const STATUS_MOVE = { NORMAL: 'Kampfschrei', FEUER: 'Irrlicht', WASSER: 'Erholung', PFLANZE: 'Sporenwolke', ELEKTRO: 'Donnerwelle', EIS: 'Härtner', KAMPF: 'Kampfschrei', GIFT: 'Giftwolke', BODEN: 'Härtner', FLUG: 'Sprint', PSYCHO: 'Konzentration', KÄFER: 'Sprint', GESTEIN: 'Härtner', GEIST: 'Irrlicht', DRACHE: 'Kampfschrei', STAHL: 'Härtner', WIND: 'Sprint' };
+M('Charme', 'FEE', 0, 100, 20, { foe: { atk: -2 } });
+const STATUS_MOVE = { NORMAL: 'Kampfschrei', FEUER: 'Irrlicht', WASSER: 'Erholung', PFLANZE: 'Sporenwolke', ELEKTRO: 'Donnerwelle', EIS: 'Härtner', KAMPF: 'Kampfschrei', GIFT: 'Giftwolke', BODEN: 'Härtner', FLUG: 'Sprint', PSYCHO: 'Konzentration', KÄFER: 'Sprint', GESTEIN: 'Härtner', GEIST: 'Irrlicht', DRACHE: 'Kampfschrei', STAHL: 'Härtner', WIND: 'Sprint', FEE: 'Charme' };
 const STATUS_INFO = {
   PSN: { tag: 'GIF', col: '#a040a0', text: 'wurde vergiftet!' }, PAR: { tag: 'PAR', col: '#c8a020', text: 'ist paralysiert! Es kann sich vielleicht nicht bewegen!' },
   BRN: { tag: 'BRT', col: '#e05030', text: 'hat Verbrennungen erlitten!' }, SLP: { tag: 'SLF', col: '#8890a0', text: 'ist eingeschlafen!' },
@@ -3436,21 +3610,20 @@ async function chooseStarter() {
     const c = await openScreen(new StarterScreen());
     if (c < 0) return say('PROF. BERNSTEIN: Lass dir ruhig Zeit.');
     const sp = SPECIES[STARTERS[c] - 1];
-    const nick = STARTER_NICKS[c];
-    const ok = await ask(`${nick.toUpperCase()}, ein ${sp.name} vom Typ ${sp.types[0]}. Bist du sicher?`, ['JA', 'NEIN']);
+    const ok = await ask(`${sp.name.toUpperCase()}, das Wesen vom Typ ${sp.types[0]}. Bist du sicher?`, ['JA', 'NEIN']);
     if (ok !== 0) continue;
-    const w = makeWesen(sp.id, 5); w.nick = nick;
+    const w = makeWesen(sp.id, 5);
     state.team.push(w);
     state.caught[sp.id] = 1;
-    await say(`${PN()} erhält ${nick.toUpperCase()}!`);
-    if (await ask(`Möchtest du ${nick.toUpperCase()} einen anderen Spitznamen geben?`, ['JA', 'NEIN'], 1) === 0) {
-      const nn = await new NameScreen(w.nick, state.profile.look, sp.id).run();
+    await say(`${PN()} erhält ${sp.name.toUpperCase()}!`);
+    if (await ask(`Möchtest du ${sp.name.toUpperCase()} einen Spitznamen geben?`, ['JA', 'NEIN'], 1) === 0) {
+      const nn = await new NameScreen('', state.profile.look, sp.id).run();
       if (nn) w.nick = nn;
     }
     state.items.Bernsteinkapsel = (state.items.Bernsteinkapsel || 0) + 5;
     state.items.Trank = (state.items.Trank || 0) + 3;
     await say(`PROF. BERNSTEIN: Nimm diese 5 BERNSTEINKAPSELN und 3 TRÄNKE mit. Damit kannst du wilde Wesen fangen!`);
-    await say(`Du und ${w.nick.toUpperCase()} seid jetzt ein Team! Mein Assistent auf Route 1 lässt euch durch.`);
+    await say(`Du und ${wName(w).toUpperCase()} seid jetzt ein Team! Mein Assistent auf Route 1 lässt euch durch.`);
     saveGame();
     return;
   }
@@ -3556,7 +3729,7 @@ function worldUpdate() {
     const [dx, dy] = DIRS[dir]; const x = n.x + dx, y = n.y + dy;
     n.dir = dir;
     if (Math.abs(x - n.home.x) > 2 || Math.abs(y - n.home.y) > 2) continue;
-    if (blocked(cur, x, y, n) || cur.warps.has(K(x, y)) || tget(cur, x, y) === T.DOOR || tget(cur, x, y) === T.CAVE_DOOR || tget(cur, x, y) === T.MAT) continue;
+    if (blocked(cur, x, y, n) || cur.warps.has(K(x, y)) || tget(cur, x, y) === T.DOOR || tget(cur, x, y) === T.CAVE_DOOR || tget(cur, x, y) === T.DOOR_STONE || tget(cur, x, y) === T.MAT) continue;
     n.start(dir);
   }
   if (popup.t > 0) popup.t--;
@@ -3876,6 +4049,11 @@ function applySave(s) {
     // Alte Spielstände: alle Urdex-Nummern rücken um die 9 neuen Starter nach hinten
     const shift = o => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [+k + 9, v]));
     (s.team || []).forEach(w => { w.sp += 9; }); s.seen = shift(s.seen); s.caught = shift(s.caught);
+  }
+  if ((s.dexv || 1) < 3) {
+    // Version 3: die früheren Wind- und Elektro-Starter (Nr. 1–6) stehen jetzt am Ende des Urdex
+    const mv = id => id <= 6 ? id + 74 : id, mvk = o => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [mv(+k), v]));
+    [...(s.team || []), ...(s.box || [])].forEach(w => { w.sp = mv(w.sp); }); s.seen = mvk(s.seen); s.caught = mvk(s.caught);
   }
   state.team = (s.team || []).filter(w => SPECIES[w.sp - 1]).map(ensureWesen); state.seen = s.seen || {}; state.caught = s.caught || {};
   state.box = (s.box || []).filter(w => SPECIES[w.sp - 1]).map(ensureWesen); state.money = s.money ?? 3000; state.lastCenter = s.lastCenter || null;

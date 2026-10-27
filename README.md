@@ -3,7 +3,7 @@
 Ein klassisches Monster-Rollenspiel im Stil der alten Handheld-Spiele, angesiedelt in der Urzeit.
 
 - 2 Regionen (Jurania und Kreidara), 16 Arenen, 16 Orden und der Meteorgipfel
-- 65 eigene Urzeit-Wesen mit Typen, Werten, Entwicklungen und Urdex-Einträgen
+- 80 eigene Urzeit-Wesen mit Typen, Werten, Entwicklungen und Urdex-Einträgen
 - Gebiete mit eigenem Wetter: Urwald, Vulkan, Eiszeit, Wüste und Sumpf
 - Tag und Nacht nach echter Uhrzeit
 - Als App installierbar (PWA), läuft offline

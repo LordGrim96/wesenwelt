@@ -79,7 +79,7 @@ html = head + src[:body_start] + "</head>\n<body>\n" + src[body_start:] + sw_reg
 manifest = {
     "name": "Wesenwelt – Urzeit-Edition",
     "short_name": "Wesenwelt",
-    "description": "Klassisches Monster-Rollenspiel in der Urzeit mit 16 Orden und 65 Wesen.",
+    "description": "Klassisches Monster-Rollenspiel in der Urzeit mit 16 Orden und 80 Wesen.",
     "lang": "de",
     "start_url": "./",
     "scope": "./",
