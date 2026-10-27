@@ -127,7 +127,7 @@ const CONFIG = {
   textSpeed: 1,
   saveKey: 'wesenwelt.urzeit.v1',
 };
-const GAME_VERSION = '202610271138'; // wird von build_app.py durch die Build-Zeit ersetzt
+const GAME_VERSION = '202610272001'; // wird von build_app.py durch die Build-Zeit ersetzt
 
 const VW = 256, VH = 192, TS = 16;
 const cv = document.getElementById('screen');
@@ -511,8 +511,59 @@ function charCanvas(rows, variant, flip) {
   rows.forEach((row, y) => { row = row.padEnd(16, '.').slice(0, 16); for (let x = 0; x < 16; x++) { const ch = row[x]; if (ch === '.' || !pal[ch]) continue; g.fillStyle = ch === 'S' && rows === ITEM_ART ? 'rgba(0,0,0,.25)' : pal[ch]; g.fillRect(flip ? 15 - x : x, y, 1, 1); } });
   return c;
 }
+/* --- Eigene Spielfigur aus dem Charakter-Editor --- */
+const LOOK_OPTS = {
+  style: ['Hut', 'Kurz', 'Lang'],
+  hair: ['#5a3a22', '#24242c', '#e8c860', '#c84830', '#e8e8f0', '#5878d8'],
+  skin: ['#f8d0a8', '#e8b888', '#c48c5c', '#8a5a38'],
+  hat: ['#e8d098', '#d84838', '#3a78d8', '#303038', '#f0f0f0', '#48a050'],
+  jacket: ['#d84838', '#3a78d8', '#48a050', '#e8b020', '#9058c0', '#f07898', '#404850'],
+  pants: ['#3a5088', '#303038', '#6a5040', '#4a7a48', '#c8c0b0'],
+  pack: ['#e0a040', '#5a3a22', '#3a78d8', '#48a050', '#d84838'],
+};
+const DEFAULT_LOOK = { style: 0, hair: 0, skin: 0, hat: 0, jacket: 0, pants: 0, pack: 0 };
+function lookPal(l) {
+  const O = LOOK_OPTS, hair = O.hair[l.hair], top = l.style === 0 ? O.hat[l.hat] : hair;
+  return { ...CH, h: top, H: shade(top, -0.3), k: hair, s: O.skin[l.skin], S: shade(O.skin[l.skin], -0.15), r: O.jacket[l.jacket], R: shade(O.jacket[l.jacket], -0.3), p: O.pants[l.pants], P: shade(O.pants[l.pants], -0.3), y: O.pack[l.pack], Y: shade(O.pack[l.pack], -0.3) };
+}
+function charRows(view, frame) {
+  const rows = view === 'down' ? [HEAD_D, BODY_D, frame === 0 ? LEG_S : frame === 1 ? LEG_W : mirror(LEG_W)]
+    : view === 'up' ? [HEAD_U, BODY_U, frame === 0 ? LEG_S : frame === 1 ? LEG_W : mirror(LEG_W)]
+      : [SIDE, frame === 0 ? SIDE_S : SIDE_W];
+  return rows.flat().map(r => r.padEnd(16, '.').slice(0, 16));
+}
+function longHair(rows, view) {
+  const set = (x, y, ch) => { if (y >= 0 && y < rows.length) rows[y] = rows[y].slice(0, x) + ch + rows[y].slice(x + 1); };
+  if (view === 'down') {
+    for (const y of [9, 10, 11, 12]) { set(2, y, 'k'); set(13, y, 'k'); set(1, y, 'o'); set(14, y, 'o'); }
+    for (const y of [9, 10]) { set(3, y, 'k'); set(12, y, 'k'); }
+    set(2, 13, 'o'); set(13, 13, 'o');
+  } else if (view === 'up') {
+    for (const y of [10, 11, 12]) { for (let x = 4; x <= 11; x++) set(x, y, 'k'); set(3, y, 'o'); set(12, y, 'o'); }
+    for (let x = 4; x <= 11; x++) set(x, 13, 'o');
+  } else {
+    for (const y of [10, 11, 12]) { set(9, y, 'k'); set(10, y, 'k'); set(11, y, 'o'); }
+    set(9, 13, 'o'); set(10, 13, 'o');
+  }
+}
+const PCHAR = new Map();
+function playerSprite(look, dir, frame) {
+  const key = JSON.stringify(look) + dir + frame;
+  let c = PCHAR.get(key); if (c) return c;
+  if (PCHAR.size > 300) PCHAR.clear();
+  const view = dir === 'right' ? 'left' : dir;
+  const rows = charRows(view, frame);
+  if (look.style === 2) longHair(rows, view);
+  const pal = lookPal(look);
+  c = document.createElement('canvas'); c.width = 16; c.height = rows.length;
+  const g = c.getContext('2d');
+  rows.forEach((row, y) => { for (let x = 0; x < 16; x++) { const ch = row[x]; if (ch === '.' || !pal[ch]) continue; g.fillStyle = pal[ch]; g.fillRect(dir === 'right' ? 15 - x : x, y, 1, 1); } });
+  PCHAR.set(key, c); return c;
+}
+
 const CHAR = {};
 function getChar(kind, variant, dir, frame) {
+  if (kind === 'player') return playerSprite(state.profile.look, dir, frame);
   const key = kind + variant;
   if (!CHAR[key]) {
     if (kind === 'item') { const c = charCanvas(ITEM_ART, 0, false); CHAR[key] = { down: [c, c, c] }; }
@@ -1192,7 +1243,7 @@ function addItem(m, x, y, name, tag) {
     talk: async () => {
       state.flags[id] = 1;
       state.items[name] = (state.items[name] || 0) + 1;
-      await say(`Du findest: ${name.toUpperCase()}!`);
+      await say(`${PN()} findet: ${name.toUpperCase()}!`);
     },
   }));
 }
@@ -1273,7 +1324,7 @@ function makeInterior(id) {
       tset(m, 4, 3, T.TABLE); tset(m, 5, 3, T.TABLE); tset(m, 0, 2, T.PLANT); tset(m, 9, 6, T.PLANT);
       if (kind === 'home') {
         npc({ x: 7, y: 4, dir: 'left', variant: 2, id: 'mom', talk: async () => {
-          await say('MAMA: Pass gut auf dich auf! Die Urzeit da draußen ist wild.');
+          await say(`MAMA: ${PN()}, pass gut auf dich auf! Die Urzeit da draußen ist wild.`);
           await healTeam(true);
         } });
       } else {
@@ -1296,7 +1347,7 @@ function makeInterior(id) {
       for (const x of [4, 5, 6]) m.objs.set(K(x, 4), { fn: () => chooseStarter() });
       m.objs.set(K(3, 4), { text: 'Notizen über Bernstein, Fossilien und Vulkangestein.' });
       npc({ x: 5, y: 3, dir: 'down', variant: 3, id: 'prof', talk: async () => {
-        if (!state.team.length) { await say('PROF. BERNSTEIN: Da bist du ja! Auf dem Tisch liegen drei Bernsteinkapseln.'); await chooseStarter(); }
+        if (!state.team.length) { await say(`PROF. BERNSTEIN: Da bist du ja, ${PN()}! Auf dem Tisch liegen drei Bernsteinkapseln.`); await chooseStarter(); }
         else await say(`PROF. BERNSTEIN: Wie geht es ${SPECIES[state.team[0].sp - 1].name.toUpperCase()}? Am PC findest du meine Urzeit-Datenbank.`);
       } });
       npc({ x: 1, y: 6, dir: 'right', variant: 3, wander: true, talk: 'ASSISTENT: Der Professor erforscht, wie die Wesen die Urzeit überlebt haben.' });
@@ -1338,8 +1389,9 @@ class Actor {
   frame() { if (this.moving && this.prog < 8) return this.parity ? 1 : 2; return 0; }
 }
 
-const state = { badges: Array(16).fill(false), flags: {}, items: {}, steps: 0, team: [], seen: {}, caught: {} };
-const player = new Actor({ sprite: 'hero', variant: 0 });
+const state = { profile: { name: 'Spieler', look: { ...DEFAULT_LOOK } }, time: 0, badges: Array(16).fill(false), flags: {}, items: {}, steps: 0, team: [], seen: {}, caught: {} };
+const player = new Actor({ sprite: 'player', variant: 0 });
+const PN = () => state.profile.name || 'Spieler';
 let cur = null;
 let lastArea = 0, popup = { text: '', t: 0 };
 let turnTimer = 0;
@@ -1382,6 +1434,8 @@ const KEYMAP = {
 };
 let noclip = false;
 addEventListener('keydown', e => {
+  // Namenseingabe: echte Tastatur tippt direkt
+  if (textInput && textInput === topLayer() && !e.altKey && !e.ctrlKey && !e.metaKey && textInput.onKey(e)) { e.preventDefault(); return; }
   if (e.code === 'KeyN' && e.altKey) { noclip = !noclip; return; } // Entwickler: Alt+N = durch Wände laufen
   if (e.code === 'KeyT' && e.altKey) { timeMode = (timeMode + 1) % TIMES.length; popup = { text: 'ZEIT: ' + TIMES[timeMode].toUpperCase(), t: 90 }; return; } // Alt+T = Tageszeit
   const k = KEYMAP[e.code]; if (!k) return;
@@ -1479,7 +1533,7 @@ class Dialog {
 const say = s => new Promise(res => layers.push(new Dialog(s, res)));
 
 class Choice {
-  constructor(prompt, opts, done) { this.d = new Dialog(prompt, () => {}); this.d.pi = this.d.pages.length - 1; this.opts = opts; this.sel = 0; this.done = done; }
+  constructor(prompt, opts, done, def = 0) { this.d = new Dialog(prompt, () => {}); this.d.pi = this.d.pages.length - 1; this.opts = opts; this.sel = def; this.done = done; }
   update() {
     if (this.d.shown < this.d.len) { this.d.shown += 2; return; }
     if (pressed.up) this.sel = (this.sel + this.opts.length - 1) % this.opts.length;
@@ -1496,11 +1550,189 @@ class Choice {
     this.opts.forEach((o, k) => { text(o, x + 20, y + 4 + k * 16); if (k === this.sel) arrowRight(x + 9, y + 8 + k * 16); });
   }
 }
-const ask = (prompt, opts) => new Promise(res => layers.push(new Choice(prompt, opts, res)));
+const ask = (prompt, opts, def = 0) => new Promise(res => layers.push(new Choice(prompt, opts, res, def)));
 function openScreen(layer) { return new Promise(res => { layer.done = res; layers.push(layer); }); }
 
+/* --- Profile, Charakter-Editor, Namenseingabe, Trainerpass --- */
+function drawStage(cx, cy, rx) { ctx.fillStyle = 'rgba(40,60,90,.18)'; ctx.beginPath(); ctx.ellipse(cx, cy, rx, rx * 0.22, 0, 0, 7); ctx.fill(); }
+class ProfileScreen {
+  constructor() { this.sel = 0; this.res = null; this.refresh(); }
+  refresh() { this.data = Array.from({ length: PROFILE_COUNT }, (_, i) => loadSlot(i)); }
+  pick() { this.refresh(); return new Promise(r => { this.res = r; }); }
+  update() {
+    if (pressed.left) this.sel = (this.sel + PROFILE_COUNT - 1) % PROFILE_COUNT;
+    if (pressed.right) this.sel = (this.sel + 1) % PROFILE_COUNT;
+    const r = this.res; if (!r) return;
+    if (pressed.A || pressed.START) { this.res = null; r(this.sel); }
+    else if (pressed.B) { this.res = null; r(-1); }
+  }
+  draw() {
+    bgPattern('#e8dcc0', '#e2d4b4');
+    header('PROFIL WÄHLEN', `${this.data.filter(Boolean).length}/${PROFILE_COUNT}`);
+    this.data.forEach((d, i) => {
+      const x = 6 + i * 84, y = 26, sel = i === this.sel;
+      rr(x, y, 76, 112, 6, UI.dark); rr(x + 1, y + 1, 74, 110, 5, sel ? UI.red : '#a89878'); rr(x + 3, y + 3, 70, 106, 4, sel ? '#fff4e8' : '#f4ecdc');
+      if (d) {
+        const look = { ...DEFAULT_LOOK, ...(d.profile || {}).look }, nm = (d.profile || {}).name || 'Spieler';
+        drawStage(x + 38, y + 52, 22);
+        const fr = sel ? [1, 0, 2, 0][(tick >> 3) & 3] : 0;
+        ctx.drawImage(playerSprite(look, 'down', fr), x + 22, y + 10, 32, 40);
+        text(nm, x + 38 - Math.floor(Math.min(measure(nm), 66) / 2), y + 54, UI.text, UI.shadow, 16, 66);
+        const n = (d.badges || []).filter(Boolean).length;
+        text(`Orden ${n}/16`, x + 8, y + 70, '#6a7890', null);
+        text(`Wesen ${(d.team || []).length}`, x + 8, y + 82, '#6a7890', null);
+        text(`Zeit ${fmtTime(d.time || 0)}`, x + 8, y + 94, '#6a7890', null);
+      } else {
+        rr(x + 30, y + 24, 16, 40, 3, sel ? UI.red : '#c8b898'); rr(x + 18, y + 36, 40, 16, 3, sel ? UI.red : '#c8b898');
+        ['Neues', 'Profil'].forEach((s, k) => text(s, x + 38 - Math.floor(measure(s) / 2), y + 72 + k * 14, sel ? UI.text : '#8a7a60', null));
+      }
+    });
+    box(DLG.x, 146, DLG.w, 44);
+    const d = this.data[this.sel];
+    if (d) text(`${(d.profile || {}).name || 'Spieler'} · ${placeName(d)}`, 12, 150, UI.text, UI.shadow, 16, 230);
+    else text('Leerer Platz für ein neues Abenteuer.', 12, 150);
+    text('A: auswählen   B: zurück', 12, 166, '#7888a0', null);
+  }
+}
+
+const EDIT_ROWS = [['name', 'NAME'], ['style', 'FRISUR'], ['hair', 'HAARFARBE'], ['skin', 'HAUTTON'], ['hat', 'HUT'], ['jacket', 'JACKE'], ['pants', 'HOSE'], ['pack', 'RUCKSACK'], ['done', 'FERTIG']];
+class EditorScreen {
+  constructor(profile, title) { this.name = profile.name || ''; this.look = { ...DEFAULT_LOOK, ...profile.look }; this.title = title; this.sel = 0; }
+  run() { return new Promise(r => { this.res = r; layers.push(this); }); }
+  update() {
+    const n = EDIT_ROWS.length, key = EDIT_ROWS[this.sel][0], opts = LOOK_OPTS[key];
+    if (pressed.up) { this.sel = (this.sel + n - 1) % n; return; }
+    if (pressed.down) { this.sel = (this.sel + 1) % n; return; }
+    const locked = key === 'hat' && this.look.style !== 0;
+    if (opts && !locked && (pressed.left || pressed.right || pressed.A)) this.look[key] = (this.look[key] + (pressed.left ? opts.length - 1 : 1)) % opts.length;
+    else if (pressed.A && key === 'name') this.editName();
+    else if ((pressed.A && key === 'done') || pressed.START) { if (this.name.trim()) this.finish(); else this.editName(); }
+    else if (pressed.B) this.cancel();
+  }
+  async editName() { const nm = await new NameScreen(this.name, this.look).run(); if (nm !== null) { this.name = nm; if (this.sel === 0) this.sel = 1; } }
+  finish() { pop(this); this.res({ name: this.name.trim(), look: { ...this.look } }); }
+  async cancel() { const c = await ask('Änderungen verwerfen?', ['JA', 'NEIN'], 1); if (c === 0) { pop(this); this.res(null); } }
+  draw() {
+    bgPattern('#dfe7f0', '#d6e0ec');
+    header(this.title);
+    box(4, 22, 104, 124, UI.panel);
+    drawStage(56, 118, 30);
+    const dirs = ['down', 'left', 'up', 'right'], dir = dirs[(tick >> 6) & 3], fr = [1, 0, 2, 0][(tick >> 3) & 3];
+    ctx.drawImage(playerSprite(this.look, dir, fr), 24, 38, 64, 80);
+    const nm = this.name || '???'; text(nm, 56 - Math.floor(Math.min(measure(nm), 90) / 2), 122, UI.text, UI.shadow, 16, 90);
+    box(110, 22, 144, 124);
+    EDIT_ROWS.forEach(([key, label], r) => {
+      const y = 25 + r * 13, sel = r === this.sel, locked = key === 'hat' && this.look.style !== 0;
+      if (sel) rr(114, y + 1, 136, 13, 3, '#f8e0d8');
+      if (key === 'done') { text('FERTIG', 182 - measure('FERTIG') / 2, y - 1, sel ? UI.red : UI.text, null); return; }
+      text(label, 120, y - 1, locked ? '#a8b0bc' : UI.text, null);
+      const vx = 196;
+      if (key === 'name') text(this.name || '-', vx - 6, y - 1, UI.text, null, 16, 58);
+      else if (key === 'style') text(LOOK_OPTS.style[this.look.style], vx, y - 1, UI.text, null);
+      else if (locked) text('-', vx + 14, y - 1, '#a8b0bc', null);
+      else { rr(vx, y + 3, 34, 9, 2, UI.dark); rr(vx + 1, y + 4, 32, 7, 2, LOOK_OPTS[key][this.look[key]]); }
+      if (sel && LOOK_OPTS[key] && !locked) {
+        ctx.fillStyle = UI.red;
+        for (let i = 0; i < 4; i++) { ctx.fillRect(vx - 6 + i, y + 7 - i, 1, 1 + i * 2); ctx.fillRect(vx + 40 - i, y + 7 - i, 1, 1 + i * 2); }
+      }
+    });
+    box(DLG.x, 148, DLG.w, 42);
+    const key = EDIT_ROWS[this.sel][0];
+    const hint = key === 'name' ? 'A: Namen eingeben' : key === 'done' ? 'A: Profil speichern' : key === 'hat' && this.look.style !== 0 ? 'Einen Hut gibt es nur mit der Frisur „Hut“.' : 'Links/Rechts: auswählen';
+    text(hint, 12, 151); text('START: fertig   B: abbrechen', 12, 166, '#7888a0', null);
+  }
+}
+
+const KB_PAGES = [['ABCDEFGHIJ', 'KLMNOPQRST', 'UVWXYZÄÖÜ '], ['abcdefghij', 'klmnopqrst', 'uvwxyzäöüß'], ['0123456789', '.,!?-+&\'#*', '():;/~@$% ']];
+const KB_PAGE_NAMES = ['ABC', 'abc', '123'];
+const NAME_MAX = 10;
+let textInput = null;
+class NameScreen {
+  constructor(name, look) { this.name = name; this.look = look; this.page = 0; this.cx = 0; this.cy = 0; }
+  run() { return new Promise(r => { this.res = r; layers.push(this); textInput = this; }); }
+  type(ch) { if (this.name.length < NAME_MAX && !(ch === ' ' && !this.name)) this.name += ch; }
+  back() { this.name = this.name.slice(0, -1); }
+  ok() { const n = this.name.trim(); if (n) this.close(n); }
+  close(v) { pop(this); textInput = null; this.res(v); }
+  onKey(e) {
+    if (e.key === 'Enter') this.ok();
+    else if (e.key === 'Backspace') this.back();
+    else if (e.key === 'Escape') this.close(null);
+    else if (e.key.length === 1 && /[\p{L}\p{N} .,!?\-+&'#*():;/~@$%]/u.test(e.key)) this.type(e.key);
+    else return false;
+    return true;
+  }
+  update() {
+    if (pressed.up) this.cy = (this.cy + 3) % 4;
+    if (pressed.down) this.cy = (this.cy + 1) % 4;
+    if (this.cy === 3) {
+      const b = this.cx < 3 ? 0 : this.cx < 7 ? 1 : 2;
+      if (pressed.left) this.cx = [7, 0, 3][b];
+      if (pressed.right) this.cx = [3, 7, 0][b];
+    } else {
+      if (pressed.left) this.cx = (this.cx + 9) % 10;
+      if (pressed.right) this.cx = (this.cx + 1) % 10;
+    }
+    if (pressed.START) { this.ok(); return; }
+    if (pressed.B) { if (this.name) this.back(); else this.close(null); return; }
+    if (pressed.A) {
+      if (this.cy < 3) { const ch = KB_PAGES[this.page][this.cy][this.cx]; this.type(ch); }
+      else { const b = this.cx < 3 ? 0 : this.cx < 7 ? 1 : 2; if (b === 0) this.page = (this.page + 1) % KB_PAGES.length; else if (b === 1) this.back(); else this.ok(); }
+    }
+  }
+  draw() {
+    bgPattern('#dfe7f0', '#d6e0ec');
+    header('WIE HEISST DU?', `${this.name.length}/${NAME_MAX}`);
+    box(4, 24, 248, 50, UI.panel);
+    ctx.drawImage(playerSprite(this.look, 'down', 0), 14, 30, 32, 40);
+    for (let i = 0; i < NAME_MAX; i++) {
+      const x = 60 + i * 18;
+      rr(x, 62, 14, 2, 1, i === this.name.length && (tick >> 4) & 1 ? UI.red : '#8aa0b8');
+      if (this.name[i]) text(this.name[i], x + 7 - Math.floor(measure(this.name[i]) / 2), 42);
+    }
+    box(4, 78, 248, 66);
+    const keys = KB_PAGES[this.page];
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 10; c++) {
+      const x = 18 + c * 23, y = 84 + r * 18, ch = keys[r][c];
+      if (r === this.cy && c === this.cx) { rr(x - 3, y + 1, 20, 16, 3, UI.red); rr(x - 2, y + 2, 18, 14, 2, '#fff0e8'); }
+      text(ch === ' ' ? '_' : ch, x + 7 - Math.floor(measure(ch === ' ' ? '_' : ch) / 2), y, ch === ' ' ? '#a8b0bc' : UI.text, null);
+    }
+    box(DLG.x, 148, DLG.w, 42);
+    const btns = [[`${KB_PAGE_NAMES[(this.page + 1) % 3]}`, 12, 70], ['LÖSCHEN', 92, 76], ['OK', 178, 66]];
+    btns.forEach(([label, x, w], b) => {
+      const sel = this.cy === 3 && (this.cx < 3 ? 0 : this.cx < 7 ? 1 : 2) === b;
+      rr(x, 154, w, 18, 4, sel ? UI.red : '#8aa0b8'); rr(x + 1, 155, w - 2, 16, 3, sel ? '#fff0e8' : '#eef2f8');
+      text(label, x + w / 2 - Math.floor(measure(label) / 2), 154, UI.text, null);
+    });
+    text('Tippen geht auch mit der Tastatur', 12, 174, '#7888a0', null);
+  }
+}
+
+class TrainerCard {
+  update() {
+    if (pressed.A) run(async () => { const p = await new EditorScreen(state.profile, 'AUSSEHEN ÄNDERN').run(); if (p) { state.profile = p; saveGame(); } });
+    else if (pressed.B || pressed.START) { pop(this); this.done(); }
+  }
+  draw() {
+    bgPattern('#5a8ac8', '#5482c0');
+    header('TRAINERPASS', `PROFIL ${currentSlot + 1}`);
+    rr(8, 26, 240, 116, 8, UI.dark); rr(10, 28, 236, 112, 7, '#d84838'); rr(14, 32, 228, 104, 5, '#f8f0e0');
+    ctx.fillStyle = '#efe2c8'; for (let y = 36; y < 132; y += 6) ctx.fillRect(18, y, 220, 1);
+    text(PN(), 24, 34, UI.text, UI.shadow);
+    const n = state.badges.filter(Boolean).length;
+    const rows = [['ORDEN', `${n}/16`], ['URDEX', `${Object.keys(state.seen).length} gesehen`], ['WESEN', `${state.team.length} im Team`], ['SPIELZEIT', fmtTime(state.time)]];
+    rows.forEach(([a, b], i) => { text(a, 24, 54 + i * 15, '#7888a0', null); text(b, 100, 54 + i * 15, UI.text, null); });
+    rr(170, 40, 64, 76, 5, '#e6d8bc');
+    drawStage(202, 108, 24);
+    ctx.drawImage(playerSprite(state.profile.look, 'down', 0), 178, 34, 48, 60);
+    for (let i = 0; i < 16; i++) { const x = 24 + i * 13, got = state.badges[i]; rr(x, 120, 11, 9, 2, got ? shade(TYPES[TOWNS[i + 1].type], -0.4) : '#c8bca0'); if (got) rr(x + 1, 121, 9, 7, 2, TYPES[TOWNS[i + 1].type]); }
+    box(DLG.x, 146, DLG.w, 44);
+    text('A: Aussehen und Namen ändern', 12, 150); text('B: zurück', 12, 166, '#7888a0', null);
+  }
+}
+
 class Menu {
-  constructor() { this.items = ['URDEX', 'TEAM', 'TASCHE', 'ORDEN', 'KARTE', 'SICHERN', 'ZURÜCK']; this.sel = 0; }
+  constructor() { this.items = ['URDEX', 'TEAM', 'TASCHE', 'PROFIL', 'ORDEN', 'KARTE', 'SICHERN', 'ZURÜCK']; this.sel = 0; }
   update() {
     if (pressed.up) this.sel = (this.sel + this.items.length - 1) % this.items.length;
     if (pressed.down) this.sel = (this.sel + 1) % this.items.length;
@@ -1512,6 +1744,7 @@ class Menu {
         if (it === 'URDEX') await openScreen(new DexScreen(false));
         if (it === 'TEAM') await openScreen(new TeamScreen());
         if (it === 'TASCHE') await showBag();
+        if (it === 'PROFIL') await openScreen(new TrainerCard());
         if (it === 'ORDEN') await openScreen(new BadgeScreen());
         if (it === 'KARTE') await openScreen(new MapScreen());
         if (it === 'SICHERN') {
@@ -1753,13 +1986,8 @@ class MapScreen {
 
 /* --- Titel --- */
 class Title {
-  constructor(done) { this.done = done; this.stage = 0; this.sel = 0; this.hasSave = !!loadRaw(); }
-  update() {
-    if (this.stage === 0) { if (pressed.A || pressed.START) { if (this.hasSave) this.stage = 1; else { pop(this); this.done('new'); } } return; }
-    if (pressed.up || pressed.down) this.sel ^= 1;
-    if (pressed.B) this.stage = 0;
-    if (pressed.A || pressed.START) { pop(this); this.done(this.sel === 0 ? 'continue' : 'new'); }
-  }
+  constructor(done) { this.done = done; }
+  update() { if (pressed.A || pressed.START) { pop(this); this.done(); } }
   draw() {
     const sky = ['#f8b060', '#f09050', '#e07048', '#c05040', '#8a3a3a', '#5a2c34', '#3a2228', '#3a2228'];
     sky.forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(0, i * 18, VW, 18); });
@@ -1774,12 +2002,7 @@ class Title {
     textOutline('URZEIT-EDITION', 18, 50, '#f8a030', '#3a1a10', 16);
     ctx.fillStyle = '#1a1014'; ctx.fillRect(0, 152, VW, 40);
     const vl = versionLabel(); if (vl) text(vl, VW - 6 - measure(vl), 175, '#8a7460', null);
-    if (this.stage === 0) { if ((tick >> 5) & 1) text('START DRÜCKEN', 128 - measure('START DRÜCKEN') / 2, 158, '#f8e8b0', '#3a1a10'); }
-    else {
-      box(70, 116, 116, 52);
-      text('WEITER', 98, 122); text('NEUES SPIEL', 98, 140);
-      arrowRight(84, 126 + this.sel * 18);
-    }
+    if ((tick >> 5) & 1) text('START DRÜCKEN', 128 - measure('START DRÜCKEN') / 2, 158, '#f8e8b0', '#3a1a10');
   }
 }
 
@@ -1822,7 +2045,7 @@ async function chooseStarter() {
     if (ok !== 0) continue;
     state.team.push(makeWesen(sp.id, 5));
     state.caught[sp.id] = 1;
-    await say(`Du erhältst ${sp.name.toUpperCase()}!`);
+    await say(`${PN()} erhält ${sp.name.toUpperCase()}!`);
     await say('PROF. BERNSTEIN: Pass gut auf es auf! Mein Assistent auf Route 1 lässt dich jetzt durch.');
     saveGame();
     return;
@@ -1844,7 +2067,7 @@ async function leaderTalk(i) {
   if (!won) return say(`${t.leader.toUpperCase()}: Trainiere weiter und versuche es noch einmal!`);
   state.badges[i - 1] = true;
   await say(`${t.leader.toUpperCase()}: Unglaublich! Du hast dir das verdient.`);
-  await say(`Du erhältst den ${t.badge.toUpperCase()}!`);
+  await say(`${PN()} erhält den ${t.badge.toUpperCase()}!`);
   const n = state.badges.filter(Boolean).length;
   if (i === 8) await say('Mit 8 Orden darfst du über die große Brücke nach KREIDARA!');
   else if (i === 16) await say('Du hast alle 16 Orden! Der Weg zum METEORGIPFEL ist frei.');
@@ -1860,7 +2083,7 @@ async function championTalk() {
   if (c !== 0) return say('Ich warte hier auf dich.');
   if (await battle({ name: 'Champion Aurelia' })) {
     state.flags.champion = 1;
-    await say('Du bist der neue CHAMPION von Jurania und Kreidara!');
+    await say(`${PN().toUpperCase()} ist der neue CHAMPION von Jurania und Kreidara!`);
     saveGame();
   }
 }
@@ -2067,7 +2290,7 @@ function step() {
     if (layers.length) topLayer().update();
     else if (mode === 'world' && busy === 0) worldUpdate();
   }
-  if (mode === 'world') weatherStep();
+  if (mode === 'world') { weatherStep(); if (tick % 60 === 0) state.time++; }
   updateStep();
   for (const k in pressed) pressed[k] = false;
 }
@@ -2079,10 +2302,10 @@ let updatePending = false, updateT = 0;
 addEventListener('wesenwelt-update', () => { updatePending = true; });
 function updateStep() {
   if (updatePending && !updateT) {
-    const onTitle = mode === 'title' && layers.length === 1 && layers[0] instanceof Title;
+    const onTitle = mode === 'title' && layers.length === 1 && (layers[0] instanceof Title || layers[0] instanceof ProfileScreen);
     const calm = mode === 'world' && !layers.length && busy === 0 && !player.moving && fade === 0 && fadeTarget === 0;
     if (onTitle || calm) {
-      if (calm) { saveGame(); try { sessionStorage.setItem('wesenwelt.resume', '1'); } catch (e) {} }
+      if (calm) { saveGame(); try { sessionStorage.setItem('wesenwelt.resume', String(currentSlot)); } catch (e) {} }
       updateT = 75;
     }
   }
@@ -2096,31 +2319,78 @@ function versionLabel() {
 /* ---------------------------------------------------------------------
    SPEICHERN / LADEN
    --------------------------------------------------------------------- */
-function snapshot() { return { map: cur ? cur.id : 'home:0', x: player.x, y: player.y, dir: player.dir, badges: state.badges, flags: state.flags, items: state.items, steps: state.steps, team: state.team, seen: state.seen, caught: state.caught }; }
-function saveGame() { try { localStorage.setItem(CONFIG.saveKey, JSON.stringify(snapshot())); return true; } catch (e) { return false; } }
+// Drei Profile mit je eigenem Spielstand
+const PROFILE_COUNT = 3;
+const slotKey = i => `wesenwelt.urzeit.slot${i + 1}`;
+let currentSlot = 0;
+function snapshot() { return { slot: currentSlot, profile: state.profile, time: state.time, map: cur ? cur.id : 'home:0', x: player.x, y: player.y, dir: player.dir, badges: state.badges, flags: state.flags, items: state.items, steps: state.steps, team: state.team, seen: state.seen, caught: state.caught }; }
+function loadSlot(i) { try { const s = localStorage.getItem(slotKey(i)); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+function writeSlot(i, d) { try { localStorage.setItem(slotKey(i), JSON.stringify(d)); return true; } catch (e) { return false; } }
+function deleteSlot(i) { try { localStorage.removeItem(slotKey(i)); } catch (e) {} }
+function saveGame() { return writeSlot(currentSlot, snapshot()); }
 function loadRaw() { try { const s = localStorage.getItem(CONFIG.saveKey); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
+function migrateOldSave() {
+  // Spielstand aus der Zeit vor den Profilen landet in Profil 1
+  const old = loadRaw();
+  if (!old || [0, 1, 2].some(i => loadSlot(i))) return;
+  old.profile = old.profile || { name: 'Spieler', look: { ...DEFAULT_LOOK } };
+  writeSlot(0, old);
+}
 function applySave(s) {
+  state.profile = s.profile || { name: 'Spieler', look: { ...DEFAULT_LOOK } };
+  state.profile.look = { ...DEFAULT_LOOK, ...state.profile.look };
+  state.time = s.time || 0;
   state.badges = (s.badges || []).slice(0, 16).concat(Array(16).fill(false)).slice(0, 16);
   state.flags = s.flags || {}; state.items = s.items || {}; state.steps = s.steps || 0;
   state.team = (s.team || []).filter(w => SPECIES[w.sp - 1]); state.seen = s.seen || {}; state.caught = s.caught || {};
   lastArea = 0;
   setMap(s.map || 'home:0', s.x ?? 4, s.y ?? 6, s.dir || 'down');
 }
+const fmtTime = sec => `${Math.floor(sec / 3600)}:${String(Math.floor(sec / 60) % 60).padStart(2, '0')}`;
+function placeName(d) {
+  if (!d || !d.map) return '';
+  if (d.map === 'world') return AREA_NAMES[aget(MAPS.world, d.x, d.y)] || 'UNTERWEGS';
+  const t = TOWNS[+d.map.split(':')[1]]; return t ? t.name.toUpperCase() : '';
+}
 
 /* ---------------------------------------------------------------------
    START
    --------------------------------------------------------------------- */
-async function newGame() {
-  Object.assign(state, { badges: Array(16).fill(false), flags: {}, items: {}, steps: 0, team: [], seen: {}, caught: {} });
+async function newGame(profile) {
+  Object.assign(state, { profile, time: 0, badges: Array(16).fill(false), flags: {}, items: {}, steps: 0, team: [], seen: {}, caught: {} });
   lastArea = 0;
   setMap('home:0', 4, 4, 'down');
   mode = 'world';
+  saveGame();
   await fadeTo(0);
-  await say('PROF. BERNSTEIN: Hallo! Willkommen in der Urzeit, der Welt der WESEN!');
+  await say(`PROF. BERNSTEIN: Hallo, ${PN()}! Willkommen in der Urzeit, der Welt der WESEN!`);
   await say('Unsere Welt hat zwei Regionen: JURANIA im Westen und KREIDARA im Osten.');
   await say('In jeder Region warten 8 Arenaleiter. Sammle alle 16 Orden!');
   await say('Dann darfst du auf dem METEORGIPFEL den Champion herausfordern.');
   await say('Doch zuerst brauchst du ein eigenes Wesen. Komm in mein Labor in FARNWEILER!');
+}
+async function profileFlow() {
+  const ps = new ProfileScreen(); layers.push(ps);
+  try {
+    for (;;) {
+      const slot = await ps.pick();
+      if (slot < 0) return null;
+      const data = loadSlot(slot);
+      if (!data) {
+        const prof = await new EditorScreen({ name: '', look: { ...DEFAULT_LOOK } }, 'NEUES PROFIL').run();
+        if (prof) return { slot, profile: prof };
+        continue;
+      }
+      const prof = { name: 'Spieler', ...data.profile, look: { ...DEFAULT_LOOK, ...(data.profile || {}).look } };
+      const c = await ask(`Profil von ${prof.name}`, ['SPIELEN', 'AUSSEHEN', 'LÖSCHEN', 'ZURÜCK']);
+      if (c === 0) return { slot, data };
+      if (c === 1) { const p = await new EditorScreen(prof, 'AUSSEHEN ÄNDERN').run(); if (p) { data.profile = p; writeSlot(slot, data); } }
+      if (c === 2) {
+        const s = await ask(`${prof.name} wirklich löschen? Der Spielstand geht verloren.`, ['JA', 'NEIN'], 1);
+        if (s === 0) { deleteSlot(slot); await say(`Das Profil von ${prof.name} wurde gelöscht.`); }
+      }
+    }
+  } finally { pop(ps); }
 }
 async function boot() {
   try { await Promise.race([Promise.all([document.fonts.load(fontOf(16)), document.fonts.load(fontOf(40))]), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
@@ -2132,16 +2402,23 @@ async function boot() {
   requestAnimationFrame(loop);
   const hot = window.claude?.hot;
   if (hot?.snapshot) { try { hot.snapshot(() => (mode === 'world' ? snapshot() : null)); } catch (e) {} }
+  migrateOldSave();
   const hotData = hot?.data;
-  if (hotData && hotData.map) { applySave(hotData); mode = 'world'; return; }
-  // Nach einem automatischen Update direkt weiterspielen
-  let resume = false;
-  try { resume = sessionStorage.getItem('wesenwelt.resume') === '1'; sessionStorage.removeItem('wesenwelt.resume'); } catch (e) {}
-  if (resume && loadRaw()) { applySave(loadRaw()); mode = 'world'; popup = { text: 'UPDATE INSTALLIERT', t: 160 }; return; }
-  const choice = await new Promise(res => layers.push(new Title(res)));
-  await fadeTo(4);
-  if (choice === 'continue' && loadRaw()) { applySave(loadRaw()); mode = 'world'; await fadeTo(0); }
-  else await run(newGame);
+  if (hotData && hotData.map) { currentSlot = hotData.slot ?? 0; applySave(hotData); mode = 'world'; return; }
+  // Nach einem automatischen Update direkt im selben Profil weiterspielen
+  let resume = null;
+  try { resume = sessionStorage.getItem('wesenwelt.resume'); sessionStorage.removeItem('wesenwelt.resume'); } catch (e) {}
+  if (resume !== null && loadSlot(+resume)) { currentSlot = +resume; applySave(loadSlot(currentSlot)); mode = 'world'; popup = { text: 'UPDATE INSTALLIERT', t: 160 }; return; }
+  for (;;) {
+    await new Promise(res => layers.push(new Title(res)));
+    const r = await profileFlow();
+    if (!r) continue;
+    currentSlot = r.slot;
+    await fadeTo(4);
+    if (r.data) { applySave(r.data); mode = 'world'; await fadeTo(0); }
+    else await run(() => newGame(r.profile));
+    return;
+  }
 }
 let last = performance.now(), acc = 0;
 function loop(now) {
