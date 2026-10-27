@@ -97,7 +97,7 @@ const CONFIG = {
   textSpeed: 1,
   saveKey: 'wesenwelt.urzeit.v1',
 };
-const GAME_VERSION = '202610272047'; // wird von build_app.py durch die Build-Zeit ersetzt
+const GAME_VERSION = '202610272106'; // wird von build_app.py durch die Build-Zeit ersetzt
 
 // Logische Bildgröße passt sich dem Bildschirm an (mindestens 256x192); SC = interne Auflösung für scharfe Schrift
 let VW = 256, VH = 192, OX = 0, OY = 0, RW = 256, RH = 192;
@@ -188,19 +188,22 @@ const T = {
   COUNTER: 16, MAT: 17, SHELF: 18, TABLE: 19, PLANT: 20, ROOF_GYM: 21, ROOF_CENTER: 22,
   ROOF_SHOP: 23, ROCK: 24, GYMFLOOR: 25, PC: 26, STATUE: 27, VOID: 28,
   WALL_CENTER: 29, WALL_SHOP: 30, WALL_GYM: 31, FERN: 32, BONES: 33, PAVE: 34, TALL_RUSTLE: 35, TORCH: 36,
+  LAB_FLOOR: 37, LAB_WALL: 38, LAB_MACHINE: 39, LAB_TANK: 40, LAB_BENCH: 41, CAPSULE_TABLE: 42,
+  CLIFF_TOP: 43, CLIFF: 44, CAVE_DOOR: 45, CAVE_WINDOW: 46, CAMPFIRE: 47,
 };
-const TREE_Q = 40, NT = 44;
+const TREE_Q = 60, NT = 64;
 const SOLID = new Set([T.TREE, T.WATER, T.ROOF, T.WALL, T.WINDOW, T.SIGN, T.FENCE, T.IWALL, T.COUNTER,
   T.SHELF, T.TABLE, T.PLANT, T.ROOF_GYM, T.ROOF_CENTER, T.ROOF_SHOP, T.ROCK, T.PC, T.STATUE, T.VOID,
-  T.WALL_CENTER, T.WALL_SHOP, T.WALL_GYM, T.FERN, T.BONES, T.TORCH]);
+  T.WALL_CENTER, T.WALL_SHOP, T.WALL_GYM, T.FERN, T.BONES, T.TORCH,
+  T.LAB_WALL, T.LAB_MACHINE, T.LAB_TANK, T.LAB_BENCH, T.CAPSULE_TABLE, T.CLIFF_TOP, T.CLIFF, T.CAVE_WINDOW, T.CAMPFIRE]);
 // Nachbarschafts-Klassen für Übergänge und Schatten
 const GROUNDY = new Set([T.GRASS, T.TALL, T.FLOWER, T.FERN, T.ROCK, T.BONES, T.SIGN, T.FENCE, T.TREE, T.TORCH]);
 const EDGE_RECV = new Set([T.PATH, T.SAND, T.PAVE]);
-const ROOFS = new Set([T.ROOF, T.ROOF_CENTER, T.ROOF_SHOP, T.ROOF_GYM]);
-const WALLS = new Set([T.WALL, T.WINDOW, T.DOOR, T.WALL_CENTER, T.WALL_SHOP, T.WALL_GYM]);
-const SHADOW_RECV = new Set([T.GRASS, T.PATH, T.SAND, T.TALL, T.FLOWER, T.PAVE, T.FLOOR, T.GYMFLOOR]);
-const TOP_CASTERS = new Set([T.TREE, T.IWALL, T.SHELF, T.PC]);
-const GLOWS = new Set([T.WINDOW, T.WALL_CENTER, T.WALL_SHOP, T.TORCH]);
+const ROOFS = new Set([T.ROOF, T.ROOF_CENTER, T.ROOF_SHOP, T.ROOF_GYM, T.CLIFF_TOP]);
+const WALLS = new Set([T.WALL, T.WINDOW, T.DOOR, T.WALL_CENTER, T.WALL_SHOP, T.WALL_GYM, T.CLIFF, T.CAVE_DOOR, T.CAVE_WINDOW]);
+const SHADOW_RECV = new Set([T.GRASS, T.PATH, T.SAND, T.TALL, T.FLOWER, T.PAVE, T.FLOOR, T.GYMFLOOR, T.LAB_FLOOR]);
+const TOP_CASTERS = new Set([T.TREE, T.IWALL, T.SHELF, T.PC, T.LAB_WALL, T.LAB_MACHINE, T.LAB_TANK]);
+const GLOWS = new Set([T.WINDOW, T.WALL_CENTER, T.WALL_SHOP, T.TORCH, T.CAVE_WINDOW, T.CAMPFIRE]);
 
 let atlas = []; // atlas[gebiet][frame]
 function painter(g, ox) {
@@ -385,6 +388,54 @@ const TILE_ART = {
     P.r(0, 0, 16, 16, b.g[1]); const m = { o: b.t[0], 1: b.g[0], 2: b.g[3], 3: b.g[3] };
     for (const [ox, oy] of [[0, 0], [8, 0], [0, 8], [8, 8]]) pat(P, TUFT, m, ox + (ox ? 1 : -1), oy + 1);
   },
+  [T.LAB_FLOOR]: P => { P.r(0, 0, 16, 16, '#e4eaee'); P.r(0, 0, 16, 1, '#f8fcfc'); P.r(0, 0, 1, 16, '#f8fcfc'); P.r(0, 15, 16, 1, '#b8c4cc'); P.r(15, 0, 1, 16, '#b8c4cc'); P.r(7, 7, 2, 2, '#d0d8de'); },
+  [T.LAB_WALL]: P => { P.r(0, 0, 16, 16, '#d4dde6'); for (let y = 2; y < 10; y += 4) P.r(0, y, 16, 1, '#c4ced8'); P.r(0, 10, 16, 6, '#7a8a9c'); P.r(0, 10, 16, 1, '#3a4858'); P.r(0, 11, 16, 1, '#a8b8c8'); P.r(0, 15, 16, 1, '#3a4858'); for (const x of [3, 11]) P.p(x, 13, '#c8d4e0'); },
+  [T.LAB_MACHINE]: (P, f) => {
+    P.r(0, 0, 16, 16, '#d4dde6'); P.r(1, 1, 14, 15, '#2a3440'); P.r(2, 2, 12, 13, '#4a5868'); P.r(3, 3, 10, 6, '#103040');
+    for (let x = 3; x < 13; x++) P.p(x, 6 + Math.round(Math.sin((x + f * 2) * 0.9) * 2), '#58e0a0');
+    P.r(3, 11, 2, 2, f % 2 ? '#f05040' : '#802820'); P.r(6, 11, 2, 2, f > 1 ? '#48e060' : '#205830'); P.r(9, 11, 4, 1, '#98a8b8'); P.r(9, 13, 4, 1, '#98a8b8');
+  },
+  [T.LAB_TANK]: (P, f) => {
+    P.r(0, 0, 16, 16, '#e4eaee'); P.r(3, 13, 10, 3, '#4a5868'); P.r(3, 0, 10, 2, '#4a5868');
+    P.r(3, 2, 10, 11, '#2a5a78'); P.r(4, 2, 8, 11, '#58b8e0'); P.r(4, 2, 2, 11, '#a8e0f8');
+    pat(P, ['.ooo.', 'oyyyo', 'oyYyo', 'oyyyo', '.ooo.'], { o: '#6a3a10', y: '#f0a020', Y: '#c07010' }, 6, 6 + (f % 2));
+    P.p(9, 10 - f * 2, '#e8f8ff'); P.p(7, 12 - ((f + 2) % 4) * 2, '#e8f8ff');
+  },
+  [T.LAB_BENCH]: P => {
+    P.r(0, 0, 16, 16, '#e4eaee'); P.r(0, 7, 16, 9, '#8a98a8'); P.r(0, 5, 16, 3, '#f4f8fa'); P.r(0, 8, 16, 1, '#5a6878');
+    P.r(2, 1, 3, 5, '#a8e0f8'); P.r(2, 3, 3, 3, '#58d070'); P.r(7, 2, 2, 4, '#a8e0f8'); P.r(7, 4, 2, 2, '#e05878'); P.r(11, 0, 2, 5, '#303840'); P.r(10, 4, 4, 2, '#303840'); P.p(12, 1, '#88c8f0');
+  },
+  [T.CAPSULE_TABLE]: P => {
+    P.r(0, 0, 16, 16, '#e4eaee'); P.r(1, 3, 14, 9, '#5a6878'); P.r(2, 4, 12, 6, '#f4f8fa'); P.r(2, 12, 2, 3, '#5a6878'); P.r(12, 12, 2, 3, '#5a6878');
+    pat(P, ['..oo..', '.oyyo.', 'oyhyyo', 'oyyyYo', '.oYYo.', '..oo..'], { o: '#6a3a10', y: '#f0a020', Y: '#c07010', h: '#fff0b0' }, 5, 3);
+  },
+  [T.CLIFF_TOP]: (P, f, b) => {
+    P.r(0, 0, 16, 16, '#9a8a72');
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const h = hash(x, y, 61); if (h < 0.12) P.p(x, y, '#b8a888'); else if (h > 0.9) P.p(x, y, '#7a6a56'); }
+    for (const [x, y] of [[3, 3], [10, 9], [12, 2]]) { P.p(x, y, b.g[2]); P.p(x + 1, y - 1, b.g[3]); P.p(x + 2, y, b.g[2]); }
+  },
+  [T.CLIFF]: P => {
+    P.r(0, 0, 16, 16, '#7a6a58');
+    for (let y = 0; y < 16; y += 4) { P.r(0, y, 16, 1, '#9a8a72'); P.r(0, y + 3, 16, 1, '#5a4c3e'); }
+    for (const [x, y] of [[4, 1], [11, 5], [7, 9], [2, 13]]) { P.p(x, y, '#4a3e32'); P.p(x + 1, y + 1, '#4a3e32'); }
+    P.r(0, 15, 16, 1, '#3a2e24');
+  },
+  [T.CAVE_DOOR]: P => {
+    TILE_ART[T.CLIFF](P);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = ((x - 7.5) / 6) ** 2 + ((y - 14) / 13) ** 2; if (d < 1) P.p(x, y, d > 0.78 ? '#b8a888' : d > 0.62 ? '#4a3e32' : '#140e0a'); }
+    P.r(4, 5, 8, 11, '#a87848'); for (let y = 6; y < 16; y += 3) P.r(5, y, 6, 1, '#7a5030'); P.r(7, 5, 2, 11, '#140e0a');
+  },
+  [T.CAVE_WINDOW]: P => {
+    TILE_ART[T.CLIFF](P);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = Math.hypot(x - 7.5, y - 7); if (d < 4.6) P.p(x, y, d > 3.6 ? '#4a3e32' : d > 2.2 ? '#f8a040' : '#ffd878'); }
+  },
+  [T.CAMPFIRE]: (P, f, b) => {
+    TILE_ART[T.PATH](P, f, b);
+    for (const [x, y] of [[2, 10], [5, 13], [10, 13], [13, 10], [3, 6], [12, 6]]) { P.r(x, y, 3, 2, '#787066'); P.r(x, y, 3, 1, '#b0a898'); }
+    P.r(5, 10, 6, 2, '#5a3820'); P.r(6, 9, 4, 1, '#7a5030');
+    const fl = [['...o...', '..ooo..', '.ooyoo.', '.oyyyo.', '..oyo..'], ['..o....', '..oo.o.', '.ooyoo.', '.oyyyo.', '..oyo..'], ['....o..', '.o.oo..', '.ooyoo.', '.oyyyo.', '..oyo..'], ['...o...', '..oyo..', '.oyyyo.', '.oyyyo.', '..oyo..']][f];
+    pat(P, fl, { o: '#f06820', y: '#f8d048' }, 4, 4);
+  },
   [T.TORCH]: (P, f, b) => {
     grass(P, b);
     P.r(7, 7, 2, 9, '#4a2c18'); P.r(7, 7, 1, 9, '#8a6038'); P.r(5, 5, 6, 3, '#5a544a'); P.r(5, 5, 6, 1, '#a09888');
@@ -457,7 +508,7 @@ function buildAtlas() {
 /* ---------------------------------------------------------------------
    FIGUREN (16x20, Buchstaben = Farben)
    --------------------------------------------------------------------- */
-const CH = { o: '#283038', h: '#e8d098', H: '#b89858', k: '#5a3a22', s: '#f8d0a8', S: '#d8a078', e: '#202028', r: '#d84838', R: '#a02c28', p: '#3a5088', P: '#28386a', b: '#6a4428', y: '#e0a040', Y: '#b07828', w: '#f8f8f8' };
+const CH = { o: '#283038', h: '#e8d098', H: '#b89858', k: '#5a3a22', s: '#f8d0a8', S: '#d8a078', e: '#202028', r: '#d84838', R: '#a02c28', p: '#3a5088', P: '#28386a', b: '#6a4428', y: '#e0a040', Y: '#b07828', w: '#f8f8f8', c: '#f4a0a0' };
 const VARIANTS = [
   {},
   { h: '#5a3a22', H: '#3a2414', r: '#58a050', R: '#3a7838', y: '#58a050', Y: '#3a7838' },
@@ -469,17 +520,22 @@ const VARIANTS = [
 ];
 const mirror = rows => rows.map(r => r.split('').reverse().join(''));
 const sym = half => half.map(r => r + r.split('').reverse().join(''));
-const HEAD_D = sym(['....oooo', '...ohhhh', '..ohhhhh', '.ohhhhhh', 'oHHHHHHH', '.okkkkkk', '.oksssss', '.okssess', '.okssess', '..osssss', '...ooSSS']);
-const BODY_D = sym(['..orrrry', '.orrrrry', 'osorrrrr', 'osoRrrrr', '.ooRRRRR', '..oppppp']);
-const HEAD_U = sym(['....oooo', '...ohhhh', '..ohhhhh', '.ohhhhhh', 'oHHHHHHH', '.okkkkkk', '.okkkkkk', '.okkkkkk', '.okkkkkk', '..okkkkk', '...ooooo']);
-const BODY_U = sym(['..oryyyy', '.oryyyyy', 'osoyYYYy', 'osoyyyyy', '.ooRYYYY', '..oppppp']);
-const LEG_S = ['..oppPo..oPppo..', '..obbbo..obbbo..', '..ooooo..ooooo..'];
-const LEG_W = ['..oppPo..oPppo..', '..obbbo..ooooo..', '..ooooo.........'];
-const SIDE = ['.....oooo.......', '....ohhhho......', '...ohhhhhho.....', '..ohhhhhhhho....', 'ooHHHHHHHHHo....',
-  '...osskkkkko....', '..osssskkkko....', '..oesssskkko....', '..osssssskko....', '...osssssso.....', '....ooSSoo......',
-  '....orrryyo.....', '...orrrryyyo....', '...osrrryyyo....', '...osRrryyyo....', '....oRRRyyo.....', '....opppppo.....'];
-const SIDE_S = ['....oppPpo......', '....obbbbo......', '....oooooo......'];
-const SIDE_W = ['..oppo.oPpo.....', '..obbo.obbo.....', '..ooo..ooo......'];
+// Figuren 16x24: runder Kopf mit Augenweiß und Wangen, abgesetzte Arme, Gurte, Stiefel
+const HAT = ['......oo', '....oohh', '...ohhhh', '..ohhhhh', '..ohhhhh', '.oHHHHHH', 'oHHHHHHH'];
+const HEAD_D = sym([...HAT, '.okkkkkk', '.okkssss', '.okswess', '.okswess', '.oscssss', '..osssss', '...ooSSS']);
+const BODY_D = sym(['..orrrrr', '.orrryrr', 'oRorryrr', 'oRorrrrr', 'osoRRRRR', '.ooppppp']);
+const HEAD_U = sym([...HAT, '.okkkkkk', '.okkkkkk', '.okkkkkk', '.okkkkkk', '.okkkkkk', '..okkkkk', '...ooooo']);
+const BODY_U = sym(['..oryyyy', '.oryyyyy', 'oRoyYyyy', 'oRoyyyyy', 'osoYYYYY', '.ooppppp']);
+// Frisur ohne Hut (für „Kurz“ und „Lang“)
+const HAIR_TOP = sym(['......oo', '....ookk', '...okkhh', '..okkkhk', '..okkkkk', '.okkkkkk', '.okkkkkk']);
+const HAIR_TOP_S = ['......ooo.......', '....ookkkoo.....', '...okkhhkkko....', '..okkkhkkkkko...', '..okkkkkkkkko...', '..okkkkkkkkko...', '..okkkkkkkkko...'];
+const LEG_S = ['...opppPPpppo...', '...oppo..oppo...', '...obbo..obbo...', '...oooo..oooo...'];
+const LEG_W = ['...opppPPpppo...', '...oppo..oppo...', '...obbo..oooo...', '...oooo.........'];
+const SIDE = ['......ooo.......', '....oohhhoo.....', '...ohhhhhhho....', '..ohhhhhhhhho...', '..ohhhhhhhhho...', '.oHHHHHHHHHHo...', 'oHHHHHHHHHHHo...',
+  '..okkkkkkkkko...', '..osskkkkkkko...', '.osewsskkkkko...', '.osewsskkkkko...', '..osscsskkko....', '...osssskko.....', '....ooSSoo......',
+  '....orrryyo.....', '...orrrryyyo....', '...oRrrryyyo....', '...oRrrryyyo....', '...osRRRyyo.....', '....oppppo......'];
+const SIDE_S = ['....oppPpo......', '.....oppo.......', '.....obbo.......', '.....oooo.......'];
+const SIDE_W = ['....oppPpo......', '...oppo.opo.....', '..obbo...obo....', '..ooo.....oo....'];
 const ITEM_ART = ['................', '................', '................', '................', '......oooo......', '.....oyyyyo.....', '....oyhwyyYo....',
   '....oyhyyyYo....', '...oyyyyyyYYo...', '...oyyyyyyYYo...', '...oYyyyyYYYo...', '....oYYYYYYo....', '.....oooooo.....', '................', '...SSSSSSSSSS...', '................'];
 
@@ -517,8 +573,8 @@ const LOOK_OPTS = {
 };
 const DEFAULT_LOOK = { style: 0, hair: 0, skin: 0, hat: 0, jacket: 0, pants: 0, pack: 0 };
 function lookPal(l) {
-  const O = LOOK_OPTS, hair = O.hair[l.hair], top = l.style === 0 ? O.hat[l.hat] : hair;
-  return { ...CH, h: top, H: shade(top, -0.3), k: hair, s: O.skin[l.skin], S: shade(O.skin[l.skin], -0.15), r: O.jacket[l.jacket], R: shade(O.jacket[l.jacket], -0.3), p: O.pants[l.pants], P: shade(O.pants[l.pants], -0.3), y: O.pack[l.pack], Y: shade(O.pack[l.pack], -0.3) };
+  const O = LOOK_OPTS, hair = O.hair[l.hair], hat = l.style === 0;
+  return { ...CH, h: hat ? O.hat[l.hat] : shade(hair, 0.3), H: shade(hat ? O.hat[l.hat] : hair, -0.3), k: hair, s: O.skin[l.skin], S: shade(O.skin[l.skin], -0.15), r: O.jacket[l.jacket], R: shade(O.jacket[l.jacket], -0.3), p: O.pants[l.pants], P: shade(O.pants[l.pants], -0.3), y: O.pack[l.pack], Y: shade(O.pack[l.pack], -0.3) };
 }
 function charRows(view, frame) {
   const rows = view === 'down' ? [HEAD_D, BODY_D, frame === 0 ? LEG_S : frame === 1 ? LEG_W : mirror(LEG_W)]
@@ -529,15 +585,14 @@ function charRows(view, frame) {
 function longHair(rows, view) {
   const set = (x, y, ch) => { if (y >= 0 && y < rows.length) rows[y] = rows[y].slice(0, x) + ch + rows[y].slice(x + 1); };
   if (view === 'down') {
-    for (const y of [9, 10, 11, 12]) { set(2, y, 'k'); set(13, y, 'k'); set(1, y, 'o'); set(14, y, 'o'); }
-    for (const y of [9, 10]) { set(3, y, 'k'); set(12, y, 'k'); }
-    set(2, 13, 'o'); set(13, 13, 'o');
+    for (let y = 8; y <= 14; y++) { set(1, y, 'k'); set(14, y, 'k'); set(0, y, 'o'); set(15, y, 'o'); }
+    set(1, 15, 'o'); set(14, 15, 'o');
   } else if (view === 'up') {
-    for (const y of [10, 11, 12]) { for (let x = 4; x <= 11; x++) set(x, y, 'k'); set(3, y, 'o'); set(12, y, 'o'); }
-    for (let x = 4; x <= 11; x++) set(x, 13, 'o');
+    for (let y = 13; y <= 17; y++) { for (let x = 3; x <= 12; x++) set(x, y, 'k'); set(2, y, 'o'); set(13, y, 'o'); }
+    for (let x = 3; x <= 12; x++) set(x, 18, 'o');
   } else {
-    for (const y of [10, 11, 12]) { set(9, y, 'k'); set(10, y, 'k'); set(11, y, 'o'); }
-    set(9, 13, 'o'); set(10, 13, 'o');
+    for (let y = 12; y <= 16; y++) { set(9, y, 'k'); set(10, y, 'k'); set(11, y, 'k'); set(12, y, 'o'); }
+    for (let x = 9; x <= 11; x++) set(x, 17, 'o');
   }
 }
 const PCHAR = new Map();
@@ -547,6 +602,7 @@ function playerSprite(look, dir, frame) {
   if (PCHAR.size > 300) PCHAR.clear();
   const view = dir === 'right' ? 'left' : dir;
   const rows = charRows(view, frame);
+  if (look.style !== 0) { const top = view === 'left' ? HAIR_TOP_S : HAIR_TOP; for (let y = 0; y < 7; y++) rows[y] = view === 'up' ? top[y].replace(/h/g, 'k') : top[y]; }
   if (look.style === 2) longHair(rows, view);
   const pal = lookPal(look);
   c = document.createElement('canvas'); c.width = 16; c.height = rows.length;
@@ -563,13 +619,8 @@ function getChar(kind, variant, dir, frame) {
   if (!CHAR[key]) {
     if (kind === 'item') { const c = charCanvas(ITEM_ART, 0, false); CHAR[key] = { down: [c, c, c] }; }
     else {
-      const down = [[...HEAD_D, ...BODY_D, ...LEG_S], [...HEAD_D, ...BODY_D, ...LEG_W], [...HEAD_D, ...BODY_D, ...mirror(LEG_W)]];
-      const up = [[...HEAD_U, ...BODY_U, ...LEG_S], [...HEAD_U, ...BODY_U, ...LEG_W], [...HEAD_U, ...BODY_U, ...mirror(LEG_W)]];
-      const side = [[...SIDE, ...SIDE_S], [...SIDE, ...SIDE_W], [...SIDE, ...SIDE_W]];
-      CHAR[key] = {
-        down: down.map(r => charCanvas(r, variant, false)), up: up.map(r => charCanvas(r, variant, false)),
-        left: side.map(r => charCanvas(r, variant, false)), right: side.map(r => charCanvas(r, variant, true)),
-      };
+      const mk = (view, flip) => [0, 1, 2].map(f => charCanvas(charRows(view, f), variant, flip));
+      CHAR[key] = { down: mk('down', false), up: mk('up', false), left: mk('left', false), right: mk('left', true) };
     }
   }
   const s = CHAR[key];
@@ -672,6 +723,175 @@ const BIOME_POOL = [
   ['Teerling', 'Dilopho', 'Sumpfkrok', 'Knochling', 'Tröti'],
 ];
 
+/* --- Typ-Merkmale: jedes Wesen trägt sichtbare Zeichen seines Typs (Blitzhörner, Flammen, Flossen …) --- */
+function backPts(an, n) {
+  const [cx, cy, rx, ry, rot] = an.body, pts = [];
+  for (let i = 0; i < 96; i++) {
+    const t = i / 96 * Math.PI * 2, ex = rx * Math.cos(t), ey = ry * Math.sin(t);
+    const x = cx + ex * Math.cos(rot) - ey * Math.sin(rot), y = cy + ex * Math.sin(rot) + ey * Math.cos(rot);
+    const nx = Math.cos(t) / rx, ny = Math.sin(t) / ry, NY = nx * Math.sin(rot) + ny * Math.cos(rot), NX = nx * Math.cos(rot) - ny * Math.sin(rot);
+    if (NY / Math.hypot(NX, NY) < -0.55 && x >= an.minx) pts.push([x, y + 1]);
+  }
+  pts.sort((a, b) => a[0] - b[0]);
+  if (!pts.length) return [[cx, cy - ry]];
+  return Array.from({ length: n }, (_, i) => pts[Math.round((i + 0.5) / n * (pts.length - 1))]);
+}
+// z: Größenausgleich, damit die Merkmale auch bei kleinen Wesen noch gut erkennbar sind
+const DECOR = {
+  ELEKTRO: {
+    head(D, an, z) {
+      const [x, y, r] = an.head;
+      for (let j = 0; j < 2; j++) {
+        const bx = x - r * 0.2 + j * 4.5 * z, by = y - r * 0.8 + j * 0.8;
+        D.P([[0, 0], [-1.6, -5], [0.8, -4.6], [-0.6, -10], [3.6, -3.2], [1.2, -3.6], [2.6, 0]].map(([u, v]) => [bx + u * z * (1 - j * 0.15), by + v * z * (1 - j * 0.15)]), '#f8d828');
+      }
+    },
+    body(D, an, z) {
+      const [tx, ty] = an.tail;
+      for (const [u, v] of [[-2, -6], [3, -3]]) { const x = tx + u * z, y = ty + v * z; D.L(x, y, x + 2 * z, y + 2 * z, 1.2, '#fff6a0'); D.L(x + 2 * z, y + 2 * z, x + 0.5 * z, y + 3 * z, 1.2, '#fff6a0'); D.L(x + 0.5 * z, y + 3 * z, x + 2.5 * z, y + 5 * z, 1.2, '#fff6a0'); }
+      for (const [x, y] of backPts(an, 3)) D.P([[x - 1.2 * z, y - 1], [x + 0.6 * z, y - 4 * z], [x + 0.2 * z, y - 2 * z], [x + 1.8 * z, y - 2.4 * z], [x - 0.4 * z, y + 0.6 * z], [x, y - 1.4 * z]], '#f8e040', false);
+    },
+  },
+  FEUER: {
+    head(D, an, z) { const [x, y, r] = an.head; D.E(x + r * 0.3, y - r - 2 * z, 2.4 * z, 4 * z, '#f86818', 0.35); D.E(x + r * 0.3, y - r - 1.4 * z, 1.2 * z, 2.2 * z, '#f8d838', 0.35, false); },
+    body(D, an, z) {
+      for (const [x, y] of backPts(an, 3)) { D.E(x + 1, y - 3 * z, 2.2 * z, 3.8 * z, '#f86818', 0.4); D.E(x + 1, y - 2.4 * z, 1.1 * z, 2 * z, '#f8d838', 0.4, false); }
+      const [tx, ty] = an.tail; D.E(tx, ty - 3 * z, 2.6 * z, 4.4 * z, '#f86818', 0.3); D.E(tx, ty - 2.4 * z, 1.3 * z, 2.4 * z, '#f8e060', 0.3, false);
+    },
+  },
+  WASSER: {
+    head(D, an, z) {
+      const [x, y, r] = an.head;
+      D.P([[x + r * 0.4, y - r * 0.3], [x + r * 0.5 + 6 * z, y - r * 0.6 - 4 * z], [x + r * 0.5 + 4 * z, y + 1 * z]], '#58b8f0');
+      for (const [u, v, rr] of [[-r - 3, -r - 2, 1.4], [-r - 5, -r - 6, 1], [-r - 2, -r - 9, 0.8]]) D.C(x + u * z, y + v * z, rr * z, '#c8f0ff');
+    },
+    body(D, an, z) {
+      const p = backPts(an, 3)[1];
+      D.P([[p[0] - 5 * z, p[1] + 1], [p[0] + 1 * z, p[1] - 8 * z], [p[0] + 5 * z, p[1] - 6 * z], [p[0] + 4 * z, p[1] + 1]], '#4aa8e8');
+      D.L(p[0] - 1 * z, p[1], p[0] + 1 * z, p[1] - 6 * z, 1, '#a8e0ff');
+    },
+  },
+  PFLANZE: {
+    head(D, an, z) {
+      const [x, y, r] = an.head, bx = x + r * 0.2, by = y - r * 0.85;
+      D.L(bx, by, bx, by - 4 * z, 1.2, '#3a8a30');
+      D.E(bx - 2.8 * z, by - 4.5 * z, 3.2 * z, 1.5 * z, '#58b840', -0.5); D.E(bx + 2.8 * z, by - 5 * z, 3.2 * z, 1.5 * z, '#58b840', 0.5);
+    },
+    body(D, an, z) {
+      const ps = backPts(an, 3);
+      for (const [x, y] of [ps[0], ps[2]]) D.E(x, y - 1.5 * z, 3.2 * z, 1.5 * z, '#58b840', -0.7);
+      const [x, y] = ps[1];
+      for (let i = 0; i < 5; i++) { const an2 = i / 5 * Math.PI * 2; D.C(x + Math.cos(an2) * 2 * z, y - 2.5 * z + Math.sin(an2) * 2 * z, 1.5 * z, '#f878a8'); }
+      D.C(x, y - 2.5 * z, 1.2 * z, '#f8e050', false);
+    },
+  },
+  EIS: {
+    head(D, an, z) { const [x, y, r] = an.head; D.P([[x - 1.5 * z, y - r * 0.7], [x + 0.5 * z, y - r * 0.7 - 7 * z], [x + 2.5 * z, y - r * 0.7]], '#b8f0ff'); D.P([[x + 2.5 * z, y - r * 0.6], [x + 5.5 * z, y - r * 0.6 - 4.5 * z], [x + 5 * z, y - r * 0.5]], '#d8f8ff'); },
+    body(D, an, z) {
+      backPts(an, 4).forEach(([x, y], i) => { const h = (i % 2 ? 5 : 8) * z; D.P([[x - 2 * z, y + 1], [x, y - h], [x + 2 * z, y + 1]], '#a8e8f8'); D.L(x - 0.3 * z, y - 1, x - 0.1 * z, y - h + 2 * z, 0.8, '#f0ffff'); });
+    },
+  },
+  GESTEIN: {
+    head(D, an, z) { const [x, y, r] = an.head; D.P([[x - 2 * z, y - r * 0.8], [x - 1 * z, y - r * 0.8 - 4 * z], [x + 3 * z, y - r * 0.8 - 5 * z], [x + 4 * z, y - r * 0.7]], '#a09080'); },
+    body(D, an, z) {
+      for (const [x, y] of backPts(an, 3)) { D.P([[x - 3.5 * z, y + 1], [x - 2.5 * z, y - 3 * z], [x + 0.5 * z, y - 4.5 * z], [x + 3.5 * z, y - 2 * z], [x + 3.5 * z, y + 1]], '#9a8c7c'); D.L(x - 1 * z, y - 3 * z, x + 0.5 * z, y - 0.5 * z, 0.8, '#6a5c4c'); }
+    },
+  },
+  BODEN: {
+    head(D, an, z) { const [x, y, r] = an.head; D.E(x + r * 0.2, y - r * 0.55, r * 0.55, r * 0.3, '#8a5a30', 0, false); },
+    body(D, an, z) {
+      const [cx, cy, rx, ry] = an.body;
+      for (let i = 0; i < 3; i++) { const x = cx - rx * 0.4 + i * rx * 0.4; D.L(x, cy - ry * 0.85, x - 2 * z, cy + ry * 0.1, 2 * z, '#7a4a24'); }
+    },
+  },
+  GIFT: {
+    head(D, an, z) { const [x, y, r] = an.head; for (let i = 0; i < 3; i++) { const bx = x - r * 0.3 + i * 3 * z; D.P([[bx - 1.2 * z, y - r * 0.75], [bx + 0.6 * z, y - r * 0.75 - (4 - i) * z], [bx + 1.6 * z, y - r * 0.7]], '#a848d0'); } },
+    body(D, an, z) {
+      const [cx, cy, rx, ry] = an.body;
+      for (const [u, v, rr] of [[-0.45, -0.45, 1.8], [0.05, -0.6, 1.4], [0.45, -0.3, 1.7], [-0.1, -0.1, 1.2], [0.3, 0.15, 1]]) { D.C(cx + u * rx, cy + v * ry, rr * z, '#9a40c0', false); D.C(cx + u * rx, cy + v * ry, rr * z * 0.45, '#d890f0', false); }
+    },
+  },
+  GEIST: {
+    head(D, an, z) { const [x, y, r] = an.head; D.E(x - r - 4 * z, y - r * 0.5, 1.8 * z, 3 * z, '#9a80f0', 0.3); D.E(x - r - 4 * z, y - r * 0.4, 0.9 * z, 1.5 * z, '#e8e0ff', 0.3, false); },
+    body(D, an, z) {
+      const [cx, cy, rx, ry] = an.body;
+      for (const [u, v] of [[0.8, -1.2], [1.25, -0.2]]) { const x = cx + u * rx, y = cy + v * ry; D.E(x, y, 2 * z, 3.4 * z, '#9a80f0', 0.3); D.E(x, y + 0.6 * z, 1 * z, 1.7 * z, '#e8e0ff', 0.3, false); }
+    },
+  },
+  PSYCHO: {
+    head(D, an, z) { const [x, y, r] = an.head; D.C(x - r * 0.15, y - r * 0.55, 1.9 * z, '#f048a8'); D.C(x - r * 0.15 - 0.6 * z, y - r * 0.55 - 0.6 * z, 0.6 * z, '#ffe0f4', false); },
+    body(D, an, z) {
+      const [x, y, r] = an.head;
+      for (const [u, v] of [[-1.3, -1.4], [0.6, -2], [1.6, -1]]) D.C(x + u * r, y + v * r * 0.8, 1.3 * z, '#f8a0d8');
+    },
+  },
+  DRACHE: {
+    head(D, an, z) {
+      const [x, y, r] = an.head;
+      D.T([[x + r * 0.1, y - r * 0.6], [x + r * 0.1 + 4 * z, y - r * 0.6 - 4 * z], [x + r * 0.1 + 9 * z, y - r * 0.6 - 5 * z]], 2.8 * z, 0.6, '#f0e4c8');
+      D.T([[x + r * 0.5, y - r * 0.4], [x + r * 0.5 + 4 * z, y - r * 0.4 - 2.5 * z], [x + r * 0.5 + 8 * z, y - r * 0.4 - 2.5 * z]], 2.4 * z, 0.6, '#d8c8a8');
+    },
+    body(D, an, z) { for (const [x, y] of backPts(an, 4)) D.P([[x - 2 * z, y + 1], [x + 1.5 * z, y - 4.5 * z], [x + 2.5 * z, y + 1]], '#6048c0'); },
+  },
+  KAMPF: {
+    head(D, an, z) {
+      const [x, y, r] = an.head, by = y - r * 0.62;
+      D.L(x - r * 0.9, by, x + r * 0.9, by, 2.2 * z, '#d83030');
+      D.T([[x + r * 0.9, by], [x + r + 4 * z, by + 2 * z], [x + r + 7 * z, by + 1 * z]], 1.8 * z, 1, '#d83030');
+      D.T([[x + r * 0.9, by], [x + r + 3 * z, by + 4 * z], [x + r + 5 * z, by + 5 * z]], 1.6 * z, 1, '#b82424');
+    },
+    body(D, an, z) { const [cx, cy, rx, ry] = an.body; D.L(cx - rx * 0.6, cy + ry * 0.2, cx - rx * 0.6 + 3 * z, cy + ry * 0.2 + 0.5, 2.2 * z, '#f0f0e8'); },
+  },
+  FLUG: {
+    head(D, an, z) {
+      const [x, y, r] = an.head;
+      for (let i = 0; i < 3; i++) { const rot = -1.1 + i * 0.4; D.E(x + r * 0.3 + i * 1.5 * z + Math.cos(rot) * 3 * z, y - r * 0.8 + Math.sin(rot) * 3 * z, 3.6 * z, 1.3 * z, i === 1 ? '#f8f4e8' : '#e8d8b0', rot); }
+    },
+    body(D, an, z) { const [tx, ty] = an.tail; for (let i = 0; i < 3; i++) D.E(tx + 1 * z, ty - 2 * z + i * 2 * z, 3.6 * z, 1.2 * z, '#f0ead8', -0.3 + i * 0.3); },
+  },
+  'KÄFER': {
+    head(D, an, z) {
+      const [x, y, r] = an.head;
+      D.L(x - r * 0.2, y - r * 0.7, x - r * 0.2 - 3 * z, y - r * 0.7 - 6 * z, 1, '#305030'); D.C(x - r * 0.2 - 3 * z, y - r * 0.7 - 6 * z, 1 * z, '#60c070', false);
+      D.L(x + r * 0.2, y - r * 0.7, x + r * 0.2 + 1 * z, y - r * 0.7 - 7 * z, 1, '#305030'); D.C(x + r * 0.2 + 1 * z, y - r * 0.7 - 7 * z, 1 * z, '#60c070', false);
+    },
+    body(D, an, z) {
+      if (an.shell) return; // hat schon einen eigenen Panzer
+      const ps = backPts(an, 3), [mx, my] = ps[1];
+      D.E(mx, my + 1.5 * z, 7 * z, 3.6 * z, '#3a9a58', 0); D.L(mx, my - 2 * z, mx, my + 4.5 * z, 1, '#1e5a30');
+      D.C(mx - 3 * z, my + 0.5 * z, 0.8 * z, '#a8f0b8', false);
+    },
+  },
+  STAHL: {
+    head(D, an, z) { const [x, y, r] = an.head; D.P([[x - r * 0.7, y - r * 0.5], [x - r * 0.4, y - r * 0.95], [x + r * 0.6, y - r * 0.95], [x + r * 0.8, y - r * 0.5]], '#b8c0cc'); D.C(x, y - r * 0.72, 0.7 * z, '#f0f4f8', false); },
+    body(D, an, z) {
+      for (const [x, y] of backPts(an, 3)) { D.P([[x - 3.5 * z, y + 1.5], [x - 2.5 * z, y - 3 * z], [x + 2.5 * z, y - 3 * z], [x + 3.5 * z, y + 1.5]], '#b0b8c8'); D.C(x - 1.6 * z, y - 1 * z, 0.6 * z, '#f0f4f8', false); D.C(x + 1.6 * z, y - 1 * z, 0.6 * z, '#f0f4f8', false); }
+    },
+  },
+  WIND: {
+    head(D, an, z) { const [x, y, r] = an.head; D.E(x + r * 0.7 + 2 * z, y - r * 0.5, 3.6 * z, 1.4 * z, '#d8f8ff', -0.5); D.E(x + r * 0.8 + 2.5 * z, y - r * 0.1, 3 * z, 1.2 * z, '#b8e8f8', -0.2); },
+    body(D, an, z) {
+      const [cx, cy, rx, ry] = an.body;
+      for (const [u, v, rr] of [[1.25, -0.9, 3.4], [1.45, 0.2, 2.6]]) {
+        const ox = cx + u * rx, oy = cy + v * ry; let px = ox + rr * z, py = oy;
+        for (let i = 1; i <= 10; i++) { const t = i / 10 * Math.PI * 1.6, rad = rr * z * (1 - i / 14), nx = ox + Math.cos(t) * rad, ny = oy - Math.sin(t) * rad; D.L(px, py, nx, ny, 1.2, '#e8fbff'); px = nx; py = ny; }
+      }
+    },
+  },
+  NORMAL: {
+    head() {},
+    body(D, an, z, k) { for (const [x, y] of backPts(an, 3)) D.L(x, y - 0.5, x - 1.5 * z, y + 4 * z, 1.6 * z, k.d1); },
+  },
+};
+function drawDecor(D, a, types, k, s) {
+  const an = D.an; if (!an || !an.head) return;
+  const z = Math.min(1.6, 1 / Math.sqrt(s));
+  // Zweittyp nur am Körper, Haupttyp an Kopf und Körper (zuletzt gezeichnet, damit er oben liegt)
+  if (types[1] && DECOR[types[1]]) DECOR[types[1]].body(D, an, z * 0.85, k);
+  const m = DECOR[types[0]]; if (!m) return;
+  m.body(D, an, z, k); m.head(D, an, z, k);
+}
+
 /* --- Sprite-Generator: zeichnet Formen, rastert sie, setzt Licht und Kontur --- */
 const SPR = {};
 function wesenSprite(id) {
@@ -724,6 +944,7 @@ function wesenSprite(id) {
     eye(x, y, col = k.dark) { eyes.push([...tf(x, y), col]); },
   };
   (ARCH[a.k] || ARCH.bi)(D, a, k);
+  if (!a.noDecor) drawDecor(D, a, sp.types, k, s);
   g.restore();
   pixelize(c, [...used], eyes, s);
   SPR[id] = c; return c;
@@ -820,12 +1041,14 @@ const ARCH = {
     if (a.crest === 'leaf') { D.T([[hx + 1, hy - 4], [hx + 1, hy - 12]], 2, 1.5, k.c3); for (let i = 0; i < 3; i++) { D.E(hx - 2, hy - 7 - i * 2.5, 3, 1.2, k.c3, -0.4); D.E(hx + 4, hy - 7 - i * 2.5, 3, 1.2, k.c3, 0.4); } }
     D.T([[27, 39], [22, 44], [19, 45]], 3.5, 2.4, k.c1);
     D.P([[19, 44], [16, 47], [19, 46.5]], k.white, false);
+    D.an = { head: [hx, hy, a.h === 'raptor' ? 5 : ['small', 'duck', 'dome'].includes(a.h) ? 6 : 7], body: [34, 38, 13, 10, hz ? -0.15 : -0.55], minx: hz ? 26 : 31, tail: tail[2] };
   },
   quad(D, a, k) {
     const low = a.low, ly = low ? 48 : 45, by = low ? 45 : 39, bry = low ? 7 : 11;
     D.T([[27, ly], [27, 57]], 5.5, 5, k.d1); D.T([[49, ly], [50, 57]], 6.5, 6, k.d1);
     const tail = low ? [[48, 44], [57, 46], [64, 50]] : [[48, 37], [57, 41], [64, 46]];
     D.T(tail, low ? 7 : 9, 1.5, k.c1);
+    D.an = { body: [37, by, 17, bry, 0], minx: 24, tail: tail[2] };
     if (a.club) D.E(tail[2][0] - 1, tail[2][1], 4.5, 3.5, k.c3);
     if (a.spikesTail) { const [tx, ty] = tail[2]; D.P([[tx - 6, ty - 3], [tx - 2, ty - 11], [tx - 2, ty - 2]], k.c3); D.P([[tx - 3, ty - 2], [tx + 3, ty - 9], [tx, ty]], k.c3); }
     if (a.sail) { D.P([[22, by - 4], [27, by - 24], [36, by - 28], [45, by - 20], [50, by - 4]], k.c3); for (let i = 0; i < 4; i++) D.L(26 + i * 6, by - 4, 28 + i * 5.5, by - 22 + Math.abs(i - 1.5) * 2, 1, k.d3); }
@@ -845,46 +1068,47 @@ const ARCH = {
         const n = a.neck;
         const hx = 14 - n * 6, hy = 33 - n * 26;
         D.T([[25, 35], [18 - n * 3, 32 - n * 10], [hx + 3, hy + 3]], 9, 5.5, k.c1);
-        D.E(hx, hy, 6.5, 4.2, k.c1, -0.15); D.E(hx - 2, hy + 2, 4, 1.4, k.c2, 0, false); D.eye(hx + 1, hy - 1.2);
+        D.E(hx, hy, 6.5, 4.2, k.c1, -0.15); D.E(hx - 2, hy + 2, 4, 1.4, k.c2, 0, false); D.eye(hx + 1, hy - 1.2); D.an.head = [hx, hy, 4.5];
         break;
       }
-      case 'small': D.T([[24, 36], [17, 38]], 7, 6, k.c1); D.E(14, 40, 6.5, 4.5, k.c1, 0.2); D.eye(14, 38.6); break;
+      case 'small': D.T([[24, 36], [17, 38]], 7, 6, k.c1); D.E(14, 40, 6.5, 4.5, k.c1, 0.2); D.eye(14, 38.6); D.an.head = [14, 39, 5]; break;
       case 'cerato':
         D.E(19, 30, 9.5, 11, k.c3); D.E(19, 30, 7, 8.5, k.d3, 0, false);
         D.E(13, 38, 8.5, 6.5, k.c1, 0.15); D.P([[5, 39], [8, 37], [8, 43]], k.d1);
         D.P([[8, 35], [3, 31], [9, 33]], k.white);
         if (a.horns >= 3) { D.P([[12, 33], [1, 24], [14, 30]], k.white); D.P([[16, 32], [6, 21], [17, 29]], k.white); }
-        D.eye(13, 35.5); break;
+        D.eye(13, 35.5); D.an.head = [17, 31, 9]; break;
       case 'ankylo':
         D.E(14, 45, 7.5, 5.5, k.c1); D.P([[10, 41], [13, 37], [17, 41]], k.c3); D.P([[17, 41], [21, 37], [22, 43]], k.c3);
         for (let i = 0; i < 4; i++) D.P([[24 + i * 7, by + 4], [21 + i * 7, by + 9], [27 + i * 7, by + 5]], k.c3);
-        D.eye(13, 43.5); break;
+        D.eye(13, 43.5); D.an.head = [14, 44, 6]; break;
       case 'mammoth':
         D.E(26, by - 9, 9, 6, k.c1); D.C(15, 31, 9, k.c1);
         D.T([[10, 35], [7, 45], [10, 54]], 5.5, 3, k.c1);
         D.T([[13, 39], [6, 46], [2, 42]], 3, 1.6, k.c3);
         D.E(21, 33, 5, 7, k.d1, 0.1);
-        D.eye(13, 28.5); break;
+        D.eye(13, 28.5); D.an.head = [15, 30, 9]; break;
       case 'cat':
         D.C(16, 34, 8, k.c1); D.P([[10, 29], [11, 23], [15, 27]], k.c1); D.P([[18, 27], [22, 22], [22, 29]], k.c1);
         D.E(12, 37, 4.5, 3, k.c2, 0, false);
         D.T([[11, 38], [10, 46]], 2.4, 1, k.white); D.T([[14, 38.5], [13.5, 45]], 2.2, 1, k.white);
         for (let i = 0; i < 4; i++) D.L(30 + i * 5, by - 9, 28 + i * 5, by - 2, 1.5, k.c3);
-        D.eye(13, 32); break;
+        D.eye(13, 32); D.an.head = [16, 33, 8]; break;
       case 'croc':
         D.E(16, 44, 11, 4.5, k.c1); D.E(6, 46, 7, 2.6, k.c1); D.E(9, 47.5, 9, 1.3, k.c2, 0, false);
         for (let i = 0; i < 5; i++) D.P([[1 + i * 3, 46.4], [2 + i * 3, 48.6], [3 + i * 3, 46.4]], k.white, false);
-        D.C(18, 39.5, 3, k.c1); D.eye(18, 39.5);
+        D.C(18, 39.5, 3, k.c1); D.eye(18, 39.5); D.an.head = [15, 42, 5];
         if (!a.sail) for (let i = 0; i < 6; i++) D.P([[26 + i * 4, by - bry + 1], [28 + i * 4, by - bry - 3], [30 + i * 4, by - bry + 1]], k.c3);
         break;
       case 'boxy':
         D.P([[6, 34], [20, 30], [24, 40], [20, 47], [6, 46]], k.c1); D.P([[6, 42], [19, 42], [18, 47], [7, 47]], k.c2);
         D.P([[8, 32], [18, 28], [21, 33], [10, 36]], k.c3);
         if (a.lava) D.L(9, 38, 15, 36, 1.5, k.c3);
-        D.eye(13, 37); break;
+        D.eye(13, 37); D.an.head = [13, 35, 7]; break;
     }
   },
   swim(D, a, k) {
+    D.an = { plesio: { head: [13, 12, 5], body: [38, 40, 14, 9, 0], minx: 28, tail: [62, 42] }, mosa: { head: [12, 34, 6], body: [34, 37, 20, 6, 0], minx: 24, tail: [58, 33] }, fish: { head: [18, 32, 9], body: [38, 37, 16, 10, 0], minx: 28, tail: [60, 30] }, coel: { head: [17, 35, 7], body: [34, 37, 17, 9.5, 0], minx: 24, tail: [61, 37] } }[a.h];
     switch (a.h) {
       case 'plesio':
         D.E(46, 48, 7, 2.5, k.d1, 0.5); D.E(28, 49, 6, 2.2, k.d1, 0.5);
@@ -919,6 +1143,7 @@ const ARCH = {
     }
   },
   fly(D, a, k) {
+    D.an = { ptero: { head: [24, 25, 5], body: [34, 34, 9, 6, -0.2], minx: 32, tail: [48, 40] }, bird: { head: [22, 26, 5.5], body: [32, 36, 9, 8, 0], minx: 30, tail: [60, 46] }, fly: { head: [21, 28, 5], body: [30, 30, 6, 5, 0], minx: 26, tail: [63, 37] } }[a.h];
     switch (a.h) {
       case 'ptero':
         D.P([[32, 30], [58, 8], [52, 30]], k.d2); D.L(32, 30, 58, 8, 2, k.d1);
@@ -949,6 +1174,7 @@ const ARCH = {
     }
   },
   trilo(D, a, k) {
+    D.an = { head: [33, 34, 7], body: [33, 45, 21, 12, 0], minx: 18, tail: [33, 57], shell: 1 };
     D.E(33, 45, 21, 12, k.c1); D.E(33, 45, 6, 11, k.c2);
     for (let i = 0; i < 6; i++) D.L(14 + i, 38 + i * 3, 52 - i, 38 + i * 3, 1, k.d1);
     D.E(33, 34, 17, 7, k.c1);
@@ -956,6 +1182,7 @@ const ARCH = {
     D.C(26, 32, 2.5, k.c3); D.C(40, 32, 2.5, k.c3); D.eye(26, 32); D.eye(40, 32);
   },
   ammo(D, a, k) {
+    D.an = { head: [20, 42, 5], body: [36, 36, 18, 18, 0], minx: 30, tail: [12, 52], shell: 1 };
     for (let i = 0; i < 5; i++) D.T([[17, 46], [10 + i * 2, 54 - (i % 2) * 2]], 3, 1.4, k.c3);
     D.C(36, 36, 18, k.c1);
     for (let r = 14, i = 0; r > 3; r -= 3.4, i++) D.E(36 + i * 1.2, 36 - i * 0.6, r, r, i % 2 ? k.c1 : k.c2, 0, true);
@@ -963,6 +1190,7 @@ const ARCH = {
     D.E(20, 42, 6, 5, k.c3); D.eye(19, 40);
   },
   ghost(D, a, k) {
+    D.an = { head: [33, 22, 10], body: [33, 30, 17, 16, 0], minx: 22, tail: [14, 54], float: 1 };
     D.P([[18, 36], [12, 56], [22, 48], [28, 58], [34, 48], [42, 58], [46, 44], [50, 34]], k.c1);
     D.E(33, 30, 17, 16, k.c1);
     if (a.h === 'skull') {
@@ -977,6 +1205,7 @@ const ARCH = {
     }
   },
   meteor(D, a, k) {
+    D.an = { head: [32, 30, 9], body: [32, 38, 17, 17, 0], minx: 22, tail: [58, 20], float: 1 };
     D.P([[44, 28], [62, 4], [58, 22], [64, 14], [56, 36]], k.c3); D.P([[48, 30], [60, 12], [56, 32]], '#f8e070', false);
     D.C(32, 38, 17, k.c1);
     D.C(24, 30, 4, k.d1, false); D.C(40, 46, 5, k.d1, false); D.C(42, 30, 2.5, k.d1, false);
@@ -984,6 +1213,7 @@ const ARCH = {
     D.E(26, 38, 3, 4, k.c3, 0, false); D.E(36, 38, 3, 4, k.c3, 0, false);
   },
   amber(D, a, k) {
+    D.an = { head: [34, 26, 9], body: [35, 35, 20, 19, 0], minx: 24, tail: [52, 50], shell: 1 };
     D.P([[14, 40], [24, 18], [44, 14], [56, 30], [52, 52], [26, 56]], k.c1);
     D.P([[22, 24], [36, 18], [30, 30]], k.c2, false); D.P([[46, 26], [52, 34], [46, 40]], k.c2, false);
     D.E(34, 40, 10, 6, k.c3, -0.2, false); D.C(24, 42, 4, k.c3, false);
@@ -1047,14 +1277,16 @@ function aset(m, x, y, a) { if (x < 0 || y < 0 || x >= m.w || y >= m.h) return; 
 function aget(m, x, y) { if (x < 0 || y < 0 || x >= m.w || y >= m.h) return 0; return m.area[y * m.w + x]; }
 function bget(m, x, y) { if (!m.biome) return m.biomeId; x = Math.max(0, Math.min(m.w - 1, x)); y = Math.max(0, Math.min(m.h - 1, y)); return m.biome[y * m.w + x]; }
 
-function building(m, x, y, w, h, roof, doorX, emblem) {
+function building(m, x, y, w, h, roof, doorX, emblem, cave) {
+  // cave: Höhlenwohnung im Fels statt Holzhaus
+  const WALL = cave ? T.CLIFF : T.WALL, WIN = cave ? T.CAVE_WINDOW : T.WINDOW;
   for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
-    let t = T.WALL;
-    if (j < h - 2) t = roof; else if (j === h - 2 && i % 2 === 1) t = T.WINDOW;
+    let t = WALL;
+    if (j < h - 2) t = cave ? T.CLIFF_TOP : roof; else if (j === h - 2 && i % 2 === 1) t = WIN;
     tset(m, x + i, y + j, t);
   }
-  tset(m, x + doorX, y + h - 1, T.DOOR);
-  tset(m, x + doorX, y + h - 2, emblem ?? T.WALL);
+  tset(m, x + doorX, y + h - 1, cave ? T.CAVE_DOOR : T.DOOR);
+  tset(m, x + doorX, y + h - 2, emblem ?? WALL);
   return { x: x + doorX, y: y + h - 1 };
 }
 
@@ -1273,6 +1505,19 @@ function buildTown(m, i, r) {
   for (const [x, y] of [[0, 0], [1, 0], [0, 1], [TW - 1, 0], [TW - 2, 0], [TW - 1, 1], [0, TH - 1], [TW - 1, TH - 1]]) tset(m, X + x, Y + y, T.FERN);
   for (let y = 13; y <= 15; y++) for (let x = 7; x <= 9; x++) tset(m, X + x, Y + y, T.FLOWER);
   for (let x = 7; x <= 9; x++) tset(m, X + x, Y + 12, T.FENCE);
+  if (t.start) {
+    // Farnweiler liegt in einer Schlucht: Felswände rundherum, Ausgang nach Osten, Lagerfeuer in der Mitte
+    for (let x = 0; x < TW; x++) { tset(m, X + x, Y, T.CLIFF_TOP); tset(m, X + x, Y + 1, T.CLIFF); tset(m, X + x, Y + TH - 1, T.CLIFF_TOP); }
+    for (let y = 0; y < TH; y++) { tset(m, X, Y + y, T.CLIFF_TOP); if (y !== TCY && y !== TCY + 1) tset(m, X + TW - 1, Y + y, T.CLIFF_TOP); }
+    for (const [x, y] of [[1, 2], [1, 3], [20, 2], [20, 15], [1, 15], [6, 2], [9, 2]]) tset(m, X + x, Y + y, T.CLIFF_TOP);
+    for (const [x, y] of [[1, 4], [20, 3], [20, 16], [1, 16]]) tset(m, X + x, Y + y, T.CLIFF);
+    for (let y = 12; y <= 15; y++) for (let x = 7; x <= 9; x++) tset(m, X + x, Y + y, T.PATH);
+    tset(m, X + 8, Y + 14, T.CAMPFIRE);
+    for (const [x, y] of [[7, 12], [9, 12]]) tset(m, X + x, Y + y, T.ROCK);
+    tset(m, X + 6, Y + 14, T.BONES); m.objs.set(K(X + 6, Y + 14), { text: 'Ein riesiger Knochen. Die Kinder aus Farnweiler klettern gern darauf herum.' });
+    m.objs.set(K(X + 8, Y + 14), { text: 'Das Lagerfeuer von Farnweiler. Abends erzählen sich hier alle Geschichten aus der Urzeit.' });
+  }
+  const caveTown = t.start || t.biome === 1 || t.biome === 3;
 
   const slots = {
     a: { x: 2, y: 4, w: 5, h: 4, door: 2 },
@@ -1287,7 +1532,7 @@ function buildTown(m, i, r) {
       : { a: ['center', T.ROOF_CENTER, T.WALL_CENTER], b: ['gym', T.ROOF_GYM, T.WALL_GYM], c: ['shop', T.ROOF_SHOP, T.WALL_SHOP], d: ['house', T.ROOF, null] };
   for (const key of Object.keys(plan)) {
     const s = slots[key]; const [kind, roof, emblem] = plan[key];
-    const door = building(m, X + s.x, Y + s.y, s.w, s.h, roof, s.door, emblem);
+    const door = building(m, X + s.x, Y + s.y, s.w, s.h, roof, s.door, emblem, caveTown && (kind === 'home' || kind === 'house' || kind === 'house2'));
     const id = `${kind}:${i}`;
     DOORS[id] = door;
     m.warps.set(K(door.x, door.y), { to: id, x: 4, y: ROOM_H[kind] - 2, dir: 'up' });
@@ -1352,18 +1597,24 @@ function makeInterior(id) {
       break;
     }
     case 'lab':
-      m = room(id, 10, H, T.FLOOR);
-      for (const x of [1, 2, 3, 6, 7, 8]) tset(m, x, 1, T.SHELF);
-      for (let x = 3; x <= 6; x++) tset(m, x, 4, T.TABLE);
-      tset(m, 0, 7, T.PLANT); tset(m, 9, 7, T.PLANT); tset(m, 9, 3, T.PC);
-      m.objs.set(K(9, 3), { fn: async () => { await say('Auf dem Bildschirm steht: URZEIT-DATENBANK.'); await openScreen(new DexScreen(true)); } });
+      m = room(id, 10, H, T.LAB_FLOOR);
+      for (let x = 0; x < 10; x++) { tset(m, x, 0, T.LAB_WALL); tset(m, x, 1, T.LAB_WALL); }
+      for (const x of [1, 2, 3]) tset(m, x, 1, T.LAB_MACHINE);
+      for (const x of [6, 7, 8]) tset(m, x, 1, T.SHELF);
+      tset(m, 0, 2, T.LAB_TANK); tset(m, 9, 2, T.LAB_TANK); tset(m, 0, 3, T.LAB_TANK);
+      tset(m, 3, 4, T.LAB_BENCH); for (const x of [4, 5, 6]) tset(m, x, 4, T.CAPSULE_TABLE);
+      tset(m, 0, 6, T.LAB_BENCH); tset(m, 0, 7, T.LAB_BENCH); tset(m, 9, 6, T.PC); tset(m, 9, 8, T.PLANT); tset(m, 0, 8, T.PLANT);
+      tset(m, 4, H - 1, T.MAT);
+      for (const x of [1, 2, 3]) m.objs.set(K(x, 1), { text: 'Ein großer Rechner analysiert Bernsteinproben. Auf dem Bildschirm zucken grüne Kurven.' });
+      for (const [x, y] of [[0, 2], [9, 2], [0, 3]]) m.objs.set(K(x, y), { text: 'Ein Glastank mit einer schwebenden Bernsteinprobe. Blubb, blubb.' });
+      for (const [x, y] of [[3, 4], [0, 6], [0, 7]]) m.objs.set(K(x, y), { text: 'Reagenzgläser, ein Mikroskop und viele Notizen über Fossilien.' });
+      m.objs.set(K(9, 6), { text: 'Prof. Bernsteins Forschungsnotizen: Jedes Wesen, das du triffst, wird in deinem URDEX eingetragen.' });
       for (const x of [4, 5, 6]) m.objs.set(K(x, 4), { fn: () => chooseStarter() });
-      m.objs.set(K(3, 4), { text: 'Notizen über Bernstein, Fossilien und Vulkangestein.' });
       npc({ x: 5, y: 3, dir: 'down', variant: 3, id: 'prof', talk: async () => {
         if (!state.team.length) { await say(`PROF. BERNSTEIN: Da bist du ja, ${PN()}! In diesen drei Bernsteinkapseln warten junge Dinos auf einen Partner.`); await say('Der flinke ACE, der starke CHOMP und die sanfte PARIS. Wen wählst du?'); await chooseStarter(); }
-        else await say(`PROF. BERNSTEIN: Wie geht es ${wName(state.team[0]).toUpperCase()}? Am PC findest du meine Urzeit-Datenbank.`);
+        else await say(`PROF. BERNSTEIN: Wie geht es ${wName(state.team[0]).toUpperCase()}? Triff viele Wesen und fülle deinen URDEX!`);
       } });
-      npc({ x: 1, y: 6, dir: 'right', variant: 3, wander: true, talk: 'ASSISTENT: Der Professor erforscht, wie die Wesen die Urzeit überlebt haben.' });
+      npc({ x: 2, y: 7, dir: 'right', variant: 3, wander: true, talk: 'ASSISTENT: Der Professor erforscht, wie die Wesen die Urzeit überlebt haben.' });
       break;
     case 'gym':
       m = room(id, 10, H, T.GYMFLOOR);
@@ -1459,9 +1710,10 @@ const KEYMAP = {
 };
 let noclip = false;
 addEventListener('keydown', e => {
+  if (domModal) return; // Textfeld für Spielstand-Codes ist offen
   // Namenseingabe: echte Tastatur tippt direkt
   if (textInput && textInput === topLayer() && !e.altKey && !e.ctrlKey && !e.metaKey && textInput.onKey(e)) { e.preventDefault(); return; }
-  if (e.code === 'KeyN' && e.altKey) { noclip = !noclip; return; } // Entwickler: Alt+N = durch Wände laufen
+  if (e.code === 'KeyN' && e.altKey && devOn) { noclip = !noclip; return; } // Entwickler: Alt+N = durch Wände laufen
   if (e.code === 'KeyT' && e.altKey) { timeMode = OPTS.time = (timeMode + 1) % TIMES.length; saveOpts(); popup = { text: 'ZEIT: ' + TIMES[timeMode].toUpperCase(), t: 90 }; return; } // Alt+T = Tageszeit
   const k = KEYMAP[e.code]; if (!k) return;
   e.preventDefault();
@@ -1602,7 +1854,7 @@ class ProfileScreen {
         const look = { ...DEFAULT_LOOK, ...(d.profile || {}).look }, nm = (d.profile || {}).name || 'Spieler';
         drawStage(x + 38, y + 52, 22);
         const fr = sel ? [1, 0, 2, 0][(tick >> 3) & 3] : 0;
-        ctx.drawImage(playerSprite(look, 'down', fr), x + 22, y + 10, 32, 40);
+        ctx.drawImage(playerSprite(look, 'down', fr), x + 22, y + 4, 32, 48);
         text(nm, x + 38 - Math.floor(Math.min(measure(nm), 66) / 2), y + 54, UI.text, UI.shadow, 16, 66);
         const n = (d.badges || []).filter(Boolean).length;
         text(`Orden ${n}/16`, x + 8, y + 70, '#6a7890', null);
@@ -1644,7 +1896,7 @@ class EditorScreen {
     box(4, 22, 104, 124, UI.panel);
     drawStage(56, 118, 30);
     const dirs = ['down', 'left', 'up', 'right'], dir = dirs[(tick >> 6) & 3], fr = [1, 0, 2, 0][(tick >> 3) & 3];
-    ctx.drawImage(playerSprite(this.look, dir, fr), 24, 38, 64, 80);
+    ctx.drawImage(playerSprite(this.look, dir, fr), 24, 24, 64, 96);
     const nm = this.name || '???'; text(nm, 56 - Math.floor(Math.min(measure(nm), 90) / 2), 122, UI.text, UI.shadow, 16, 90);
     box(110, 22, 144, 124);
     EDIT_ROWS.forEach(([key, label], r) => {
@@ -1674,9 +1926,9 @@ const KB_PAGE_NAMES = ['ABC', 'abc', '123'];
 const NAME_MAX = 10;
 let textInput = null;
 class NameScreen {
-  constructor(name, look, wesen = 0) { this.name = name; this.look = look; this.wesen = wesen; this.page = 0; this.cx = 0; this.cy = 0; }
+  constructor(name, look, wesen = 0, opts = {}) { this.name = name; this.look = look; this.wesen = wesen; this.opts = opts; this.page = 0; this.cx = 0; this.cy = 0; }
   run() { return new Promise(r => { this.res = r; layers.push(this); textInput = this; }); }
-  type(ch) { if (this.name.length < NAME_MAX && !(ch === ' ' && !this.name)) this.name += ch; }
+  type(ch) { if (this.name.length < NAME_MAX && !(ch === ' ' && !this.name)) { this.name += ch; this.shownT = 40; } }
   back() { this.name = this.name.slice(0, -1); }
   ok() { const n = this.name.trim(); if (n) this.close(n); }
   close(v) { pop(this); textInput = null; this.res(v); }
@@ -1689,6 +1941,7 @@ class NameScreen {
     return true;
   }
   update() {
+    if (this.shownT > 0) this.shownT--;
     if (pressed.up) this.cy = (this.cy + 3) % 4;
     if (pressed.down) this.cy = (this.cy + 1) % 4;
     if (this.cy === 3) {
@@ -1708,13 +1961,16 @@ class NameScreen {
   }
   draw() {
     bgPattern('#dfe7f0', '#d6e0ec');
-    header(this.wesen ? 'SPITZNAME' : 'WIE HEISST DU?', `${this.name.length}/${NAME_MAX}`);
+    header(this.opts.title || (this.wesen ? 'SPITZNAME' : 'WIE HEISST DU?'), `${this.name.length}/${NAME_MAX}`);
     box(4, 24, 248, 50, UI.panel);
-    if (this.wesen) ctx.drawImage(wesenSprite(this.wesen), 0, 0, 64, 64, 12, 34, 40, 40); else ctx.drawImage(playerSprite(this.look, 'down', 0), 14, 30, 32, 40);
+    if (this.wesen) ctx.drawImage(wesenSprite(this.wesen), 0, 0, 64, 64, 12, 34, 40, 40);
+    else if (this.look) ctx.drawImage(playerSprite(this.look, 'down', 0), 14, 26, 32, 48);
+    else { rr(20, 44, 22, 18, 3, UI.dark); rr(22, 46, 18, 14, 2, '#f0c040'); ctx.fillStyle = UI.dark; ctx.fillRect(24, 34, 2, 10); ctx.fillRect(36, 34, 2, 10); ctx.fillRect(24, 32, 14, 2); ctx.fillRect(30, 50, 2, 5); }
     for (let i = 0; i < NAME_MAX; i++) {
       const x = 60 + i * 18;
       rr(x, 62, 14, 2, 1, i === this.name.length && (tick >> 4) & 1 ? UI.red : '#8aa0b8');
-      if (this.name[i]) text(this.name[i], x + 7 - Math.floor(measure(this.name[i]) / 2), 42);
+      const ch = this.opts.mask ? (i === this.name.length - 1 && this.shownT > 0 ? this.name[i] : '*') : this.name[i];
+      if (this.name[i]) text(ch, x + 7 - Math.floor(measure(ch) / 2), 42);
     }
     box(4, 78, 248, 66);
     const keys = KB_PAGES[this.page];
@@ -1730,7 +1986,7 @@ class NameScreen {
       rr(x, 154, w, 18, 4, sel ? UI.red : '#8aa0b8'); rr(x + 1, 155, w - 2, 16, 3, sel ? '#fff0e8' : '#eef2f8');
       text(label, x + w / 2 - Math.floor(measure(label) / 2), 154, UI.text, null);
     });
-    text('Tippen geht auch mit der Tastatur', 12, 174, '#7888a0', null);
+    text(this.opts.mask ? 'Nur für den Entwickler des Spiels' : 'Tippen geht auch mit der Tastatur', 12, 174, '#7888a0', null);
   }
 }
 
@@ -1750,7 +2006,7 @@ class TrainerCard {
     rows.forEach(([a, b], i) => { text(a, 24, 50 + i * 13, '#7888a0', null); text(b, 100, 50 + i * 13, UI.text, null); });
     rr(170, 40, 64, 76, 5, '#e6d8bc');
     drawStage(202, 108, 24);
-    ctx.drawImage(playerSprite(state.profile.look, 'down', 0), 178, 34, 48, 60);
+    ctx.drawImage(playerSprite(state.profile.look, 'down', 0), 178, 40, 48, 72);
     for (let i = 0; i < 16; i++) { const x = 24 + i * 13, got = state.badges[i]; rr(x, 120, 11, 9, 2, got ? shade(TYPES[TOWNS[i + 1].type], -0.4) : '#c8bca0'); if (got) rr(x + 1, 121, 9, 7, 2, TYPES[TOWNS[i + 1].type]); }
     box(2, 146, 252, 44);
     text('A: Aussehen und Namen ändern', 12, 150); text('B: zurück', 12, 166, '#7888a0', null);
@@ -1758,7 +2014,7 @@ class TrainerCard {
 }
 
 class OptionsScreen {
-  constructor() { this.sel = 0; this.rows = [['gfx', 'GRAFIK', GFX_NAMES], ['time', 'TAGESZEIT', ['AUTOMATISCH', 'MORGEN', 'TAG', 'ABEND', 'NACHT']], ['text', 'TEXTTEMPO', TEXT_NAMES], ['back', 'ZURÜCK']]; }
+  constructor() { this.sel = 0; this.rows = [['gfx', 'GRAFIK', GFX_NAMES], ['time', 'TAGESZEIT', ['AUTOMATISCH', 'MORGEN', 'TAG', 'ABEND', 'NACHT']], ['text', 'TEXTTEMPO', TEXT_NAMES], ['code', 'SPIELSTAND-CODE'], ['dev', 'ENTWICKLER'], ['back', 'ZURÜCK']]; }
   update() {
     const n = this.rows.length, [key, , vals] = this.rows[this.sel];
     if (pressed.up) this.sel = (this.sel + n - 1) % n;
@@ -1767,29 +2023,32 @@ class OptionsScreen {
       OPTS[key] = (OPTS[key] + (pressed.left ? vals.length - 1 : 1)) % vals.length;
       timeMode = OPTS.time; CONFIG.textSpeed = TEXT_SPEEDS[OPTS.text]; saveOpts();
     }
+    if (pressed.A && key === 'dev') run(devToggle);
+    if (pressed.A && key === 'code') run(() => exportCode());
     if (pressed.B || pressed.START || (pressed.A && key === 'back')) { pop(this); this.done(); }
   }
   draw() {
     bgPattern('#dfe7f0', '#d6e0ec');
     header('OPTIONEN');
-    box(4, 26, 248, 100);
+    box(4, 24, 248, 120);
     this.rows.forEach(([key, label, vals], r) => {
-      const y = 34 + r * 22, sel = r === this.sel;
+      const y = 30 + r * 18, sel = r === this.sel;
       if (sel) rr(10, y, 236, 18, 4, '#f8e0d8');
       text(label, 20, y + 1, sel ? UI.red : UI.text, null);
+      if (key === 'dev') { const v = devOn ? 'AN' : 'AUS'; text(v, 186 - measure(v) / 2, y + 1, devOn ? '#2f8a3a' : '#7888a0', null); }
       if (!vals) return;
       const v = vals[OPTS[key]]; text(v, 186 - measure(v) / 2, y + 1, UI.text, null);
       if (sel) { ctx.fillStyle = UI.red; for (let i = 0; i < 4; i++) { ctx.fillRect(126 + i, y + 9 - i, 1, 1 + i * 2); ctx.fillRect(244 - i, y + 9 - i, 1, 1 + i * 2); } }
     });
     box(2, 146, 252, 44);
     const key = this.rows[this.sel][0];
-    const info = { gfx: ['Alle Effekte: Wolken, Flugsaurier, Vignette.', 'Fast alle Effekte, schont den Akku.', 'Ohne Wetter und Effekte, für ältere Handys.'][OPTS.gfx], time: OPTS.time ? 'Feste Tageszeit für die ganze Welt.' : 'Tageszeit nach deiner echten Uhrzeit.', text: 'So schnell erscheinen die Texte.', back: 'Einstellungen werden automatisch gespeichert.' }[key];
+    const info = { gfx: ['Alle Effekte: Wolken, Flugsaurier, Vignette.', 'Fast alle Effekte, schont den Akku.', 'Ohne Wetter und Effekte, für ältere Handys.'][OPTS.gfx], time: OPTS.time ? 'Feste Tageszeit für die ganze Welt.' : 'Tageszeit nach deiner echten Uhrzeit.', text: 'So schnell erscheinen die Texte.', code: 'Spielstand auf Handy oder PC mitnehmen.', dev: devOn ? 'A: Entwicklermodus ausschalten.' : 'A: Passwort eingeben.', back: 'Einstellungen werden automatisch gespeichert.' }[key];
     text(info, 12, 150); text('Links/Rechts: ändern   B: zurück', 12, 166, '#7888a0', null);
   }
 }
 
 class Menu {
-  constructor() { this.items = ['URDEX', 'TEAM', 'TASCHE', 'PROFIL', 'ORDEN', 'KARTE', 'OPTIONEN', 'SICHERN', 'ZURÜCK']; this.sel = 0; }
+  constructor() { this.items = ['URDEX', 'TEAM', 'TASCHE', 'PROFIL', 'ORDEN', 'KARTE', 'OPTIONEN', 'SICHERN', ...(devOn ? ['ENTWICKLER'] : []), 'ZURÜCK']; this.sel = 0; }
   update() {
     if (pressed.up) this.sel = (this.sel + this.items.length - 1) % this.items.length;
     if (pressed.down) this.sel = (this.sel + 1) % this.items.length;
@@ -1805,6 +2064,7 @@ class Menu {
         if (it === 'OPTIONEN') await openScreen(new OptionsScreen());
         if (it === 'ORDEN') await openScreen(new BadgeScreen());
         if (it === 'KARTE') await openScreen(new MapScreen());
+        if (it === 'ENTWICKLER') await devMenu();
         if (it === 'SICHERN') {
           const c = await ask('Spielstand sichern?', ['JA', 'NEIN']);
           if (c === 0) await say(saveGame() ? 'Spielstand gesichert!' : 'Speichern ist in diesem Browser nicht möglich.');
@@ -1813,7 +2073,7 @@ class Menu {
     }
   }
   draw() {
-    const w = 84, h = this.items.length * 16 + 12, x = VW - w - 2;
+    const w = this.items.length > 9 ? 100 : 84, h = this.items.length * 16 + 12, x = VW - w - 2;
     box(x, 2, w, h);
     this.items.forEach((o, k) => { text(o, x + 22, 6 + k * 16); if (k === this.sel) arrowRight(x + 10, 10 + k * 16); });
   }
@@ -2050,6 +2310,7 @@ class MapScreen {
   update() {
     if (pressed.left || pressed.up) this.sel = (this.sel + TOWNS.length - 1) % TOWNS.length;
     if (pressed.right || pressed.down) this.sel = (this.sel + 1) % TOWNS.length;
+    if (pressed.A && devOn) { pop(this); this.done(); closeMenus(); const r = TOWN_RECTS[this.sel]; run(() => devTravel({ map: 'world', x: r.cx, y: r.cy })); return; }
     if (pressed.B || pressed.A || pressed.START || pressed.SELECT) { pop(this); this.done(); }
   }
   draw() {
@@ -2065,7 +2326,7 @@ class MapScreen {
     const t = TOWNS[this.sel];
     text(`${t.name.toUpperCase()}  ·  ${BIOMES[t.biome].name}`, 12, 150);
     const info = t.start ? 'Dein Heimatort' : t.league ? 'Champion-Liga' : (state.badges[this.sel - 1] ? `${t.badge} erhalten` : `Arena: ${t.leader} · Typ ${t.type}`);
-    text(info, 12, 166, '#7888a0', null);
+    text(devOn ? info + ' · A: HINREISEN' : info, 12, 166, devOn ? UI.red : '#7888a0', null, 16, 232);
   }
 }
 
@@ -2097,7 +2358,220 @@ class Title {
   }
 }
 
-for (const C of [Title, ProfileScreen, EditorScreen, NameScreen, TrainerCard, OptionsScreen, DexScreen, TeamScreen, SummaryScreen, StarterScreen, BadgeScreen, MapScreen]) C.prototype.full = true;
+/* --- Allgemeine Auswahlliste (z. B. für den Entwicklermodus) --- */
+class ListScreen {
+  // rows: Text oder [Text, Wert]; done(Index) oder done(-1) bei B
+  constructor(title, rows, sel = 0, info) { this.title = title; this.rows = rows; this.sel = Math.min(sel, rows.length - 1); this.scroll = Math.max(0, this.sel - 6); this.info = info; }
+  update() {
+    const n = this.rows.length;
+    if (pressed.up) this.sel = (this.sel + n - 1) % n;
+    if (pressed.down) this.sel = (this.sel + 1) % n;
+    if (pressed.left) this.sel = Math.max(0, this.sel - 7);
+    if (pressed.right) this.sel = Math.min(n - 1, this.sel + 7);
+    if (this.sel < this.scroll) this.scroll = this.sel;
+    if (this.sel >= this.scroll + 7) this.scroll = this.sel - 6;
+    if (pressed.A) { pop(this); this.done(this.sel); }
+    else if (pressed.B || pressed.START) { pop(this); this.done(-1); }
+  }
+  draw() {
+    bgPattern('#3a3448', '#363044');
+    header(this.title, `${this.sel + 1}/${this.rows.length}`);
+    box(4, 24, 248, 120);
+    for (let r = 0; r < 7; r++) {
+      const i = this.scroll + r; if (i >= this.rows.length) break;
+      const row = this.rows[i], [lb, val] = Array.isArray(row) ? row : [row], y = 29 + r * 16, sel = i === this.sel;
+      if (sel) { rr(10, y, 236, 16, 3, '#f8e0d8'); arrowRight(14, y + 3); }
+      text(lb, 26, y - 1, sel ? UI.red : UI.text, null, 16, Math.min(measure(lb), val ? 130 : 214));
+      if (val) text(val, 238 - Math.min(measure(val), 80), y - 1, '#5a6880', null, 16, 80);
+    }
+    if (this.rows.length > 7) { const h = Math.max(8, Math.round(112 * 7 / this.rows.length)), y = 28 + Math.round((112 - h) * this.scroll / (this.rows.length - 7)); rr(246, y, 3, h, 1, '#8aa0b8'); }
+    box(2, 146, 252, 44);
+    const inf = typeof this.info === 'function' ? this.info(this.sel) : this.info || '';
+    text(inf, 12, 150, UI.text, null, 16, Math.min(measure(inf), 232));
+    text('A: wählen   B: zurück   ←→: blättern', 12, 166, '#7888a0', null);
+  }
+}
+
+/* ---------------------------------------------------------------------
+   ENTWICKLERMODUS – nur mit Passwort. Schnellreise, Durch-Wände-Laufen,
+   Koordinaten, Wesen/Items/Orden setzen. Gilt pro Gerät.
+   --------------------------------------------------------------------- */
+const DEV_HASH = 'f7a8160978b77c6c56e18a5347972c11efcb80295d7339ba08c6a9c3c4866e9b';
+const DEV_KEY = 'wesenwelt.dev';
+let devOn = false, devCoords = false;
+try { devOn = localStorage.getItem(DEV_KEY) === DEV_HASH; } catch (e) {}
+function sha256(str) {
+  const b = new TextEncoder().encode(str), K = [], H = [];
+  for (let n = 2, c = 0; c < 64; n++) {
+    let p = true; for (let d = 2; d * d <= n; d++) if (n % d === 0) { p = false; break; }
+    if (!p) continue;
+    if (c < 8) H[c] = (Math.sqrt(n) % 1) * 2 ** 32 | 0;
+    K[c++] = (Math.cbrt(n) % 1) * 2 ** 32 | 0;
+  }
+  const l = b.length, w = new Uint32Array(((l + 8 >> 6) + 1) * 16);
+  for (let i = 0; i < l; i++) w[i >> 2] |= b[i] << (24 - (i % 4) * 8);
+  w[l >> 2] |= 0x80 << (24 - (l % 4) * 8); w[w.length - 1] = l * 8;
+  const W = new Uint32Array(64), r = (x, k) => (x >>> k) | (x << (32 - k));
+  for (let j = 0; j < w.length; j += 16) {
+    let [a, bb, c, d, e, f, g, h] = H;
+    for (let i = 0; i < 64; i++) {
+      W[i] = i < 16 ? w[j + i] : (r(W[i - 2], 17) ^ r(W[i - 2], 19) ^ (W[i - 2] >>> 10)) + W[i - 7] + (r(W[i - 15], 7) ^ r(W[i - 15], 18) ^ (W[i - 15] >>> 3)) + W[i - 16];
+      const t1 = h + (r(e, 6) ^ r(e, 11) ^ r(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + W[i] | 0;
+      const t2 = (r(a, 2) ^ r(a, 13) ^ r(a, 22)) + ((a & bb) ^ (a & c) ^ (bb & c)) | 0;
+      h = g; g = f; f = e; e = d + t1 | 0; d = c; c = bb; bb = a; a = t1 + t2 | 0;
+    }
+    [a, bb, c, d, e, f, g, h].forEach((v, i) => { H[i] = H[i] + v | 0; });
+  }
+  return H.map(v => (v >>> 0).toString(16).padStart(8, '0')).join('');
+}
+async function devToggle() {
+  if (devOn) { if (await ask('Entwicklermodus ausschalten?', ['JA', 'NEIN'], 1) === 0) { devLock(); await say('Entwicklermodus ist aus.'); } return; }
+  const pw = await new NameScreen('', null, 0, { title: 'PASSWORT', mask: true }).run();
+  if (pw === null) return;
+  if (sha256('wesenwelt:' + pw) !== DEV_HASH) { await say('Falsches Passwort.'); return; }
+  devOn = true; try { localStorage.setItem(DEV_KEY, DEV_HASH); } catch (e) {}
+  await say('Entwicklermodus aktiv! Im START-Menü gibt es jetzt den Punkt ENTWICKLER, und auf der KARTE reist du mit A sofort an jeden Ort.');
+}
+function devLock() { devOn = false; noclip = false; devCoords = false; try { localStorage.removeItem(DEV_KEY); } catch (e) {} }
+function unstick() {
+  // Steht die Figur in einer Wand, rückt sie auf die nächste freie Kachel
+  if (!SOLID.has(tget(cur, player.x, player.y)) && !npcAt(cur, player.x, player.y)) return;
+  for (let r = 1; r < 10; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+    const x = player.x + dx, y = player.y + dy;
+    if (!SOLID.has(tget(cur, x, y)) && !npcAt(cur, x, y)) { player.x = x; player.y = y; return; }
+  }
+}
+function closeMenus() { for (let i = layers.length - 1; i >= 0; i--) if (layers[i] instanceof Menu) layers.splice(i, 1); }
+async function devTravel(d) {
+  await fadeTo(4);
+  lastArea = 0; setMap(d.map, d.x, d.y, d.dir || 'down'); unstick();
+  await fadeTo(0);
+}
+function devDests() {
+  const inside = (kind, i, name) => ({ name, tag: 'GEBÄUDE', map: `${kind}:${i}`, x: 4, y: ROOM_H[kind] - 2, dir: 'up' });
+  return [
+    inside('home', 0, 'Zuhause'), inside('lab', 0, 'Labor Farnweiler'),
+    ...TOWNS.map((t, i) => ({ name: t.name, tag: i ? (t.league ? 'LIGA' : `ORDEN ${i}`) : 'START', map: 'world', x: TOWN_RECTS[i].cx, y: TOWN_RECTS[i].cy })),
+    ...TOWNS.slice(1, 17).map((t, k) => inside('gym', k + 1, `Arena ${t.name}`)),
+    inside('league', 17, 'Champion-Liga'),
+    ...ROUTES.map(r => { const p = r.pts[r.pts.length >> 1]; return { name: `Route ${r.n}`, tag: `${TOWNS[r.from].name.slice(0, 5)}-${TOWNS[r.to].name.slice(0, 5)}`, map: 'world', x: p.x, y: p.y }; }),
+  ];
+}
+const DEV_INFO = {
+  'SCHNELLREISE': 'Sofort zu Stadt, Arena oder Route.', 'DURCH WÄNDE': 'Durch Bäume, Wände und Wasser laufen.',
+  'KOORDINATEN': 'Zeigt Karte, X/Y und Gebiet unten links.', 'WILDE WESEN': 'Begegnungen im hohen Gras an oder aus.',
+  'ORDEN': 'Alle Orden geben oder wegnehmen.', 'WESEN HOLEN': 'Ein beliebiges Wesen mit Wunsch-Level.',
+  'TEAM +5 LEVEL': 'Alle Team-Wesen steigen 5 Level auf.', 'TEAM HEILEN': 'KP, AP und Status voll.',
+  'ITEMS & TALER': 'Von jedem Item 10 Stück und 10000 Taler.', 'URDEX FÜLLEN': 'Alle Wesen als gesehen und gefangen.',
+  'DATENBANK': 'Alle Wesen mit Bild und Text ansehen.', 'TAGESZEIT': 'Tageszeit wechseln (auch Alt+T).',
+  'SPIELSTAND-CODE': 'Spielstand als Code für ein anderes Gerät.', 'SPERREN': 'Entwicklermodus auf diesem Gerät ausschalten.',
+};
+async function devMenu() {
+  let sel = 0;
+  for (;;) {
+    const rows = [['SCHNELLREISE'], ['DURCH WÄNDE', noclip ? 'AN' : 'AUS'], ['KOORDINATEN', devCoords ? 'AN' : 'AUS'], ['WILDE WESEN', CONFIG.encounters ? 'AN' : 'AUS'],
+      ['ORDEN', `${state.badges.filter(Boolean).length}/16`], ['WESEN HOLEN'], ['TEAM +5 LEVEL'], ['TEAM HEILEN'], ['ITEMS & TALER', String(state.money)], ['URDEX FÜLLEN'],
+      ['DATENBANK'], ['TAGESZEIT', TIMES[timeMode].toUpperCase()], ['SPIELSTAND-CODE'], ['SPERREN']];
+    sel = await openScreen(new ListScreen('ENTWICKLER', rows, sel, i => DEV_INFO[rows[i][0]]));
+    if (sel < 0) return;
+    const it = rows[sel][0];
+    if (it === 'SCHNELLREISE') {
+      const ds = devDests(), i = await openScreen(new ListScreen('SCHNELLREISE', ds.map(d => [d.name, d.tag]), 0, k => ds[k].map === 'world' ? `Welt ${ds[k].x}, ${ds[k].y}` : `Innenraum ${ds[k].map}`));
+      if (i >= 0) { closeMenus(); await devTravel(ds[i]); return; }
+    }
+    if (it === 'DURCH WÄNDE') noclip = !noclip;
+    if (it === 'KOORDINATEN') devCoords = !devCoords;
+    if (it === 'WILDE WESEN') CONFIG.encounters = !CONFIG.encounters;
+    if (it === 'ORDEN') { const c = await ask('Orden ändern?', ['ALLE GEBEN', 'ALLE WEG', 'ZURÜCK'], 0); if (c < 2) state.badges = Array(16).fill(c === 0); }
+    if (it === 'WESEN HOLEN') {
+      const si = await openScreen(new ListScreen('WESEN HOLEN', SPECIES.map(s => [`${String(s.id).padStart(3, '0')} ${s.name}`, s.types.map(t => t.slice(0, 3)).join('/')]), 0, k => SPECIES[k].cat + '-Wesen'));
+      if (si < 0) continue;
+      const LV = [5, 10, 15, 20, 25, 30, 40, 50, 60, 70, 80, 100];
+      const li = await openScreen(new ListScreen('LEVEL', LV.map(l => `Level ${l}`), 1, `${SPECIES[si].name} bekommt dieses Level.`));
+      if (li < 0) continue;
+      const w = makeWesen(si + 1, LV[li]); state.seen[w.sp] = state.caught[w.sp] = 1;
+      if (state.team.length < 6) { state.team.push(w); await say(`${SPECIES[si].name.toUpperCase()} (Lv.${w.lvl}) ist jetzt in deinem Team.`); }
+      else { state.box.push(w); await say(`Das Team ist voll. ${SPECIES[si].name.toUpperCase()} ist im Lager am Stein-PC.`); }
+    }
+    if (it === 'TEAM +5 LEVEL') {
+      for (const w of state.team) { w.lvl = Math.min(100, w.lvl + 5); w.exp = expFor(w.lvl); const known = new Set(w.moves.map(m => m.n)); for (const n of movesAt(w.sp, w.lvl)) if (!known.has(n) && w.moves.length < 4) w.moves.push({ n, pp: MOVES[n].pp }); healWesen(w); }
+      await say(state.team.length ? 'Dein Team ist 5 Level stärker!' : 'Du hast noch keine Wesen.');
+    }
+    if (it === 'TEAM HEILEN') { state.team.forEach(healWesen); await say('Dein Team ist wieder fit.'); }
+    if (it === 'ITEMS & TALER') { for (const n of Object.keys(ITEMS)) state.items[n] = (state.items[n] || 0) + 10; state.money += 10000; await say('Von jedem Item 10 Stück und 10000 Taler dazu.'); }
+    if (it === 'URDEX FÜLLEN') { SPECIES.forEach(s => { state.seen[s.id] = state.caught[s.id] = 1; }); await say('Der Urdex ist vollständig.'); }
+    if (it === 'DATENBANK') await openScreen(new DexScreen(true));
+    if (it === 'TAGESZEIT') { timeMode = OPTS.time = (timeMode + 1) % TIMES.length; saveOpts(); }
+    if (it === 'SPIELSTAND-CODE') await exportCode();
+    if (it === 'SPERREN') { if (await ask('Entwicklermodus ausschalten?', ['JA', 'NEIN'], 1) === 0) { devLock(); closeMenus(); return; } }
+  }
+}
+
+/* ---------------------------------------------------------------------
+   SPIELSTAND-CODE – Spielstand auf ein anderes Gerät mitnehmen (Handy ↔ PC)
+   --------------------------------------------------------------------- */
+async function packSave(d) {
+  let bytes = new TextEncoder().encode(JSON.stringify(d)), tag = 'WW0';
+  if (window.CompressionStream) {
+    try { bytes = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer()); tag = 'WW1'; } catch (e) {}
+  }
+  let bin = ''; for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return tag + ':' + btoa(bin);
+}
+async function unpackSave(code) {
+  try {
+    const m = /^(WW[01]):([A-Za-z0-9+/=]+)$/.exec(String(code).replace(/\s+/g, '')); if (!m) return null;
+    let bytes = Uint8Array.from(atob(m[2]), c => c.charCodeAt(0));
+    if (m[1] === 'WW1') bytes = new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer());
+    const d = JSON.parse(new TextDecoder().decode(bytes));
+    return d && typeof d === 'object' && Array.isArray(d.team) && d.profile ? d : null;
+  } catch (e) { return null; }
+}
+let domModal = false;
+function codeModal({ title, hint, value = '', readOnly = false, ok }) {
+  // Echtes Textfeld über dem Spiel, damit man Codes kopieren und einfügen kann
+  return new Promise(res => {
+    domModal = true; for (const k in held) held[k] = false;
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:fixed;inset:0;z-index:1000;background:rgba(10,8,6,.72);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
+    const btn = 'font:20px VT323,monospace;padding:8px 14px;border-radius:6px;border:2px solid #2a221c;background:#f8f0e0;color:#2a221c;cursor:pointer';
+    wrap.innerHTML = `<div style="width:min(440px,100%);background:#f8f0e0;border:4px solid #2a221c;border-radius:10px;padding:14px;box-sizing:border-box;font:20px VT323,monospace;color:#2a221c">
+      <div style="font-size:26px;margin-bottom:6px"></div><div style="margin-bottom:8px;color:#5a5048"></div>
+      <textarea spellcheck="false" style="width:100%;height:120px;box-sizing:border-box;font:12px ui-monospace,monospace;word-break:break-all;border:2px solid #a89878;border-radius:6px;padding:6px;background:#fff"></textarea>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:10px"></div><div style="margin-top:6px;color:#2f8a3a;min-height:20px"></div></div>`;
+    const [tEl, hEl, , bar, note] = wrap.firstElementChild.children, ta = wrap.querySelector('textarea');
+    tEl.textContent = title; hEl.textContent = hint; ta.value = value; ta.readOnly = readOnly;
+    const close = v => { wrap.remove(); domModal = false; res(v); };
+    const add = (label, fn, main) => { const b = document.createElement('button'); b.textContent = label; b.style.cssText = btn + (main ? ';background:#d84838;color:#fff' : ''); b.onclick = fn; bar.appendChild(b); };
+    if (readOnly) {
+      add('KOPIEREN', async () => { ta.select(); try { await navigator.clipboard.writeText(ta.value); } catch (e) { try { document.execCommand('copy'); } catch (_) {} } note.textContent = 'Kopiert!'; }, true);
+      if (navigator.share) add('TEILEN', () => navigator.share({ title: 'Wesenwelt-Spielstand', text: ta.value }).catch(() => {}));
+      add('FERTIG', () => close(null));
+    } else {
+      if (navigator.clipboard && navigator.clipboard.readText) add('EINFÜGEN', async () => { try { ta.value = await navigator.clipboard.readText(); } catch (e) { note.textContent = 'Bitte lange ins Feld tippen und „Einfügen“ wählen.'; } });
+      add('ABBRECHEN', () => close(null));
+      add(ok || 'OK', () => close(ta.value), true);
+    }
+    document.body.appendChild(wrap);
+    if (readOnly) ta.select(); else ta.focus();
+  });
+}
+async function exportCode(data) {
+  if (!data) saveGame();
+  const code = await packSave(data || snapshot());
+  await codeModal({ title: 'Spielstand-Code', hint: 'Kopiere den Code. Auf dem anderen Gerät beim Profil-Bildschirm einen leeren Platz wählen und CODE LADEN drücken.', value: code, readOnly: true });
+}
+async function importCode(slot) {
+  const v = await codeModal({ title: 'Spielstand laden', hint: 'Füge hier den Spielstand-Code von deinem anderen Gerät ein.', ok: 'LADEN' });
+  if (v === null) return false;
+  const d = await unpackSave(v);
+  if (!d) { await say('Dieser Code ist leider ungültig.'); return false; }
+  d.slot = slot; writeSlot(slot, d);
+  await say(`Der Spielstand von ${d.profile.name || 'Spieler'} ist jetzt auf diesem Gerät!`);
+  return true;
+}
+
+for (const C of [Title, ProfileScreen, EditorScreen, NameScreen, TrainerCard, OptionsScreen, DexScreen, TeamScreen, SummaryScreen, StarterScreen, BadgeScreen, MapScreen, ListScreen]) C.prototype.full = true;
 
 /* =====================================================================
    KAMPFSYSTEM – Typen, Attacken, Kampf, Fangen, Erfahrung, Entwicklung
@@ -2612,8 +3086,8 @@ class Battle {
     this.drawBg();
     const fx = 196 + (1 - e) * -280, px = 64 + (1 - e) * 280;
     this.platform(fx, 86, 52, 11); this.platform(px, 132, 64, 13);
-    if (this.tr && v.trF > 0) { ctx.globalAlpha = v.trF; ctx.drawImage(getChar('hero', this.tr.variant ?? 1, 'down', 0), fx - 21 + (1 - v.trF) * 70, 34, 128 / 3, 160 / 3); ctx.globalAlpha = 1; }
-    if (v.trP > 0) { ctx.globalAlpha = Math.min(1, v.trP * 1.5); ctx.drawImage(playerSprite(state.profile.look, 'up', 0), px - 21 - (1 - v.trP) * 70, 80, 128 / 3, 160 / 3); ctx.globalAlpha = 1; }
+    if (this.tr && v.trF > 0) { ctx.globalAlpha = v.trF; ctx.drawImage(getChar('hero', this.tr.variant ?? 1, 'down', 0), fx - 21 + (1 - v.trF) * 70, 24, 128 / 3, 64); ctx.globalAlpha = 1; }
+    if (v.trP > 0) { ctx.globalAlpha = Math.min(1, v.trP * 1.5); ctx.drawImage(playerSprite(state.profile.look, 'up', 0), px - 21 - (1 - v.trP) * 70, 70, 128 / 3, 64); ctx.globalAlpha = 1; }
     if (!(v.blink === 'f' && (tick >> 2) & 1)) this.drawMon(this.F, fx + v.fX, 86 + v.fY, v.fK, v.fA, false, v.fFlash);
     if (!(v.blink === 'p' && (tick >> 2) & 1)) this.drawMon(this.P, px + v.pX, 132 + v.pY, v.pK, v.pA, true, 0);
     const c = v.capsule;
@@ -3104,7 +3578,7 @@ function worldUpdate() {
     const [dx, dy] = DIRS[dir]; const x = n.x + dx, y = n.y + dy;
     n.dir = dir;
     if (Math.abs(x - n.home.x) > 2 || Math.abs(y - n.home.y) > 2) continue;
-    if (blocked(cur, x, y, n) || cur.warps.has(K(x, y)) || tget(cur, x, y) === T.DOOR || tget(cur, x, y) === T.MAT) continue;
+    if (blocked(cur, x, y, n) || cur.warps.has(K(x, y)) || tget(cur, x, y) === T.DOOR || tget(cur, x, y) === T.CAVE_DOOR || tget(cur, x, y) === T.MAT) continue;
     n.start(dir);
   }
   if (popup.t > 0) popup.t--;
@@ -3297,9 +3771,9 @@ function drawWorld() {
       continue;
     }
     ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(sx + 3, sy + 18, 10, 2); ctx.fillRect(sx + 4, sy + 17, 8, 4);
-    const bob = a.moving && a.prog >= 4 && a.prog < 12 ? -1 : 0;
-    ctx.drawImage(getChar(a.sprite, a.variant, a.dir, a.frame()), sx, sy + bob);
-    if (a.alert > 0) { a.alert--; rr(sx + 3, sy - 15, 10, 13, 3, '#283038'); rr(sx + 4, sy - 14, 8, 11, 2, '#ffffff'); ctx.fillStyle = UI.red; ctx.fillRect(sx + 7, sy - 12, 2, 5); ctx.fillRect(sx + 7, sy - 6, 2, 2); }
+    const bob = a.moving && a.prog >= 4 && a.prog < 12 ? -1 : 0, img = getChar(a.sprite, a.variant, a.dir, a.frame()), top = sy + 20 - img.height;
+    ctx.drawImage(img, sx, top + bob);
+    if (a.alert > 0) { a.alert--; rr(sx + 3, top - 14, 10, 13, 3, '#283038'); rr(sx + 4, top - 13, 8, 11, 2, '#ffffff'); ctx.fillStyle = UI.red; ctx.fillRect(sx + 7, top - 11, 2, 5); ctx.fillRect(sx + 7, top - 5, 2, 2); }
   }
   const gx = Math.round(player.px / TS), gy = Math.round(player.py / TS);
   if (tget(cur, gx, gy) === T.TALL) ctx.drawImage(atlas[bget(cur, gx, gy)][f], (rustle.has(K(gx, gy)) ? T.TALL_RUSTLE : T.TALL) * TS, 8, TS, 8, gx * TS - camX, gy * TS - camY + 8, TS, 8);
@@ -3335,7 +3809,11 @@ function drawWorld() {
     rr(2, 2 - slide, w, 22, 4, UI.dark); rr(3, 3 - slide, w - 2, 20, 3, '#f8f0e0'); ctx.fillStyle = '#c8a878'; ctx.fillRect(6, 19 - slide, w - 8, 1);
     text(popup.text, 12, 3 - slide);
   }
-  if (noclip) text('NOCLIP', 200, 2, '#ffffff', '#000000');
+  if (noclip) text('NOCLIP', VW - 52, 2, '#ffffff', '#000000');
+  if (devOn && devCoords) {
+    const s = `${cur.id}  ${player.x},${player.y}` + (cur.outdoor ? `  ${AREA_NAMES[aget(cur, player.x, player.y)] || '-'}  ${BIOMES[bget(cur, player.x, player.y)].name}` : '');
+    rr(2, VH - 18, measure(s) + 12, 16, 3, 'rgba(0,0,0,.62)'); text(s, 8, VH - 20, '#ffffff', null);
+  }
 }
 function drawFull(l) {
   // Menübildschirme sind für 256x192 gebaut: mittig zeichnen, Hintergrund füllt den Rest
@@ -3425,6 +3903,7 @@ function applySave(s) {
   state.box = (s.box || []).filter(w => SPECIES[w.sp - 1]).map(ensureWesen); state.money = s.money ?? 3000; state.lastCenter = s.lastCenter || null;
   lastArea = 0;
   setMap(s.map || 'home:0', s.x ?? 4, s.y ?? 6, s.dir || 'down');
+  unstick();
 }
 const fmtTime = sec => `${Math.floor(sec / 3600)}:${String(Math.floor(sec / 60) % 60).padStart(2, '0')}`;
 function placeName(d) {
@@ -3457,15 +3936,19 @@ async function profileFlow() {
       if (slot < 0) return null;
       const data = loadSlot(slot);
       if (!data) {
+        const c = await ask('Leerer Platz. Was möchtest du tun?', ['NEUES PROFIL', 'CODE LADEN', 'ZURÜCK']);
+        if (c === 1) { await importCode(slot); ps.refresh(); continue; }
+        if (c !== 0) continue;
         const prof = await new EditorScreen({ name: '', look: { ...DEFAULT_LOOK } }, 'NEUES PROFIL').run();
         if (prof) return { slot, profile: prof };
         continue;
       }
       const prof = { name: 'Spieler', ...data.profile, look: { ...DEFAULT_LOOK, ...(data.profile || {}).look } };
-      const c = await ask(`Profil von ${prof.name}`, ['SPIELEN', 'AUSSEHEN', 'LÖSCHEN', 'ZURÜCK']);
+      const c = await ask(`Profil von ${prof.name}`, ['SPIELEN', 'AUSSEHEN', 'CODE ZEIGEN', 'LÖSCHEN', 'ZURÜCK']);
       if (c === 0) return { slot, data };
       if (c === 1) { const p = await new EditorScreen(prof, 'AUSSEHEN ÄNDERN').run(); if (p) { data.profile = p; writeSlot(slot, data); } }
-      if (c === 2) {
+      if (c === 2) await exportCode(data);
+      if (c === 3) {
         const s = await ask(`${prof.name} wirklich löschen? Der Spielstand geht verloren.`, ['JA', 'NEIN'], 1);
         if (s === 0) { deleteSlot(slot); await say(`Das Profil von ${prof.name} wurde gelöscht.`); }
       }
@@ -3539,7 +4022,7 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
-window.WW = { setTime: i => { timeMode = i; }, startBattle, gymLeader, MOVES, typeEff, learnset, movesAt, BagScreen, ShopScreen, TeamScreen, SummaryScreen, evolve, run: f => run(f), get cur() { return cur; }, MAPS, TOWNS, SPECIES, TOWN_RECTS: () => TOWN_RECTS, ROUTES: () => ROUTES, state, player, T, SOLID, tget, aget, DOORS, wesenSprite, drawWesen, layers, screen: openScreen, DexScreen, TeamScreen, StarterScreen, makeWesen, setMap: (...a) => { setMap(...a); mode = 'world'; } };
+window.WW = { setTime: i => { timeMode = i; }, playerSprite, getChar, startBattle, gymLeader, MOVES, typeEff, learnset, movesAt, BagScreen, ShopScreen, TeamScreen, SummaryScreen, evolve, run: f => run(f), get cur() { return cur; }, MAPS, TOWNS, SPECIES, TOWN_RECTS: () => TOWN_RECTS, ROUTES: () => ROUTES, state, player, T, SOLID, tget, aget, DOORS, wesenSprite, drawWesen, layers, screen: openScreen, DexScreen, TeamScreen, StarterScreen, makeWesen, setMap: (...a) => { setMap(...a); mode = 'world'; } };
 boot();
 </script>
 
