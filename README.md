@@ -10,6 +10,8 @@ Ein klassisches Monster-Rollenspiel im Stil der alten Handheld-Spiele, angesiede
 
 ## Spielen
 
+**▶ https://lordgrim96.github.io/wesenwelt/**
+
 Die App wird bei jedem Push auf `main` automatisch auf GitHub Pages veröffentlicht.
 Auf dem Handy die Seite öffnen und „App installieren“ (Android) bzw. „Zum Home-Bildschirm“ (iPhone) wählen.
 
