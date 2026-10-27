@@ -103,7 +103,7 @@ const UI = {
 const TYPES = {
   NORMAL: '#a8a878', FEUER: '#f08030', WASSER: '#6890f0', PFLANZE: '#78c850', ELEKTRO: '#e8c020', EIS: '#78c8c8',
   KAMPF: '#c03028', GIFT: '#a040a0', BODEN: '#d8b058', FLUG: '#a890f0', PSYCHO: '#f85888', KÄFER: '#a8b820',
-  GESTEIN: '#b8a038', GEIST: '#705898', DRACHE: '#7038f8', STAHL: '#a8a8c0',
+  GESTEIN: '#b8a038', GEIST: '#705898', DRACHE: '#7038f8', STAHL: '#a8a8c0', WIND: '#58b8b0',
 };
 
 /* ---------------------------------------------------------------------
@@ -561,6 +561,16 @@ function getChar(kind, variant, dir, frame) {
 const STAT_NAMES = ['KP', 'ANGRIFF', 'VERTEID.', 'SP.-ANG.', 'SP.-VER.', 'INIT.'];
 const SPECIES = [];
 function S(name, types, base, evo, cat, dex, art) { SPECIES.push({ id: SPECIES.length + 1, name, types, base, evo, cat, dex, art }); }
+// Die drei Starter (angelehnt an die Dino-Partner aus „Dinosaurier King“): Wind, Blitz und Pflanze
+S('Karnokid', ['WIND'], [45, 60, 40, 55, 45, 65], 16, 'Wirbelhorn', 'Mutig und blitzschnell. Mit seinen kleinen Hörnern wirbelt es kräftige Windstöße auf.', { k: 'bi', h: 'carno', s: .58, c: ['#d84a30', '#f4cca0', '#f4ead8'], wind: 1 });
+S('Karnotaurus', ['WIND'], [60, 80, 55, 70, 55, 85], 36, 'Wirbelhorn', 'Rennt so schnell, dass hinter ihm ein kleiner Wirbelsturm entsteht.', { k: 'bi', h: 'carno', s: .8, c: ['#c83c24', '#f4cca0', '#f4ead8'], wind: 1, pose: 'horiz' });
+S('Sturmtaurus', ['WIND', 'KAMPF'], [80, 110, 75, 90, 70, 105], 0, 'Sturmhorn', 'Sein Brüllen entfacht einen Orkan. Für seine Freunde stellt es sich jedem Gegner.', { k: 'bi', h: 'carno', s: 1.02, c: ['#b8301c', '#f4cca0', '#f8f0e0'], wind: 1, spines: 1 });
+S('Funkhorn', ['ELEKTRO'], [50, 55, 60, 50, 50, 40], 16, 'Donnerhorn', 'Gutmütig und verfressen. Wird es wütend, knistern Funken zwischen seinen Hörnern.', { k: 'quad', h: 'cerato', s: .56, c: ['#d8b038', '#fff0b8', '#4a6ad0'], horns: 1, bolt: 1 });
+S('Donnerhorn', ['ELEKTRO'], [70, 75, 85, 65, 65, 50], 36, 'Donnerhorn', 'Senkt es den Kopf, schlagen Blitze in seine drei Hörner ein. Dann gibt es kein Halten mehr.', { k: 'quad', h: 'cerato', s: .78, c: ['#c8a028', '#fff0b8', '#3a58c0'], horns: 3, bolt: 1 });
+S('Blitzeratops', ['ELEKTRO', 'BODEN'], [95, 105, 110, 80, 85, 55], 0, 'Gewitterhorn', 'Sein Ansturm klingt wie Donnergrollen. Selbst Felswände zerspringen unter seinen Hörnern.', { k: 'quad', h: 'cerato', s: 1, c: ['#b89020', '#fff0b8', '#2a48b0'], horns: 3, bolt: 1, armor: 1 });
+S('Paraspross', ['PFLANZE'], [50, 40, 45, 60, 60, 50], 16, 'Blütenkamm', 'Freundlich und neugierig. Die sanften Töne aus seinem Kamm lassen Pflanzen wachsen.', { k: 'bi', h: 'duck', s: .58, c: ['#e890b0', '#fae4ec', '#58a848'], crest: 'hadro', leaves: 1 });
+S('Parablatt', ['PFLANZE'], [65, 55, 60, 80, 80, 65], 36, 'Blütenkamm', 'Sein Lied beruhigt wilde Wesen. Auf seinem Rücken blühen Farne und Blumen.', { k: 'bi', h: 'duck', s: .8, c: ['#e07ca0', '#fae4ec', '#48a040'], crest: 'hadro', leaves: 1 });
+S('Paraflora', ['PFLANZE', 'PSYCHO'], [85, 70, 80, 110, 105, 80], 0, 'Waldsängerin', 'Ihr Gesang hallt durch den ganzen Urwald. Wo sie singt, wachsen über Nacht neue Bäume.', { k: 'bi', h: 'duck', s: 1, c: ['#d06890', '#fae4ec', '#3a9838'], crest: 'hadro', leaves: 2 });
 S('Farnodon', ['PFLANZE'], [45, 49, 49, 65, 65, 45], 16, 'Farnhals', 'Knabbert am liebsten junge Farnspitzen. Auf seinem Rücken wachsen kleine Blätter.', { k: 'quad', h: 'sauro', neck: .55, s: .55, c: ['#68b848', '#e8e8a0', '#2f8a3a'], leaves: 1 });
 S('Zykadon', ['PFLANZE'], [60, 62, 63, 80, 80, 60], 36, 'Farnhals', 'Sein Hals ist so lang, dass es Früchte aus den höchsten Baumkronen pflückt.', { k: 'quad', h: 'sauro', neck: .8, s: .75, c: ['#58a840', '#e8e8a0', '#2f8a3a'], leaves: 1 });
 S('Gigafarnus', ['PFLANZE', 'BODEN'], [80, 82, 83, 100, 100, 80], 0, 'Urriese', 'Zieht es über die Ebene, bebt der Boden meilenweit. Auf seinem Rücken wächst ein ganzer Wald.', { k: 'quad', h: 'sauro', neck: 1, s: 1, c: ['#4a9038', '#e0dca0', '#2f7a2a'], leaves: 2 });
@@ -627,7 +637,10 @@ S('Tyrannodrak', ['DRACHE', 'BODEN'], [91, 134, 95, 100, 100, 80], 0, 'Tyrannene
 S('Magmator', ['FEUER', 'GESTEIN'], [100, 120, 110, 130, 90, 80], 0, 'Vulkan', 'Schlief im Herzen des größten Vulkans. Sein Erwachen veränderte die Welt.', { k: 'quad', h: 'boxy', s: 1.05, c: ['#4a3a3a', '#e86020', '#f8d040'], lava: 1, plates: 1 });
 S('Chronodon', ['PSYCHO', 'DRACHE'], [100, 120, 100, 150, 100, 90], 0, 'Zeit', 'Es heißt, Chronodon hüte den Fluss der Zeit seit dem ersten Tag der Urzeit.', { k: 'bi', h: 'rex', s: 1.05, c: ['#3a5ab0', '#c8d8f8', '#f0d050'], wings: 1, rings: 1 });
 const SPID = Object.fromEntries(SPECIES.map(s => [s.name, s.id]));
-const STARTERS = [SPID.Farnodon, SPID.Funkiraptor, SPID.Plesiplitsch];
+const STARTERS = [SPID.Karnokid, SPID.Funkhorn, SPID.Paraspross];
+const STARTER_NICKS = ['Ace', 'Chomp', 'Paris'];
+const DEX_VERSION = 2; // Version 2: die 9 neuen Starter-Arten stehen vorn im Urdex
+const wName = w => w.nick || SPECIES[w.sp - 1].name;
 // Wilde Wesen je Gebiet (für das kommende Kampfsystem)
 const BIOME_POOL = [
   ['Kompso', 'Pteri', 'Libellux', 'Halmi', 'Archi', 'Plattling', 'Hornix', 'Trilobix'],
@@ -748,6 +761,8 @@ const ARCH = {
     if (a.bolt) D.P([[30, 31], [36, 33], [33, 36], [39, 38], [32, 37], [34, 34]], k.c3, false);
     if (a.rings) { D.E(31, 39, 7, 7, k.c3); D.E(31, 39, 4.5, 4.5, k.c1, 0, false); D.L(31, 39, 31, 35.5, 1.5, k.c3); D.L(31, 39, 34, 40, 1.5, k.c3); }
     if (a.feathers) { D.P([[40, 30], [46, 24], [46, 31]], k.c3); D.P([[24, 41], [18, 46], [24, 45]], k.c3); }
+    if (a.leaves) for (let i = 0; i < 2 + a.leaves; i++) D.E(37 + i * 4, (hz ? 28 : 29) + i * 2, 3.2, 1.5, k.c3, -0.5 + (i % 2) * 0.9);
+    if (a.wind) for (const [x, y, l] of [[46, 28, 9], [50, 34, 7], [47, 40, 8]]) { D.L(x, y, x + l, y - 1, 1.4, '#e8fbff'); D.L(x + l, y - 1, x + l + 2, y - 3, 1.4, '#e8fbff'); }
     D.E(39, 44, 6, 7.5, k.c1);
     D.T([[39, 49], [38, 54], [40, 57]], 4.5, 3.5, k.c1); D.E(37.5, 57, 5, 1.8, k.c1);
     const hx = hz ? 15 : 19, hy = hz ? 27 : 17;
@@ -767,6 +782,11 @@ const ARCH = {
         D.C(hx, hy + 1.5, 6.5, k.c1); D.E(hx + 1, hy - 3, 7, 5.5, k.c3); D.E(hx - 5, hy + 4, 4.5, 2.6, k.c1);
         for (let i = 0; i < 4; i++) D.C(hx - 3 + i * 3, hy + 1.4 - (i % 2), 0.9, k.d3, false);
         D.eye(hx - 1, hy + 1.6); break;
+      case 'carno':
+        D.E(hx, hy, 10, 6.5, k.c1, -0.1); D.E(hx - 2, hy + 5, 7.5, 2.4, k.c2, -0.1);
+        D.P([[hx - 1, hy - 4], [hx - 4, hy - 11], [hx + 2, hy - 5]], k.c3); D.P([[hx + 4, hy - 4], [hx + 5, hy - 11], [hx + 7, hy - 3]], k.c3);
+        for (let i = 0; i < 3; i++) D.P([[hx - 8 + i * 3, hy + 2.5], [hx - 7 + i * 3, hy + 4.5], [hx - 6 + i * 3, hy + 2.5]], k.white, false);
+        D.eye(hx + 1.5, hy - 2); break;
       case 'dragon':
         D.P([[hx + 3, hy - 4], [hx + 14, hy - 12], [hx + 8, hy - 2]], k.c3); D.P([[hx + 6, hy - 2], [hx + 16, hy - 6], [hx + 9, hy + 1]], k.c3);
         D.E(hx, hy, 10, 6.5, k.c1, -0.1); D.E(hx - 2, hy + 5, 7.5, 2.4, k.c2, -0.1);
@@ -792,6 +812,7 @@ const ARCH = {
     D.E(37, by, 17, bry, k.c1);
     D.E(35, by + bry * 0.55, 12, bry * 0.35, k.c2, 0, false);
     if (a.leaves) for (let i = 0; i < 4 + a.leaves; i++) D.E(28 + i * 5, by - bry + 1, 3.5, 1.7, k.c3, -0.6 + (i % 2) * 1.2);
+    if (a.bolt) D.P([[30, by - 7], [38, by - 3], [34, by - 2], [43, by + 4], [31, by], [35, by - 1]], k.c3, false);
     if (a.armor) for (let r = 0; r < 2; r++) for (let i = 0; i < 5; i++) D.C(27 + i * 5 + r * 2.5, by - bry * 0.55 + r * 4, 1.3, k.c3, false);
     if (a.lava) { D.L(27, by - 3, 33, by + 2, 1.5, k.c3); D.L(33, by + 2, 40, by - 2, 1.5, k.c3); D.L(42, by + 3, 48, by - 1, 1.5, k.c3); }
     if (a.h === 'mammoth') for (let i = 0; i < 9; i++) D.L(24 + i * 3.4, by - 6 + (i % 3), 23 + i * 3.4, by + 4 + (i % 2) * 2, 1, k.d1);
@@ -1320,8 +1341,8 @@ function makeInterior(id) {
       for (const x of [4, 5, 6]) m.objs.set(K(x, 4), { fn: () => chooseStarter() });
       m.objs.set(K(3, 4), { text: 'Notizen über Bernstein, Fossilien und Vulkangestein.' });
       npc({ x: 5, y: 3, dir: 'down', variant: 3, id: 'prof', talk: async () => {
-        if (!state.team.length) { await say(`PROF. BERNSTEIN: Da bist du ja, ${PN()}! Auf dem Tisch liegen drei Bernsteinkapseln.`); await chooseStarter(); }
-        else await say(`PROF. BERNSTEIN: Wie geht es ${SPECIES[state.team[0].sp - 1].name.toUpperCase()}? Am PC findest du meine Urzeit-Datenbank.`);
+        if (!state.team.length) { await say(`PROF. BERNSTEIN: Da bist du ja, ${PN()}! In diesen drei Bernsteinkapseln warten junge Dinos auf einen Partner.`); await say('Der flinke ACE, der starke CHOMP und die sanfte PARIS. Wen wählst du?'); await chooseStarter(); }
+        else await say(`PROF. BERNSTEIN: Wie geht es ${wName(state.team[0]).toUpperCase()}? Am PC findest du meine Urzeit-Datenbank.`);
       } });
       npc({ x: 1, y: 6, dir: 'right', variant: 3, wander: true, talk: 'ASSISTENT: Der Professor erforscht, wie die Wesen die Urzeit überlebt haben.' });
       break;
@@ -1622,7 +1643,7 @@ const KB_PAGE_NAMES = ['ABC', 'abc', '123'];
 const NAME_MAX = 10;
 let textInput = null;
 class NameScreen {
-  constructor(name, look) { this.name = name; this.look = look; this.page = 0; this.cx = 0; this.cy = 0; }
+  constructor(name, look, wesen = 0) { this.name = name; this.look = look; this.wesen = wesen; this.page = 0; this.cx = 0; this.cy = 0; }
   run() { return new Promise(r => { this.res = r; layers.push(this); textInput = this; }); }
   type(ch) { if (this.name.length < NAME_MAX && !(ch === ' ' && !this.name)) this.name += ch; }
   back() { this.name = this.name.slice(0, -1); }
@@ -1656,9 +1677,9 @@ class NameScreen {
   }
   draw() {
     bgPattern('#dfe7f0', '#d6e0ec');
-    header('WIE HEISST DU?', `${this.name.length}/${NAME_MAX}`);
+    header(this.wesen ? 'SPITZNAME' : 'WIE HEISST DU?', `${this.name.length}/${NAME_MAX}`);
     box(4, 24, 248, 50, UI.panel);
-    ctx.drawImage(playerSprite(this.look, 'down', 0), 14, 30, 32, 40);
+    if (this.wesen) ctx.drawImage(wesenSprite(this.wesen), 0, 0, 64, 64, 12, 34, 40, 40); else ctx.drawImage(playerSprite(this.look, 'down', 0), 14, 30, 32, 40);
     for (let i = 0; i < NAME_MAX; i++) {
       const x = 60 + i * 18;
       rr(x, 62, 14, 2, 1, i === this.name.length && (tick >> 4) & 1 ? UI.red : '#8aa0b8');
@@ -1830,7 +1851,7 @@ class TeamScreen {
       const sel = i === this.sel;
       rr(x, y, 122, 42, 6, UI.dark); rr(x + 1, y + 1, 120, 40, 5, sel ? '#f8a070' : '#58a0d8'); rr(x + 3, y + 3, 116, 36, 4, sel ? '#ffd8c0' : '#c8e4f8');
       drawWesen(w.sp, x + 2, y + 4 + ((tick >> 3) & 1 && sel ? -1 : 0), 0.5);
-      text(sp.name, x + 36, y + 1, UI.text, UI.shadow, 16, Math.min(measure(sp.name), 82));
+      text(wName(w), x + 36, y + 1, UI.text, UI.shadow, 16, Math.min(measure(wName(w)), 82));
       text(`Lv.${w.lvl}`, x + 36, y + 16);
       hpBar(x + 70, y + 21, 46, w.hp, st[0]);
       const hpS = `${w.hp}/${st[0]}`;
@@ -1851,7 +1872,7 @@ class SummaryScreen {
     box(4, 24, 112, 116, UI.panel);
     ctx.fillStyle = '#c8d8e8'; ctx.beginPath(); ctx.ellipse(60, 118, 40, 8, 0, 0, 7); ctx.fill();
     drawWesen(w.sp, 28, 58);
-    text(sp.name.toUpperCase(), 12, 26); text(`Lv.${w.lvl}`, 12, 40);
+    text(wName(w).toUpperCase(), 12, 26); text(w.nick ? `${sp.name} · Lv.${w.lvl}` : `Lv.${w.lvl}`, 12, 40, UI.text, UI.shadow, 16, 100);
     sp.types.forEach((t, i) => typeChip(t, 120 + i * 52, 26));
     box(118, 42, 136, 100);
     st.forEach((v, i) => {
@@ -1881,12 +1902,13 @@ class StarterScreen {
       rr(x, y, 76, 112, 6, UI.dark); rr(x + 1, y + 1, 74, 110, 5, sel ? UI.red : '#a89878'); rr(x + 3, y + 3, 70, 106, 4, sel ? '#fff4e8' : '#f4ecdc');
       ctx.fillStyle = '#e0d4bc'; ctx.beginPath(); ctx.ellipse(x + 38, y + 72, 28, 6, 0, 0, 7); ctx.fill();
       drawWesen(id, x + 6, y + 10 + (sel && (tick >> 3) & 1 ? -2 : 0));
-      text(sp.name, x + 38 - Math.floor(measure(sp.name) / 2), y + 78);
-      typeChip(sp.types[0], x + 14, y + 95);
+      const nk = STARTER_NICKS[i]; text(nk, x + 38 - Math.floor(measure(nk) / 2), y + 76);
+      typeChip(sp.types[0], x + 14, y + 94);
     });
     box(2, 146, 252, 44);
     const sp = SPECIES[STARTERS[this.sel] - 1];
-    wrapW(sp.dex, 228).slice(0, 2).forEach((l, i) => text(l, 12, 150 + i * 16));
+    text(`${STARTER_NICKS[this.sel].toUpperCase()} · ${sp.name} · ${sp.cat}`, 12, 150);
+    const dl = wrapW(sp.dex, 222); text(dl[0] + (dl.length > 1 ? ' …' : ''), 12, 166, '#7888a0', null);
   }
 }
 
@@ -2055,12 +2077,18 @@ async function chooseStarter() {
     const c = await openScreen(new StarterScreen());
     if (c < 0) return say('PROF. BERNSTEIN: Lass dir ruhig Zeit.');
     const sp = SPECIES[STARTERS[c] - 1];
-    const ok = await ask(`${sp.name.toUpperCase()}, das ${sp.types[0]}-Wesen. Bist du sicher?`, ['JA', 'NEIN']);
+    const nick = STARTER_NICKS[c];
+    const ok = await ask(`${nick.toUpperCase()}, ein ${sp.name} vom Typ ${sp.types[0]}. Bist du sicher?`, ['JA', 'NEIN']);
     if (ok !== 0) continue;
-    state.team.push(makeWesen(sp.id, 5));
+    const w = makeWesen(sp.id, 5); w.nick = nick;
+    state.team.push(w);
     state.caught[sp.id] = 1;
-    await say(`${PN()} erhält ${sp.name.toUpperCase()}!`);
-    await say('PROF. BERNSTEIN: Pass gut auf es auf! Mein Assistent auf Route 1 lässt dich jetzt durch.');
+    await say(`${PN()} erhält ${nick.toUpperCase()}!`);
+    if (await ask(`Möchtest du ${nick.toUpperCase()} einen anderen Spitznamen geben?`, ['JA', 'NEIN'], 1) === 0) {
+      const nn = await new NameScreen(w.nick, state.profile.look, sp.id).run();
+      if (nn) w.nick = nn;
+    }
+    await say(`PROF. BERNSTEIN: Du und ${w.nick.toUpperCase()} seid jetzt ein Team! Mein Assistent auf Route 1 lässt euch durch.`);
     saveGame();
     return;
   }
@@ -2454,7 +2482,7 @@ function versionLabel() {
 const PROFILE_COUNT = 3;
 const slotKey = i => `wesenwelt.urzeit.slot${i + 1}`;
 let currentSlot = 0;
-function snapshot() { return { slot: currentSlot, profile: state.profile, time: state.time, map: cur ? cur.id : 'home:0', x: player.x, y: player.y, dir: player.dir, badges: state.badges, flags: state.flags, items: state.items, steps: state.steps, team: state.team, seen: state.seen, caught: state.caught }; }
+function snapshot() { return { dexv: DEX_VERSION, slot: currentSlot, profile: state.profile, time: state.time, map: cur ? cur.id : 'home:0', x: player.x, y: player.y, dir: player.dir, badges: state.badges, flags: state.flags, items: state.items, steps: state.steps, team: state.team, seen: state.seen, caught: state.caught }; }
 function loadSlot(i) { try { const s = localStorage.getItem(slotKey(i)); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function writeSlot(i, d) { try { localStorage.setItem(slotKey(i), JSON.stringify(d)); return true; } catch (e) { return false; } }
 function deleteSlot(i) { try { localStorage.removeItem(slotKey(i)); } catch (e) {} }
@@ -2473,6 +2501,11 @@ function applySave(s) {
   state.time = s.time || 0;
   state.badges = (s.badges || []).slice(0, 16).concat(Array(16).fill(false)).slice(0, 16);
   state.flags = s.flags || {}; state.items = s.items || {}; state.steps = s.steps || 0;
+  if ((s.dexv || 1) < 2) {
+    // Alte Spielstände: alle Urdex-Nummern rücken um die 9 neuen Starter nach hinten
+    const shift = o => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [+k + 9, v]));
+    (s.team || []).forEach(w => { w.sp += 9; }); s.seen = shift(s.seen); s.caught = shift(s.caught);
+  }
   state.team = (s.team || []).filter(w => SPECIES[w.sp - 1]); state.seen = s.seen || {}; state.caught = s.caught || {};
   lastArea = 0;
   setMap(s.map || 'home:0', s.x ?? 4, s.y ?? 6, s.dir || 'down');
