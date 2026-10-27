@@ -92,12 +92,12 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 const CONFIG = {
   seed: 1996,
-  encounters: false,      // HOOK: auf true setzen, sobald das Kampfsystem steht
+  encounters: true,
   encounterRate: 1 / 10,
   textSpeed: 1,
   saveKey: 'wesenwelt.urzeit.v1',
 };
-const GAME_VERSION = '202610272026'; // wird von build_app.py durch die Build-Zeit ersetzt
+const GAME_VERSION = '202610272047'; // wird von build_app.py durch die Build-Zeit ersetzt
 
 // Logische Bildgröße passt sich dem Bildschirm an (mindestens 256x192); SC = interne Auflösung für scharfe Schrift
 let VW = 256, VH = 192, OX = 0, OY = 0, RW = 256, RH = 192;
@@ -1189,13 +1189,10 @@ function genWorld() {
       if (SOLID.has(tget(m, x, y))) tset(m, x, y, T.GRASS);
       const dir = p.dy === 0 ? (side > 0 ? 'up' : 'down') : (side > 0 ? 'left' : 'right');
       const cls = TRAINER_CLASSES[ri(0, TRAINER_CLASSES.length - 1)];
-      m.npcs.push(new Actor({
-        x, y, dir, variant: ri(1, 2), id: `trainer:${route.n}:${q}`,
-        talk: async () => {
-          await say(`${cls.toUpperCase()}: Ich warte hier auf meinen ersten Wesen-Kampf!`);
-          await say('(Trainerkämpfe folgen mit dem Kampfsystem.)');
-        },
-      }));
+      const tr = routeTrainer(route, bget(m, x, y), q, cls, ri(1, 2));
+      const actor = new Actor({ x, y, dir, variant: tr.variant, id: `trainer:${route.n}:${q}`, trainer: tr });
+      actor.talk = () => trainerEncounter(actor, false);
+      m.npcs.push(actor);
     }
 
     {
@@ -1322,7 +1319,7 @@ function makeInterior(id) {
       m = room(id, 10, H, T.FLOOR);
       tset(m, 0, 3, T.PLANT); tset(m, 9, 3, T.PLANT);
       for (let x = 1; x <= 8; x++) tset(m, x, 3, T.COUNTER);
-      tset(m, 9, 5, T.PC); m.objs.set(K(9, 5), { text: 'Ein Stein-PC. Das Wesen-Lager wird gerade eingerichtet.' });
+      tset(m, 9, 5, T.PC); m.objs.set(K(9, 5), { fn: () => usePC() });
       tset(m, 1, 5, T.TABLE); tset(m, 1, 6, T.PLANT);
       npc({ x: 4, y: 2, dir: 'down', variant: 6, id: 'nurse', talk: async () => { await say('Willkommen im Wesen-Center!'); await healTeam(); } });
       npc({ x: 7, y: 6, dir: 'left', variant: 1, wander: true, talk: 'Im Center ruhen sich Trainer aus. Hier riecht es nach Kräutertee.' });
@@ -1374,8 +1371,10 @@ function makeInterior(id) {
       for (const y of [4, 7]) { tset(m, 1, y, T.STATUE); tset(m, 8, y, T.STATUE); }
       for (const x of [3, 6]) m.objs.set(K(x, H - 3), { text: `ARENA ${t.name.toUpperCase()}\nLeitung: ${t.leader} · Typ: ${t.type}` });
       npc({ x: 4, y: 2, dir: 'down', variant: 5, id: 'leader', talk: () => leaderTalk(i) });
-      npc({ x: 2, y: 8, dir: 'right', variant: 1, talk: `Ich trainiere hier, um eines Tages ${t.leader} zu schlagen.` });
-      npc({ x: 7, y: 5, dir: 'left', variant: 2, talk: `Die Wesen in dieser Arena sind vom Typ ${t.type}.` });
+      for (const [k, x, y, dir] of [[0, 2, 8, 'right'], [1, 7, 5, 'left']]) {
+        const tr = gymTrainer(i, k), a = new Actor({ x, y, dir, variant: tr.variant, trainer: tr, still: true });
+        a.talk = () => trainerEncounter(a, false); m.npcs.push(a);
+      }
       npc({ x: 6, y: H - 2, dir: 'left', variant: 4, talk: `Hey, Herausforderer! ${t.leader} setzt auf ${t.type}-Wesen. Bereite dich gut vor!` });
       break;
     case 'league':
@@ -1405,7 +1404,7 @@ class Actor {
   frame() { if (this.moving && this.prog < 8) return this.parity ? 1 : 2; return 0; }
 }
 
-const state = { profile: { name: 'Spieler', look: { ...DEFAULT_LOOK } }, time: 0, badges: Array(16).fill(false), flags: {}, items: {}, steps: 0, team: [], seen: {}, caught: {} };
+const state = { profile: { name: 'Spieler', look: { ...DEFAULT_LOOK } }, time: 0, money: 3000, box: [], lastCenter: null, badges: Array(16).fill(false), flags: {}, items: {}, steps: 0, team: [], seen: {}, caught: {} };
 const player = new Actor({ sprite: 'player', variant: 0 });
 const PN = () => state.profile.name || 'Spieler';
 let cur = null;
@@ -1433,11 +1432,21 @@ function calcStats(w) {
   const sp = SPECIES[w.sp - 1];
   return sp.base.map((b, i) => i === 0 ? Math.floor((2 * b + w.iv[i]) * w.lvl / 100) + w.lvl + 10 : Math.floor((2 * b + w.iv[i]) * w.lvl / 100) + 5);
 }
+const expFor = l => l ** 3; // Erfahrung für ein Level (Lv. 100 = 1.000.000 EP)
 function makeWesen(sp, lvl) {
-  const w = { sp, lvl, iv: Array.from({ length: 6 }, () => Math.floor(Math.random() * 32)), exp: 0 };
+  const w = { sp, lvl, iv: Array.from({ length: 6 }, () => Math.floor(Math.random() * 32)), exp: expFor(lvl), status: null, moves: movesAt(sp, lvl).map(n => ({ n, pp: MOVES[n].pp })) };
   w.hp = calcStats(w)[0];
   return w;
 }
+// Ältere Spielstände: fehlende Attacken, Erfahrung und Zustand ergänzen
+function ensureWesen(w) {
+  if (!w.moves || !w.moves.length) w.moves = movesAt(w.sp, w.lvl).map(n => ({ n, pp: MOVES[n].pp }));
+  w.moves = w.moves.filter(m => MOVES[m.n]);
+  if (!(w.exp >= expFor(w.lvl))) w.exp = expFor(w.lvl);
+  if (w.status === undefined) w.status = null;
+  return w;
+}
+function healWesen(w) { w.hp = calcStats(w)[0]; w.status = null; w.sleep = 0; w.moves.forEach(m => { m.pp = MOVES[m.n].pp; }); }
 
 /* ---------------------------------------------------------------------
    INPUT
@@ -1737,8 +1746,8 @@ class TrainerCard {
     ctx.fillStyle = '#efe2c8'; for (let y = 36; y < 132; y += 6) ctx.fillRect(18, y, 220, 1);
     text(PN(), 24, 34, UI.text, UI.shadow);
     const n = state.badges.filter(Boolean).length;
-    const rows = [['ORDEN', `${n}/16`], ['URDEX', `${Object.keys(state.seen).length} gesehen`], ['WESEN', `${state.team.length} im Team`], ['SPIELZEIT', fmtTime(state.time)]];
-    rows.forEach(([a, b], i) => { text(a, 24, 54 + i * 15, '#7888a0', null); text(b, 100, 54 + i * 15, UI.text, null); });
+    const rows = [['ORDEN', `${n}/16`], ['URDEX', `${Object.keys(state.caught).length} gefangen`], ['WESEN', `${state.team.length} im Team`], ['TALER', String(state.money)], ['SPIELZEIT', fmtTime(state.time)]];
+    rows.forEach(([a, b], i) => { text(a, 24, 50 + i * 13, '#7888a0', null); text(b, 100, 50 + i * 13, UI.text, null); });
     rr(170, 40, 64, 76, 5, '#e6d8bc');
     drawStage(202, 108, 24);
     ctx.drawImage(playerSprite(state.profile.look, 'down', 0), 178, 34, 48, 60);
@@ -1856,32 +1865,51 @@ class DexScreen {
 
 /* --- Team & Übersicht --- */
 class TeamScreen {
-  constructor() { this.sel = 0; }
+  // mode: 'view' (Menü), 'pick' (auswählen, B bricht ab), 'force' (muss wählen)
+  constructor(mode = 'view', title) { this.mode = mode; this.title = title; this.sel = 0; this.swap = -1; }
   update() {
     const n = state.team.length;
-    if (pressed.B || pressed.START || !n) { pop(this); this.done(); if (!n) run(() => say('Du hast noch keine Wesen dabei.')); return; }
+    if (!n) { pop(this); this.done(-1); if (this.mode === 'view') run(() => say('Du hast noch keine Wesen dabei.')); return; }
     if (pressed.up) this.sel = (this.sel - 2 + n * 2) % n;
     if (pressed.down) this.sel = (this.sel + 2) % n;
     if (pressed.left || pressed.right) this.sel = (this.sel ^ 1) < n ? this.sel ^ 1 : this.sel;
-    if (pressed.A) run(() => openScreen(new SummaryScreen(state.team[this.sel])));
+    if (pressed.B || pressed.START) {
+      if (this.mode === 'force') return;
+      if (this.swap >= 0) { this.swap = -1; return; }
+      pop(this); this.done(-1); return;
+    }
+    if (!pressed.A) return;
+    if (this.mode !== 'view') { pop(this); this.done(this.sel); return; }
+    if (this.swap >= 0) { const t = state.team; [t[this.swap], t[this.sel]] = [t[this.sel], t[this.swap]]; this.swap = -1; return; }
+    const w = state.team[this.sel];
+    run(async () => {
+      const c = await ask(`${wName(w).toUpperCase()}: Was möchtest du tun?`, ['ÜBERSICHT', 'TAUSCHEN', 'ZURÜCK']);
+      if (c === 0) await openScreen(new SummaryScreen(w));
+      else if (c === 1) this.swap = this.sel;
+    });
   }
   draw() {
     bgPattern('#5a8a58', '#548252');
     state.team.forEach((w, i) => {
       const sp = SPECIES[w.sp - 1], st = calcStats(w);
       const x = 4 + (i % 2) * 126, y = 4 + Math.floor(i / 2) * 46 + (i % 2) * 8;
-      const sel = i === this.sel;
-      rr(x, y, 122, 42, 6, UI.dark); rr(x + 1, y + 1, 120, 40, 5, sel ? '#f8a070' : '#58a0d8'); rr(x + 3, y + 3, 116, 36, 4, sel ? '#ffd8c0' : '#c8e4f8');
-      drawWesen(w.sp, x + 2, y + 4 + ((tick >> 3) & 1 && sel ? -1 : 0), 0.5);
+      const sel = i === this.sel, ko = w.hp <= 0, sw = i === this.swap;
+      rr(x, y, 122, 42, 6, UI.dark);
+      rr(x + 1, y + 1, 120, 40, 5, sw ? '#f8d040' : sel ? '#f8a070' : ko ? '#a87870' : '#58a0d8');
+      rr(x + 3, y + 3, 116, 36, 4, sel ? '#ffd8c0' : ko ? '#e8d0cc' : '#c8e4f8');
+      drawWesen(w.sp, x + 2, y + 4 + ((tick >> 3) & 1 && sel && !ko ? -1 : 0), 0.5);
       text(wName(w), x + 36, y + 1, UI.text, UI.shadow, 16, Math.min(measure(wName(w)), 82));
       text(`Lv.${w.lvl}`, x + 36, y + 16);
+      if (ko) { rr(x + 36, y + 31, 24, 8, 2, '#c03028'); text('K.O.', x + 48 - measure('K.O.') / 2, y + 27, '#ffffff', null); }
+      else if (w.status) { const si = STATUS_INFO[w.status]; rr(x + 36, y + 31, 24, 8, 2, si.col); text(si.tag, x + 48 - measure(si.tag) / 2, y + 27, '#ffffff', null); }
       hpBar(x + 70, y + 21, 46, w.hp, st[0]);
       const hpS = `${w.hp}/${st[0]}`;
       text(hpS, x + 116 - measure(hpS), y + 24, UI.text, null);
     });
     box(2, 146, 252, 44);
-    text('Wähle ein Wesen.', 12, 150);
-    text('A: Übersicht   B: zurück', 12, 166, '#7888a0', null);
+    if (this.mode !== 'view') { text(this.title || 'Wähle ein Wesen.', 12, 150); text(this.mode === 'force' ? 'A: auswählen' : 'A: auswählen   B: zurück', 12, 166, '#7888a0', null); }
+    else if (this.swap >= 0) { text(`Mit wem soll ${wName(state.team[this.swap])} tauschen?`, 12, 150); text('A: tauschen   B: abbrechen', 12, 166, '#7888a0', null); }
+    else { text('Das erste Wesen kämpft zuerst.', 12, 150); text('A: Optionen   B: zurück', 12, 166, '#7888a0', null); }
   }
 }
 class SummaryScreen {
@@ -1894,16 +1922,23 @@ class SummaryScreen {
     box(4, 24, 112, 116, UI.panel);
     ctx.fillStyle = '#c8d8e8'; ctx.beginPath(); ctx.ellipse(60, 118, 40, 8, 0, 0, 7); ctx.fill();
     drawWesen(w.sp, 28, 58);
-    text(wName(w).toUpperCase(), 12, 26); text(w.nick ? `${sp.name} · Lv.${w.lvl}` : `Lv.${w.lvl}`, 12, 40, UI.text, UI.shadow, 16, 100);
+    text(wName(w).toUpperCase(), 12, 26, UI.text, UI.shadow, 16, 100); text(`Lv.${w.lvl}`, 12, 40);
+    if (w.nick) text(sp.name, 12, 54, '#7888a0', null, 16, 100);
     sp.types.forEach((t, i) => typeChip(t, 120 + i * 52, 26));
     box(118, 42, 136, 100);
     st.forEach((v, i) => {
-      text(STAT_NAMES[i], 128, 45 + i * 15, UI.text, null);
+      text(STAT_NAMES[i], 128, 44 + i * 13, UI.text, null);
       const s = i === 0 ? `${w.hp}/${v}` : String(v);
-      text(s, 244 - measure(s), 45 + i * 15, UI.text, null);
+      text(s, 244 - measure(s), 44 + i * 13, UI.text, null);
     });
+    const need = w.lvl < 100 ? Math.max(0, expFor(w.lvl + 1) - w.exp) : 0;
+    text(w.lvl < 100 ? `Nächstes Level: ${need} EP` : 'Höchstes Level!', 128, 122, '#7888a0', null, 16, 118);
     box(2, 146, 252, 44);
-    wrapW(sp.dex, 228).slice(0, 2).forEach((l, i) => text(l, 12, 150 + i * 16));
+    w.moves.forEach((m, i) => {
+      const Mv = MOVES[m.n], x = 12 + (i & 1) * 120, y = 150 + (i >> 1) * 16;
+      rr(x, y + 5, 4, 8, 1, TYPES[Mv.type]); text(Mv.name, x + 8, y, UI.text, null, 16, 78);
+      const pp = `${m.pp}/${Mv.pp}`; text(pp, x + 112 - measure(pp), y, '#7888a0', null);
+    });
   }
 }
 
@@ -2064,34 +2099,884 @@ class Title {
 
 for (const C of [Title, ProfileScreen, EditorScreen, NameScreen, TrainerCard, OptionsScreen, DexScreen, TeamScreen, SummaryScreen, StarterScreen, BadgeScreen, MapScreen]) C.prototype.full = true;
 
-/* ---------------------------------------------------------------------
-   HOOKS – hier docken Kämpfe, Laden und Heilen an
-   --------------------------------------------------------------------- */
-async function battle(opts) {
-  // TODO: Kampfsystem. Rückgabe true = gewonnen.
-  await flash();
-  await say(`[KAMPF GEGEN ${opts.name.toUpperCase()}]`);
-  await say('Das Kampfsystem kommt im nächsten Schritt. Dieser Kampf zählt als gewonnen!');
-  return true;
+/* =====================================================================
+   KAMPFSYSTEM – Typen, Attacken, Kampf, Fangen, Erfahrung, Entwicklung
+   ===================================================================== */
+// Physisch oder speziell hängt (wie in den klassischen Spielen) vom Typ ab
+const PHYS_TYPES = new Set(['NORMAL', 'KAMPF', 'FLUG', 'GIFT', 'BODEN', 'GESTEIN', 'KÄFER', 'GEIST', 'STAHL']);
+// Angriffstyp → s: sehr effektiv, w: nicht sehr effektiv, i: keine Wirkung.
+// Starter-Dreieck: Wind > Pflanze > Elektro > Wind
+const CHART = {
+  NORMAL: { s: [], w: ['GESTEIN', 'STAHL'], i: ['GEIST'] },
+  FEUER: { s: ['PFLANZE', 'EIS', 'KÄFER', 'STAHL'], w: ['FEUER', 'WASSER', 'GESTEIN', 'DRACHE'], i: [] },
+  WASSER: { s: ['FEUER', 'BODEN', 'GESTEIN'], w: ['WASSER', 'PFLANZE', 'DRACHE'], i: [] },
+  PFLANZE: { s: ['WASSER', 'BODEN', 'GESTEIN', 'ELEKTRO'], w: ['FEUER', 'PFLANZE', 'GIFT', 'FLUG', 'KÄFER', 'DRACHE', 'STAHL', 'WIND'], i: [] },
+  ELEKTRO: { s: ['WASSER', 'FLUG', 'WIND'], w: ['ELEKTRO', 'PFLANZE', 'DRACHE'], i: ['BODEN'] },
+  EIS: { s: ['PFLANZE', 'BODEN', 'FLUG', 'DRACHE'], w: ['FEUER', 'WASSER', 'EIS', 'STAHL'], i: [] },
+  KAMPF: { s: ['NORMAL', 'EIS', 'GESTEIN', 'STAHL'], w: ['GIFT', 'FLUG', 'PSYCHO', 'KÄFER'], i: ['GEIST'] },
+  GIFT: { s: ['PFLANZE'], w: ['GIFT', 'BODEN', 'GESTEIN', 'GEIST'], i: ['STAHL'] },
+  BODEN: { s: ['FEUER', 'ELEKTRO', 'GIFT', 'GESTEIN', 'STAHL'], w: ['PFLANZE', 'KÄFER'], i: ['FLUG'] },
+  FLUG: { s: ['PFLANZE', 'KAMPF', 'KÄFER'], w: ['ELEKTRO', 'GESTEIN', 'STAHL'], i: [] },
+  PSYCHO: { s: ['KAMPF', 'GIFT'], w: ['PSYCHO', 'STAHL'], i: [] },
+  KÄFER: { s: ['PFLANZE', 'PSYCHO'], w: ['FEUER', 'KAMPF', 'GIFT', 'FLUG', 'GEIST', 'STAHL'], i: [] },
+  GESTEIN: { s: ['FEUER', 'EIS', 'FLUG', 'KÄFER', 'WIND'], w: ['KAMPF', 'BODEN', 'STAHL'], i: [] },
+  GEIST: { s: ['PSYCHO', 'GEIST'], w: ['STAHL'], i: ['NORMAL'] },
+  DRACHE: { s: ['DRACHE'], w: ['STAHL'], i: [] },
+  STAHL: { s: ['EIS', 'GESTEIN'], w: ['FEUER', 'WASSER', 'ELEKTRO', 'STAHL'], i: [] },
+  WIND: { s: ['PFLANZE', 'KÄFER'], w: ['ELEKTRO', 'GESTEIN', 'STAHL', 'WIND'], i: [] },
+};
+function typeEff(atk, defTypes) { const c = CHART[atk]; let m = 1; for (const d of defTypes) m *= c.i.includes(d) ? 0 : c.s.includes(d) ? 2 : c.w.includes(d) ? 0.5 : 1; return m; }
+
+/* --- Attacken --- */
+const MOVES = {};
+function M(name, type, pow, acc, pp, eff) { MOVES[name] = { name, type, pow, acc, pp, eff: eff || null, cat: pow ? (PHYS_TYPES.has(type) ? 'phys' : 'spez') : 'status' }; }
+// Je Typ vier Stufen: Stärke 40 / 60 / 80 / 105
+const TIER_MOVES = {
+  NORMAL: ['Rempler', 'Stampfer', 'Kopfstoß', 'Gigaramme'],
+  FEUER: ['Glut', 'Feuerbiss', 'Flammenwurf', 'Vulkanausbruch'],
+  WASSER: ['Blubber', 'Aquaknall', 'Wasserwelle', 'Urzeitflut'],
+  PFLANZE: ['Rankenhieb', 'Blattwirbel', 'Farnsturm', 'Urwaldgewalt'],
+  ELEKTRO: ['Funkenstoß', 'Donnerbiss', 'Donnerblitz', 'Gewitterzorn'],
+  EIS: ['Frosthauch', 'Eissplitter', 'Eisstrahl', 'Gletschersturz'],
+  KAMPF: ['Tritt', 'Prankenhieb', 'Kraftstoß', 'Urzeitfaust'],
+  GIFT: ['Giftstachel', 'Giftspucke', 'Säurewelle', 'Toxinflut'],
+  BODEN: ['Sandwurf', 'Erdstoß', 'Erdbeben', 'Kontinentalbeben'],
+  FLUG: ['Flügelschlag', 'Sturzflug', 'Luftschnitt', 'Himmelssturz'],
+  PSYCHO: ['Konfusion', 'Psystrahl', 'Psychokinese', 'Gedankenbeben'],
+  KÄFER: ['Käferbiss', 'Schwirrflug', 'Insektenschwarm', 'Megahorn'],
+  GESTEIN: ['Steinwurf', 'Felsgrab', 'Steinhagel', 'Meteorschlag'],
+  GEIST: ['Schlecker', 'Spukbiss', 'Schattenball', 'Seelenfresser'],
+  DRACHE: ['Drachenwut', 'Drachenklaue', 'Drachenpuls', 'Urzorn'],
+  STAHL: ['Metallklaue', 'Eisenschädel', 'Eisenschweif', 'Meteorhammer'],
+  WIND: ['Windstoß', 'Wirbelklinge', 'Sturmschnitt', 'Orkan'],
+};
+const SIDE_FX = { FEUER: ['BRN', [10, 10, 10, 20]], ELEKTRO: ['PAR', [10, 10, 10, 20]], GIFT: ['PSN', [30, 30, 20, 30]] };
+for (const [type, names] of Object.entries(TIER_MOVES)) names.forEach((n, t) => {
+  const fx = SIDE_FX[type];
+  M(n, type, [40, 60, 80, 105][t], [100, 100, 100, 85][t], [30, 20, 15, 5][t], fx ? { status: fx[0], chance: fx[1][t] } : null);
+});
+M('Brüllen', 'NORMAL', 0, 100, 40, { foe: { atk: -1 } });
+M('Schwanzhieb', 'NORMAL', 0, 100, 30, { foe: { def: -1 } });
+M('Härtner', 'NORMAL', 0, 100, 30, { self: { def: 1 } });
+M('Kampfschrei', 'NORMAL', 0, 100, 20, { self: { atk: 2 } });
+M('Sprint', 'WIND', 0, 100, 30, { self: { ini: 2 } });
+M('Konzentration', 'PSYCHO', 0, 100, 20, { self: { spa: 2 } });
+M('Erholung', 'NORMAL', 0, 100, 10, { heal: 0.5 });
+M('Giftwolke', 'GIFT', 0, 75, 20, { status: 'PSN', chance: 100 });
+M('Donnerwelle', 'ELEKTRO', 0, 90, 20, { status: 'PAR', chance: 100 });
+M('Schlafgesang', 'PSYCHO', 0, 60, 15, { status: 'SLP', chance: 100 });
+M('Sporenwolke', 'PFLANZE', 0, 75, 15, { status: 'SLP', chance: 100 });
+M('Irrlicht', 'FEUER', 0, 85, 15, { status: 'BRN', chance: 100 });
+const STATUS_MOVE = { NORMAL: 'Kampfschrei', FEUER: 'Irrlicht', WASSER: 'Erholung', PFLANZE: 'Sporenwolke', ELEKTRO: 'Donnerwelle', EIS: 'Härtner', KAMPF: 'Kampfschrei', GIFT: 'Giftwolke', BODEN: 'Härtner', FLUG: 'Sprint', PSYCHO: 'Konzentration', KÄFER: 'Sprint', GESTEIN: 'Härtner', GEIST: 'Irrlicht', DRACHE: 'Kampfschrei', STAHL: 'Härtner', WIND: 'Sprint' };
+const STATUS_INFO = {
+  PSN: { tag: 'GIF', col: '#a040a0', text: 'wurde vergiftet!' }, PAR: { tag: 'PAR', col: '#c8a020', text: 'ist paralysiert! Es kann sich vielleicht nicht bewegen!' },
+  BRN: { tag: 'BRT', col: '#e05030', text: 'hat Verbrennungen erlitten!' }, SLP: { tag: 'SLF', col: '#8890a0', text: 'ist eingeschlafen!' },
+};
+// Lernliste: wird aus den Typen der Art gebaut
+const LEARN = {};
+function learnset(id) {
+  if (LEARN[id]) return LEARN[id];
+  const sp = SPECIES[id - 1], t1 = sp.types[0], t2 = sp.types[1] || 'NORMAL';
+  const raw = [[1, 'Rempler'], [1, 'Brüllen'], [4, 'Schwanzhieb'], [7, TIER_MOVES[t1][0]], [12, STATUS_MOVE[t1]], [16, TIER_MOVES[t1][1]],
+    [21, TIER_MOVES[t2][t2 === 'NORMAL' ? 1 : 0]], [27, t1 === 'WASSER' || t1 === 'NORMAL' ? 'Erholung' : 'Kampfschrei'], [32, TIER_MOVES[t1][2]],
+    [38, TIER_MOVES[t2][2]], [46, TIER_MOVES[t1][3]], [55, TIER_MOVES[t2][3]]];
+  const seen = new Set();
+  return (LEARN[id] = raw.filter(([, n]) => !seen.has(n) && seen.add(n)));
 }
+const movesAt = (id, lvl) => learnset(id).filter(([l]) => l <= lvl).map(([, n]) => n).slice(-4);
+const newMovesAt = (id, lvl) => learnset(id).filter(([l]) => l === lvl).map(([, n]) => n);
+const baseExp = id => Math.round(SPECIES[id - 1].base.reduce((a, b) => a + b, 0) / 5);
+const isEvoTarget = id => id > 1 && SPECIES[id - 2].evo > 0;
+const canEvolve = w => SPECIES[w.sp - 1].evo > 0 && w.lvl >= SPECIES[w.sp - 1].evo;
+function speciesAtLevel(id, lvl) { while (SPECIES[id - 1].evo && lvl >= SPECIES[id - 1].evo) id++; return id; }
+function lineOf(id) { const L = [id]; while (SPECIES[L[L.length - 1] - 1].evo) L.push(L[L.length - 1] + 1); return L; }
+const LEGENDS = new Set([SPID.Magmator, SPID.Chronodon]);
+function catchRate(id) { if (LEGENDS.has(id)) return 3; if (!isEvoTarget(id)) return SPECIES[id - 1].evo ? 190 : 100; return SPECIES[id - 1].evo ? 90 : 45; }
+
+const STAGE_IDX = { atk: 1, def: 2, spa: 3, spd: 4, ini: 5 };
+const STAGE_NAMES = { atk: 'ANGRIFF', def: 'VERTEIDIGUNG', spa: 'SP.-ANGRIFF', spd: 'SP.-VERTEIDIGUNG', ini: 'INITIATIVE' };
+const freshStages = () => ({ atk: 0, def: 0, spa: 0, spd: 0, ini: 0 });
+const stageMul = s => (s >= 0 ? (2 + s) / 2 : 2 / (2 - s));
+function bStat(w, key, st) { let v = calcStats(w)[STAGE_IDX[key]] * stageMul(st[key]); if (key === 'ini' && w.status === 'PAR') v /= 2; return v; }
+function calcDamage(u, t, Mv, us, ts, crit) {
+  const phys = Mv.cat === 'phys';
+  let A = bStat(u, phys ? 'atk' : 'spa', us); const D = bStat(t, phys ? 'def' : 'spd', ts);
+  if (phys && u.status === 'BRN') A /= 2;
+  let d = Math.floor(Math.floor(Math.floor(2 * u.lvl / 5 + 2) * Mv.pow * A / D) / 50) + 2;
+  if (SPECIES[u.sp - 1].types.includes(Mv.type)) d *= 1.5;
+  d *= typeEff(Mv.type, SPECIES[t.sp - 1].types);
+  if (crit) d *= 1.5;
+  d *= (85 + Math.floor(Math.random() * 16)) / 100;
+  return Math.max(1, Math.floor(d));
+}
+
+/* --- Gegenstände --- */
+const ITEMS = {
+  Bernsteinkapsel: { capture: 1, price: 200, desc: 'Fängt wilde Wesen. Wirkt besser, wenn sie geschwächt sind.', col: '#f0a020' },
+  Trank: { heal: 20, price: 300, desc: 'Heilt 20 KP eines Wesens.', col: '#b070d8' },
+  Supertrank: { heal: 60, price: 700, desc: 'Heilt 60 KP eines Wesens.', col: '#f0c030' },
+  Beere: { heal: 10, price: 80, desc: 'Eine saftige Urzeitbeere. Heilt 10 KP.', col: '#e04848' },
+  Gegengift: { cure: 'PSN', price: 100, desc: 'Heilt eine Vergiftung.', col: '#58b858' },
+  Brandsalbe: { cure: 'BRN', price: 150, desc: 'Heilt Verbrennungen.', col: '#e08040' },
+  Wachmacher: { cure: 'SLP', price: 150, desc: 'Weckt ein schlafendes Wesen.', col: '#60a8e0' },
+  Lähmheiler: { cure: 'PAR', price: 150, desc: 'Heilt eine Paralyse.', col: '#e8d040' },
+  Fluchtseil: { escape: 1, price: 250, desc: 'Bringt dich zum letzten Wesen-Center zurück.', col: '#a07848' },
+  Sonderbonbon: { level: 1, desc: 'Ein Wesen steigt sofort ein Level auf.', col: '#f080c0' },
+  Fossil: { desc: 'Ein uraltes Fossil. Vielleicht weiß ein Forscher mehr darüber.', col: '#a8a090' },
+};
+const SHOP_LIST = ['Bernsteinkapsel', 'Trank', 'Supertrank', 'Beere', 'Gegengift', 'Brandsalbe', 'Wachmacher', 'Lähmheiler', 'Fluchtseil'];
+function canUse(info, w) {
+  if (info.heal) return w.hp > 0 && w.hp < calcStats(w)[0];
+  if (info.cure) return w.hp > 0 && w.status === info.cure;
+  if (info.level) return w.lvl < 100;
+  return false;
+}
+function applyItem(w, info) {
+  const N = wName(w).toUpperCase();
+  if (info.heal) { const a = Math.min(info.heal, calcStats(w)[0] - w.hp); w.hp += a; return `${N} wurde um ${a} KP geheilt.`; }
+  if (info.cure) { w.status = null; w.sleep = 0; return `${N} ist wieder gesund.`; }
+  return '';
+}
+function takeItem(name) { state.items[name]--; if (state.items[name] <= 0) delete state.items[name]; }
+function drawItemIcon(name, x, y) {
+  const info = ITEMS[name] || {}, c = info.col || '#c0c0c0';
+  if (info.capture) { rr(x + 2, y + 3, 12, 11, 5, shade(c, -0.5)); rr(x + 3, y + 4, 10, 9, 4, c); ctx.fillStyle = '#fff4c0'; ctx.fillRect(x + 5, y + 6, 2, 2); return; }
+  if (info.heal || info.cure) { rr(x + 4, y + 6, 8, 9, 3, shade(c, -0.5)); rr(x + 5, y + 7, 6, 7, 2, c); ctx.fillStyle = '#e8e8e8'; ctx.fillRect(x + 6, y + 3, 4, 3); ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 6, y + 8, 1, 3); return; }
+  rr(x + 3, y + 4, 10, 10, 4, shade(c, -0.5)); rr(x + 4, y + 5, 8, 8, 3, c);
+}
+
+/* --- Kampf --- */
+class Battle {
+  full = true;
+  constructor(o) {
+    this.o = o; this.wild = !!o.wild; this.tr = o.trainer || null;
+    this.foes = this.wild ? [makeWesen(o.wild.sp, o.wild.lvl)] : this.tr.team.map(t => makeWesen(t.sp, t.lvl));
+    this.fi = 0; this.pi = Math.max(0, state.team.findIndex(w => w.hp > 0));
+    this.st = { p: freshStages(), f: freshStages() };
+    this.part = new Set(); this.leveled = new Set();
+    this.waits = []; this.fx = []; this.message = null; this.ui = null; this.sel = 0; this.msel = 0; this.note = null; this.runs = 0;
+    this.view = { intro: 0, pX: 0, fX: 0, pY: 0, fY: 0, pK: 0, fK: 0, pA: 1, fA: 1, trP: 1, trF: this.tr ? 1 : 0, shake: 0, blink: null, capsule: null, fFlash: 0, lvlFlash: 0 };
+    this.dhp = { p: 0, f: 0 }; this.dexp = 0;
+    this.biome = cur.outdoor ? bget(cur, player.x, player.y) : -1;
+  }
+  get P() { return state.team[this.pi]; }
+  get F() { return this.foes[this.fi]; }
+  nm(side) { const n = wName(side === 'p' ? this.P : this.F).toUpperCase(); return side === 'p' ? n : (this.wild ? `Das wilde ${n}` : `Das gegnerische ${n}`); }
+  ofName(side) { const n = wName(side === 'p' ? this.P : this.F).toUpperCase(); return side === 'p' ? `von ${n}` : (this.wild ? `des wilden ${n}` : `des gegnerischen ${n}`); }
+  wait(n) { return new Promise(r => this.waits.push({ n, r })); }
+  tween(n, fn) { return new Promise(r => this.waits.push({ n, total: n, fn, r })); }
+  msg(t) {
+    return new Promise(r => {
+      const lines = wrapW(t, 228), pages = [];
+      for (let i = 0; i < lines.length; i += 2) pages.push(lines.slice(i, i + 2));
+      this.message = { pages, pi: 0, shown: 0, hold: 0, r };
+    });
+  }
+  async run() {
+    layers.push(this);
+    try { return await this.flow(); } finally { pop(this); }
+  }
+  update() {
+    for (let i = this.waits.length - 1; i >= 0; i--) { const w = this.waits[i]; w.n--; if (w.fn) w.fn(1 - w.n / w.total); if (w.n <= 0) { this.waits.splice(i, 1); w.r(); } }
+    for (let i = this.fx.length - 1; i >= 0; i--) { const p = this.fx[i]; p.x += p.vx; p.y += p.vy; p.vy += p.g || 0; if (--p.life <= 0) this.fx.splice(i, 1); }
+    const v = this.view; if (v.shake > 0) v.shake--; if (v.lvlFlash > 0) v.lvlFlash--; if (this.note && --this.note.t <= 0) this.note = null;
+    const m = this.message;
+    if (m) {
+      const len = m.pages[m.pi].join('').length;
+      if (m.shown < len) { m.shown += CONFIG.textSpeed * (held.A ? 3 : 1.5); if (pressed.A || pressed.B) m.shown = len; }
+      else if (pressed.A || pressed.B || ++m.hold > 75) { if (m.pi < m.pages.length - 1) { m.pi++; m.shown = 0; m.hold = 0; } else { this.message = null; m.r(); } }
+      return;
+    }
+    if (this.ui === 'main') {
+      if (pressed.left || pressed.right) this.sel ^= 1;
+      if (pressed.up || pressed.down) this.sel ^= 2;
+      if (pressed.A) {
+        if (this.sel === 0) {
+          if (this.P.moves.every(mv => mv.pp <= 0)) { this.ui = null; this.uiRes({ kind: 'move', i: -1 }); }
+          else this.ui = 'moves';
+        } else { this.ui = null; this.uiRes({ kind: ['', 'bag', 'team', 'run'][this.sel] }); }
+      }
+    } else if (this.ui === 'moves') {
+      const n = this.P.moves.length;
+      if (pressed.left || pressed.right) this.msel ^= 1;
+      if (pressed.up || pressed.down) this.msel ^= 2;
+      if (this.msel >= n) this.msel = n - 1;
+      if (pressed.B) this.ui = 'main';
+      else if (pressed.A) {
+        if (this.P.moves[this.msel].pp <= 0) this.note = { text: 'Für diese Attacke sind keine AP mehr übrig!', t: 90 };
+        else { this.ui = null; this.uiRes({ kind: 'move', i: this.msel }); }
+      }
+    }
+  }
+  async flow() {
+    const v = this.view;
+    this.dhp.f = this.F.hp; this.dhp.p = this.P.hp; this.dexp = this.P.exp;
+    await this.tween(36, k => { v.intro = k; });
+    if (this.wild) {
+      state.seen[this.F.sp] = 1; v.fK = 1;
+      await this.msg(`Ein wildes ${wName(this.F).toUpperCase()} erscheint!`);
+    } else {
+      await this.msg(`${this.tr.name.toUpperCase()} möchte kämpfen!`);
+      await this.tween(18, k => { v.trF = 1 - k; });
+      await this.sendOut('f');
+    }
+    await this.tween(16, k => { v.trP = 1 - k; });
+    await this.sendOut('p');
+    for (;;) {
+      const r = await this.turn(await this.chooseAction());
+      if (r) return r;
+    }
+  }
+  async sendOut(side) {
+    const v = this.view;
+    if (side === 'p') {
+      this.part.add(this.pi); this.st.p = freshStages(); this.dhp.p = this.P.hp; this.dexp = this.P.exp; v.pY = 0; v.pA = 1; v.pK = 0;
+      await Promise.all([this.msg(`Los, ${wName(this.P).toUpperCase()}!`), this.tween(22, k => { v.pK = k; })]);
+    } else {
+      state.seen[this.F.sp] = 1; this.st.f = freshStages(); this.dhp.f = this.F.hp; v.fY = 0; v.fA = 1; v.fK = 0;
+      this.part = new Set([this.pi]);
+      await Promise.all([this.msg(`${this.tr.name.toUpperCase()} schickt ${wName(this.F).toUpperCase()} in den Kampf!`), this.tween(22, k => { v.fK = k; })]);
+    }
+  }
+  async chooseAction() {
+    for (;;) {
+      const a = await new Promise(r => { this.ui = 'main'; this.uiRes = r; });
+      if (a.kind === 'move' || a.kind === 'run') return a;
+      if (a.kind === 'bag') { const r = await openScreen(new BagScreen(this)); if (r && r.item) return { kind: 'item', ...r }; }
+      if (a.kind === 'team') {
+        const i = await openScreen(new TeamScreen('pick', 'Welches Wesen soll kämpfen?'));
+        if (i < 0) continue;
+        if (i === this.pi) await this.msg(`${wName(this.P).toUpperCase()} kämpft bereits!`);
+        else if (state.team[i].hp <= 0) await this.msg(`${wName(state.team[i]).toUpperCase()} ist kampfunfähig!`);
+        else return { kind: 'switch', i };
+      }
+    }
+  }
+  aiMove() {
+    const f = this.F, p = this.P, usable = f.moves.map((m, i) => ({ m, i })).filter(o => o.m.pp > 0);
+    if (!usable.length) return -1;
+    if (this.wild) return usable[Math.floor(Math.random() * usable.length)].i;
+    let best = usable[0], bs = -1;
+    for (const o of usable) {
+      const Mv = MOVES[o.m.n];
+      let s = Mv.pow ? Mv.pow * typeEff(Mv.type, SPECIES[p.sp - 1].types) * (SPECIES[f.sp - 1].types.includes(Mv.type) ? 1.5 : 1) : (Mv.eff.status ? (p.status ? 0 : 45) : 28);
+      s *= 0.8 + Math.random() * 0.4;
+      if (s > bs) { bs = s; best = o; }
+    }
+    return best.i;
+  }
+  async turn(act) {
+    const foeMove = this.aiMove(), order = [];
+    if (act.kind === 'move') {
+      const ps = bStat(this.P, 'ini', this.st.p), fs = bStat(this.F, 'ini', this.st.f);
+      const pFirst = ps > fs || (ps === fs && Math.random() < 0.5);
+      order.push(...(pFirst ? [['p', act.i], ['f', foeMove]] : [['f', foeMove], ['p', act.i]]));
+    } else {
+      if (act.kind === 'run') {
+        if (!this.wild) { await this.msg('Vor einem Trainerkampf kann man nicht fliehen!'); return null; }
+        this.runs++;
+        if (bStat(this.P, 'ini', this.st.p) >= bStat(this.F, 'ini', this.st.f) || Math.random() < 0.35 + this.runs * 0.2) { await this.msg('Du bist entkommen!'); return 'run'; }
+        await this.msg('Flucht gescheitert!');
+      } else if (act.kind === 'item') {
+        const r = await this.useItem(act); if (r) return r;
+      } else if (act.kind === 'switch') {
+        await this.msg(`Komm zurück, ${wName(this.P).toUpperCase()}!`);
+        await this.tween(16, k => { this.view.pK = 1 - k; });
+        this.pi = act.i; await this.sendOut('p');
+      }
+      order.push(['f', foeMove]);
+    }
+    for (const [side, mi] of order) {
+      if (this.P.hp <= 0 || this.F.hp <= 0) break;
+      await this.useMove(side, mi);
+      const r = await this.checkFaints(); if (r) return r;
+      if (this.replaced) break;
+    }
+    // Rundenende: Gift und Verbrennung
+    for (const side of ['p', 'f']) {
+      const w = side === 'p' ? this.P : this.F;
+      if (w.hp <= 0 || (w.status !== 'PSN' && w.status !== 'BRN')) continue;
+      const max = calcStats(w)[0];
+      w.hp = Math.max(0, w.hp - Math.max(1, Math.floor(max / (w.status === 'PSN' ? 8 : 16))));
+      this.burst(side, STATUS_INFO[w.status].col); this.view.blink = side; await this.wait(18); this.view.blink = null;
+      await this.drain(side);
+      await this.msg(`${this.nm(side)} ${w.status === 'PSN' ? 'wird durch das Gift verletzt!' : 'leidet unter seiner Verbrennung!'}`);
+      const r = await this.checkFaints(); if (r) return r;
+    }
+    return null;
+  }
+  async useMove(side, mi) {
+    const o = side === 'p' ? 'f' : 'p', u = side === 'p' ? this.P : this.F, t = side === 'p' ? this.F : this.P;
+    if (u.status === 'SLP') {
+      if (--u.sleep > 0) { await this.msg(`${this.nm(side)} schläft tief und fest.`); return; }
+      u.status = null; await this.msg(`${this.nm(side)} ist aufgewacht!`);
+    }
+    if (u.status === 'PAR' && Math.random() < 0.25) { await this.msg(`${this.nm(side)} ist paralysiert! Es kann sich nicht bewegen!`); return; }
+    const mv = mi >= 0 ? u.moves[mi] : null;
+    let Mv;
+    if (mv) { mv.pp = Math.max(0, mv.pp - 1); Mv = MOVES[mv.n]; } else Mv = { ...MOVES.Rempler, name: 'Verzweifler', pow: 50, acc: 100 };
+    await this.msg(`${this.nm(side)} setzt ${Mv.name.toUpperCase()} ein!`);
+    await this.tween(12, k => { this.view[side + 'X'] = Math.sin(k * Math.PI) * (side === 'p' ? 12 : -12); });
+    if (Math.random() * 100 >= Mv.acc) { await this.msg('Die Attacke ging daneben!'); return; }
+    if (Mv.cat === 'status') return this.statusMove(side, Mv);
+    const eff = typeEff(Mv.type, SPECIES[t.sp - 1].types);
+    if (eff === 0) { await this.msg('Es hat keine Wirkung...'); return; }
+    const crit = Math.random() < 1 / 16;
+    const dmg = calcDamage(u, t, Mv, this.st[side], this.st[o], crit);
+    this.burst(o, TYPES[Mv.type]); this.view.blink = o; if (eff > 1 || crit) this.view.shake = 16;
+    await this.wait(22); this.view.blink = null;
+    t.hp = Math.max(0, t.hp - dmg); await this.drain(o);
+    if (crit) await this.msg('Ein Volltreffer!');
+    if (eff > 1) await this.msg('Das ist sehr effektiv!'); else if (eff < 1) await this.msg('Das ist nicht sehr effektiv...');
+    if (t.hp > 0 && Mv.eff && Mv.eff.status && Math.random() * 100 < Mv.eff.chance) await this.inflict(o, Mv.eff.status, false);
+  }
+  async statusMove(side, Mv) {
+    const o = side === 'p' ? 'f' : 'p', u = side === 'p' ? this.P : this.F, e = Mv.eff;
+    if (e.heal) {
+      const max = calcStats(u)[0];
+      if (u.hp >= max) return this.msg('Aber es hat keine Wirkung...');
+      u.hp = Math.min(max, u.hp + Math.floor(max * e.heal)); this.burst(side, '#88f0a0', true); await this.drain(side);
+      return this.msg(`${this.nm(side)} hat sich erholt!`);
+    }
+    if (e.status) return this.inflict(o, e.status, true);
+    for (const [who, ch] of [[side, e.self], [o, e.foe]]) if (ch) for (const [k, d] of Object.entries(ch)) await this.stage(who, k, d);
+  }
+  async stage(side, key, d) {
+    const s = this.st[side], nv = Math.max(-6, Math.min(6, s[key] + d));
+    if (nv === s[key]) return this.msg(`${STAGE_NAMES[key]} ${this.ofName(side)} kann nicht weiter ${d > 0 ? 'steigen' : 'sinken'}!`);
+    s[key] = nv;
+    this.burst(side, d > 0 ? '#80c8f8' : '#f88880', true, d > 0 ? -1 : 1); await this.wait(20);
+    await this.msg(`${STAGE_NAMES[key]} ${this.ofName(side)} ${d > 1 ? 'steigt stark' : d > 0 ? 'steigt' : d < -1 ? 'sinkt stark' : 'sinkt'}!`);
+  }
+  async inflict(side, st, fromMove) {
+    const w = side === 'p' ? this.P : this.F, types = SPECIES[w.sp - 1].types;
+    const immune = w.status || (st === 'PSN' && (types.includes('GIFT') || types.includes('STAHL'))) || (st === 'BRN' && types.includes('FEUER')) || (st === 'PAR' && types.includes('ELEKTRO'));
+    if (immune) { if (fromMove) await this.msg('Aber es hat keine Wirkung...'); return; }
+    w.status = st; if (st === 'SLP') w.sleep = 2 + Math.floor(Math.random() * 3);
+    this.burst(side, STATUS_INFO[st].col, true); await this.wait(16);
+    await this.msg(`${this.nm(side)} ${STATUS_INFO[st].text}`);
+  }
+  async drain(side) {
+    const w = side === 'p' ? this.P : this.F, from = this.dhp[side], to = w.hp, max = calcStats(w)[0];
+    const n = Math.max(10, Math.min(45, Math.round(Math.abs(from - to) / max * 60)));
+    await this.tween(n, k => { this.dhp[side] = from + (to - from) * k; });
+  }
+  burst(side, col, soft, dir = 0) {
+    const [cx, cy] = side === 'p' ? [62, 100] : [196, 58];
+    for (let i = 0; i < (soft ? 10 : 16); i++) {
+      const a = Math.random() * Math.PI * 2, sp = soft ? 0.4 : 1 + Math.random() * 1.6;
+      this.fx.push({ x: cx + (soft ? (Math.random() - 0.5) * 40 : 0), y: cy + (soft ? (Math.random() - 0.5) * 30 : 0), vx: soft ? 0 : Math.cos(a) * sp, vy: dir ? dir * (0.5 + Math.random()) : soft ? -0.4 : Math.sin(a) * sp, c: Math.random() < 0.3 ? '#ffffff' : col, life: 18 + Math.floor(Math.random() * 12), s: soft ? 2 : 3 });
+    }
+  }
+  async checkFaints() {
+    this.replaced = false;
+    if (this.F.hp <= 0) {
+      await this.tween(22, k => { this.view.fY = k * 22; this.view.fA = 1 - k; });
+      await this.msg(`${this.nm('f')} wurde besiegt!`);
+      await this.giveExp();
+      const next = this.foes.findIndex((w, i) => i > this.fi && w.hp > 0);
+      if (next < 0) return this.win();
+      this.fi = next; await this.sendOut('f'); this.replaced = true;
+    }
+    if (this.P.hp <= 0) {
+      await this.tween(22, k => { this.view.pY = k * 22; this.view.pA = 1 - k; });
+      await this.msg(`${this.nm('p')} wurde besiegt!`);
+      if (!state.team.some(w => w.hp > 0)) {
+        await this.msg(`${PN()} hat keine kampffähigen Wesen mehr!`);
+        await this.msg(`${PN()} wird ohnmächtig...`);
+        return 'lose';
+      }
+      for (;;) { const i = await openScreen(new TeamScreen('force', 'Welches Wesen soll weiterkämpfen?')); if (i >= 0 && state.team[i].hp > 0) { this.pi = i; break; } }
+      await this.sendOut('p'); this.replaced = true;
+    }
+    return null;
+  }
+  async giveExp() {
+    const f = this.F, gain = Math.max(1, Math.floor(baseExp(f.sp) * f.lvl / 7 * (this.wild ? 1 : 1.5)));
+    const alive = [...this.part].filter(i => state.team[i] && state.team[i].hp > 0);
+    if (!alive.length) return;
+    const each = Math.max(1, Math.floor(gain / alive.length));
+    for (const i of alive) {
+      const w = state.team[i];
+      await this.msg(`${wName(w).toUpperCase()} erhält ${each} Erfahrungspunkte!`);
+      await this.addExp(w, each, i === this.pi);
+    }
+  }
+  async addExp(w, amount, active) {
+    let left = amount;
+    while (left > 0 && w.lvl < 100) {
+      const need = expFor(w.lvl + 1) - w.exp, step = Math.min(left, need), from = w.exp;
+      w.exp += step; left -= step;
+      if (active) await this.tween(Math.max(8, Math.round(step / (expFor(w.lvl + 1) - expFor(w.lvl)) * 40)), k => { this.dexp = from + step * k; });
+      if (w.exp >= expFor(w.lvl + 1)) await this.levelUp(w, active);
+    }
+  }
+  async levelUp(w, active) {
+    const before = calcStats(w)[0]; w.lvl++; const after = calcStats(w)[0];
+    if (w.hp > 0) w.hp += after - before;
+    if (active) { this.dhp.p = w.hp; this.dexp = w.exp; this.view.lvlFlash = 40; this.burst('p', '#f8e070', true, -1); }
+    this.leveled.add(w);
+    await this.msg(`${wName(w).toUpperCase()} erreicht Level ${w.lvl}!`);
+    for (const mv of newMovesAt(w.sp, w.lvl)) await teachMove(w, mv, t => this.msg(t));
+  }
+  async win() {
+    if (this.wild) return 'win';
+    await this.tween(18, k => { this.view.trF = k; });
+    await this.msg(`${PN()} hat ${this.tr.name.toUpperCase()} besiegt!`);
+    if (this.tr.lose) await this.msg(`${this.tr.name.toUpperCase()}: ${this.tr.lose}`);
+    if (this.tr.money) { state.money += this.tr.money; await this.msg(`${PN()} erhält ${this.tr.money} Taler.`); }
+    return 'win';
+  }
+  async useItem({ item, target }) {
+    const info = ITEMS[item]; takeItem(item);
+    if (info.capture) return this.throwCapsule();
+    const w = state.team[target];
+    await this.msg(`${PN()} benutzt ${item.toUpperCase()}.`);
+    const t = applyItem(w, info);
+    if (target === this.pi) { this.burst('p', '#88f0a0', true, -1); await this.drain('p'); }
+    await this.msg(t);
+    return null;
+  }
+  async throwCapsule() {
+    const v = this.view, f = this.F;
+    v.capsule = { x: 40, y: 120, rot: 0, star: 0 };
+    const said = this.msg(`${PN()} wirft eine BERNSTEINKAPSEL!`);
+    await this.tween(28, k => { v.capsule.x = 40 + 156 * k; v.capsule.y = 116 - 58 * k - Math.sin(k * Math.PI) * 60; });
+    await this.tween(14, k => { v.fK = 1 - k; v.fFlash = 1; }); v.fFlash = 0;
+    await this.tween(12, k => { v.capsule.y = 58 + 24 * k; });
+    await said;
+    const max = calcStats(f)[0], bonus = f.status === 'SLP' ? 2 : f.status ? 1.5 : 1;
+    const p = Math.min(1, ((3 * max - 2 * f.hp) * catchRate(f.sp) * bonus / (3 * max)) / 255);
+    const caught = Math.random() < p, shakes = caught ? 3 : p > 0.6 ? 2 : p > 0.3 ? 1 : 0;
+    for (let i = 0; i < shakes; i++) { await this.wait(18); await this.tween(18, k => { v.capsule.rot = Math.sin(k * Math.PI * 2) * 0.4; }); }
+    if (caught) {
+      v.capsule.star = 1; this.burst('f', '#f8e070', true, -1); await this.wait(24);
+      const N = wName(f).toUpperCase();
+      await this.msg(`Toll! ${N} wurde gefangen!`);
+      state.seen[f.sp] = state.caught[f.sp] = 1;
+      if (await ask(`Möchtest du ${N} einen Spitznamen geben?`, ['JA', 'NEIN'], 1) === 0) { const nn = await new NameScreen('', state.profile.look, f.sp).run(); if (nn) f.nick = nn; }
+      if (state.team.length < 6) state.team.push(f);
+      else { state.box.push(f); await this.msg(`${wName(f).toUpperCase()} wurde ins Lager am Stein-PC geschickt.`); }
+      return 'caught';
+    }
+    await this.wait(10); v.capsule = null;
+    await this.tween(12, k => { v.fK = k; });
+    await this.msg(['Oh nein! Es hat sich befreit!', 'Mist! Fast hätte es geklappt!', 'Argh! Das war knapp!'][Math.min(2, shakes)]);
+    return null;
+  }
+  drawBg() {
+    const b = this.biome >= 0 ? BIOMES[this.biome] : null, ph = cur && cur.outdoor ? dayPhase() : 'tag';
+    let sky = ['#78b8f0', '#c8e8f8'];
+    if (!b) sky = ['#a8a090', '#d8d0c0']; else if (ph === 'nacht') sky = ['#141c40', '#34407a']; else if (ph === 'abend') sky = ['#e8885a', '#f8d0a0']; else if (this.biome === 1) sky = ['#4a2424', '#b05a38']; else if (this.biome === 2) sky = ['#98b8d8', '#e0ecf8']; else if (this.biome === 4) sky = ['#5a7068', '#a8b8a0'];
+    const ground = b ? b.g[1] : '#b8b0a0';
+    const [r1, g1, b1] = hexRgb(sky[0]), [r2, g2, b2] = hexRgb(sky[1]);
+    for (let i = 0; i < 8; i++) { const k = i / 7; ctx.fillStyle = rgbHex(r1 + (r2 - r1) * k, g1 + (g2 - g1) * k, b1 + (b2 - b1) * k); ctx.fillRect(-OX, i === 0 ? -OY : i * 11, RW, i === 0 ? 11 + OY : 11); }
+    if (b) for (let x = -Math.ceil(OX / 16) * 16; x < 256 + OX; x += 16) ctx.drawImage(atlas[this.biome][0], (TREE_Q + ((x / 16) & 1)) * TS, 0, 16, 16, x, 72, 16, 16);
+    ctx.fillStyle = ground; ctx.fillRect(-OX, 86, RW, RH);
+    ctx.fillStyle = shade(ground, 0.12); for (let y = 92; y < 150; y += 7 + (y - 92) / 6) ctx.fillRect(-OX, Math.round(y), RW, 1);
+  }
+  platform(cx, cy, rx, ry, k) {
+    const g = this.biome >= 0 ? BIOMES[this.biome].g[1] : '#b8b0a0';
+    ctx.fillStyle = shade(g, -0.35); ctx.beginPath(); ctx.ellipse(cx, cy + 2, rx, ry, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = shade(g, 0.18); ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = shade(g, 0.35); ctx.beginPath(); ctx.ellipse(cx - rx * 0.15, cy - ry * 0.2, rx * 0.6, ry * 0.45, 0, 0, 7); ctx.fill();
+  }
+  drawMon(w, cx, by, k, a, back, flash) {
+    if (k <= 0 || a <= 0) return;
+    const sc = back ? 4 / 3 : 1, size = 64 * sc * k, x = cx - size / 2, y = by - 58 * sc * k;
+    ctx.globalAlpha = Math.max(0, a);
+    const img = flash || k < 0.6 ? tintSprite(w.sp, '#fff8e0') : wesenSprite(w.sp);
+    if (back) { ctx.save(); ctx.translate(x + size, y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, 64, 64, 0, 0, size, size); ctx.restore(); }
+    else ctx.drawImage(img, 0, 0, 64, 64, x, y, size, size);
+    ctx.globalAlpha = 1;
+  }
+  infoBox(side) {
+    const w = side === 'p' ? this.P : this.F, max = calcStats(w)[0];
+    const [x, y, wd, h] = side === 'p' ? [132, 98, 120, 44] : [6, 12, 118, 32];
+    rr(x, y, wd, h, 5, '#283028'); rr(x + 1, y + 1, wd - 2, h - 2, 4, side === 'p' && this.view.lvlFlash && (tick >> 2) & 1 ? '#fff4b0' : '#f8f4e0');
+    ctx.fillStyle = '#e4dcc0'; ctx.fillRect(x + 3, y + h - 6, wd - 6, 2);
+    const nm = wName(w).toUpperCase(), lv = `Lv.${w.lvl}`;
+    text(nm, x + 7, y, UI.text, UI.shadow, 16, wd - 18 - measure(lv)); text(lv, x + wd - 7 - measure(lv), y, UI.text, UI.shadow);
+    if (w.status) { const si = STATUS_INFO[w.status]; rr(x + 7, y + 17, 22, 9, 2, si.col); text(si.tag, x + 18 - measure(si.tag) / 2, y + 13, '#ffffff', null); }
+    else text('KP', x + 9, y + 13, '#d06030', null);
+    hpBar(x + 32, y + 19, wd - 40, this.dhp[side], max);
+    if (side === 'p') {
+      const s = `${Math.ceil(this.dhp.p)}/${max}`; text(s, x + wd - 8 - measure(s), y + 23, UI.text, null);
+      const lo = expFor(w.lvl), hi = expFor(w.lvl + 1), r = Math.max(0, Math.min(1, (this.dexp - lo) / (hi - lo)));
+      ctx.fillStyle = '#3a4858'; ctx.fillRect(x + 8, y + 39, wd - 16, 2); ctx.fillStyle = '#48b0f0'; ctx.fillRect(x + 8, y + 39, Math.round((wd - 16) * r), 2);
+    }
+  }
+  draw() {
+    const v = this.view, e = 1 - (1 - v.intro) ** 3;
+    ctx.save(); if (v.shake) ctx.translate(Math.round(Math.random() * 4 - 2), Math.round(Math.random() * 2 - 1));
+    this.drawBg();
+    const fx = 196 + (1 - e) * -280, px = 64 + (1 - e) * 280;
+    this.platform(fx, 86, 52, 11); this.platform(px, 132, 64, 13);
+    if (this.tr && v.trF > 0) { ctx.globalAlpha = v.trF; ctx.drawImage(getChar('hero', this.tr.variant ?? 1, 'down', 0), fx - 21 + (1 - v.trF) * 70, 34, 128 / 3, 160 / 3); ctx.globalAlpha = 1; }
+    if (v.trP > 0) { ctx.globalAlpha = Math.min(1, v.trP * 1.5); ctx.drawImage(playerSprite(state.profile.look, 'up', 0), px - 21 - (1 - v.trP) * 70, 80, 128 / 3, 160 / 3); ctx.globalAlpha = 1; }
+    if (!(v.blink === 'f' && (tick >> 2) & 1)) this.drawMon(this.F, fx + v.fX, 86 + v.fY, v.fK, v.fA, false, v.fFlash);
+    if (!(v.blink === 'p' && (tick >> 2) & 1)) this.drawMon(this.P, px + v.pX, 132 + v.pY, v.pK, v.pA, true, 0);
+    const c = v.capsule;
+    if (c) {
+      ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.rot || 0);
+      rr(-6, -6, 12, 12, 5, '#6a3a10'); rr(-5, -5, 10, 10, 4, '#f0a020'); ctx.fillStyle = '#fff0b0'; ctx.fillRect(-3, -3, 2, 2);
+      ctx.restore();
+      if (c.star) { ctx.fillStyle = '#ffffff'; for (const [dx, dy] of [[-10, -12], [10, -14], [0, -18]]) { ctx.fillRect(c.x + dx, c.y + dy - 2, 1, 5); ctx.fillRect(c.x + dx - 2, c.y + dy, 5, 1); } }
+    }
+    for (const p of this.fx) { ctx.globalAlpha = Math.min(1, p.life / 10); ctx.fillStyle = p.c; ctx.fillRect(Math.round(p.x), Math.round(p.y), p.s, p.s); }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+    if (v.intro >= 1) { if (v.fK > 0 && v.fA > 0.05) this.infoBox('f'); if (v.pK > 0 && v.pA > 0.05) this.infoBox('p'); }
+    this.drawPanel();
+  }
+  drawPanel() {
+    const m = this.message;
+    if (this.ui === 'moves') {
+      box(2, 124, 252, 66);
+      this.P.moves.forEach((mv, i) => {
+        const Mv = MOVES[mv.n], x = 8 + (i & 1) * 122, y = 130 + (i >> 1) * 22, sel = i === this.msel, col = TYPES[Mv.type];
+        rr(x, y, 118, 19, 4, sel ? UI.red : shade(col, -0.4)); rr(x + 1, y + 1, 116, 17, 3, sel ? '#fff4ec' : shade(col, 0.62));
+        rr(x + 4, y + 5, 4, 9, 1, col);
+        text(Mv.name, x + 12, y, mv.pp ? UI.text : '#a0a0a0', null, 16, 100);
+      });
+      const mv = this.P.moves[this.msel], Mv = MOVES[mv.n];
+      if (this.note) text(this.note.text, 12, 172, UI.red, null);
+      else {
+        text(`AP ${mv.pp}/${Mv.pp}`, 12, 172, mv.pp ? UI.text : UI.red, null);
+        typeChip(Mv.type, 80, 176);
+        text(Mv.pow ? `STÄRKE ${Mv.pow} · ${Mv.cat === 'phys' ? 'PHYS.' : 'SPEZ.'}` : 'STATUS', 136, 172, '#7888a0', null);
+      }
+      return;
+    }
+    if (this.ui === 'main') {
+      box(2, 146, 124, 44);
+      wrapW(`Was soll ${wName(this.P).toUpperCase()} tun?`, 104).slice(0, 2).forEach((l, i) => text(l, 12, 150 + i * 16));
+      box(128, 146, 126, 44);
+      const cmds = [['KAMPF', '#d84830'], ['TASCHE', '#d89820'], ['WESEN', '#3a9848'], ['FLUCHT', '#3870c8']];
+      cmds.forEach(([label, col], i) => {
+        const x = 134 + (i & 1) * 58, y = 151 + (i >> 1) * 18, sel = i === this.sel;
+        rr(x, y, 54, 16, 4, sel ? '#ffffff' : shade(col, -0.45)); rr(x + 1, y + 1, 52, 14, 3, sel ? shade(col, 0.2) : col);
+        text(label, x + 27 - measure(label) / 2, y - 1, '#ffffff', shade(col, -0.5));
+      });
+      return;
+    }
+    box(2, 146, 252, 44);
+    if (m) {
+      let left = Math.floor(m.shown);
+      m.pages[m.pi].forEach((ln, k) => { const n = Math.max(0, Math.min(ln.length, left)); left -= ln.length; if (n > 0) text(ln, 12, 150 + k * 16, UI.text, UI.shadow, 16, n >= ln.length ? undefined : measure(ln.slice(0, n)) + 1); });
+    }
+  }
+}
+const TINTS = {};
+function tintSprite(id, col) {
+  const key = id + col; if (TINTS[key]) return TINTS[key];
+  const s = document.createElement('canvas'); s.width = s.height = 64; const g = s.getContext('2d');
+  g.drawImage(wesenSprite(id), 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = col; g.fillRect(0, 0, 64, 64);
+  return (TINTS[key] = s);
+}
+
+async function teachMove(w, name, sayFn = say) {
+  if (w.moves.some(m => m.n === name)) return;
+  const N = wName(w).toUpperCase(), MN = name.toUpperCase();
+  if (w.moves.length < 4) { w.moves.push({ n: name, pp: MOVES[name].pp }); return sayFn(`${N} hat ${MN} erlernt!`); }
+  await sayFn(`${N} möchte ${MN} erlernen, kennt aber schon vier Attacken.`);
+  const c = await ask(`Welche Attacke soll ${N} für ${MN} vergessen?`, [...w.moves.map(m => m.n.toUpperCase()), 'NICHT LERNEN'], 4);
+  if (c >= 4) return sayFn(`${N} hat ${MN} nicht erlernt.`);
+  const old = w.moves[c].n.toUpperCase(); w.moves[c] = { n: name, pp: MOVES[name].pp };
+  await sayFn(`1, 2 und... schwupps! ${N} hat ${old} vergessen und ${MN} erlernt!`);
+}
+
+/* --- Entwicklung --- */
+class EvolutionScreen {
+  full = true;
+  constructor(w, to) { this.w = w; this.from = w.sp; this.to = to; this.t = -1; }
+  play() { return new Promise(r => { this.t = 0; this.res = r; }); }
+  update() { if (this.t >= 0 && ++this.t === 230 && this.res) { const r = this.res; this.res = null; r(); } }
+  draw() {
+    ctx.fillStyle = '#101830'; ctx.fillRect(-OX, -OY, RW, RH);
+    const t = Math.max(0, this.t), glow = Math.min(1, t / 120);
+    ctx.globalAlpha = 0.25 + glow * 0.35; ctx.fillStyle = '#88a8f8';
+    for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2 + t / 90; ctx.beginPath(); ctx.moveTo(128, 80); ctx.lineTo(128 + Math.cos(a) * 220, 80 + Math.sin(a) * 220); ctx.lineTo(128 + Math.cos(a + 0.12) * 220, 80 + Math.sin(a + 0.12) * 220); ctx.fill(); }
+    ctx.globalAlpha = 1;
+    let id = this.from, white = false;
+    if (t > 0 && t < 200) { const period = Math.max(4, 40 - t / 6); id = Math.floor(t / period) % 2 ? this.to : this.from; white = true; }
+    else if (t >= 200) id = this.to;
+    const img = white ? tintSprite(id, '#ffffff') : wesenSprite(id);
+    ctx.drawImage(img, 0, 0, 64, 64, 64, 22, 128, 128);
+    if (t >= 196 && t < 216) { ctx.globalAlpha = 1 - Math.abs(t - 206) / 10; ctx.fillStyle = '#ffffff'; ctx.fillRect(-OX, -OY, RW, RH); ctx.globalAlpha = 1; }
+  }
+}
+async function evolve(w) {
+  const from = SPECIES[w.sp - 1], to = SPECIES[w.sp];
+  const N = wName(w).toUpperCase(), scr = new EvolutionScreen(w, to.id);
+  layers.push(scr);
+  await say(`Nanu? ${N} entwickelt sich!`);
+  await scr.play();
+  const before = calcStats(w)[0]; w.sp = to.id; const after = calcStats(w)[0];
+  if (w.hp > 0) w.hp += after - before;
+  state.seen[to.id] = state.caught[to.id] = 1;
+  await say(`Glückwunsch! ${w.nick ? N : from.name.toUpperCase()} hat sich zu ${to.name.toUpperCase()} entwickelt!`);
+  for (const mv of newMovesAt(w.sp, w.lvl)) await teachMove(w, mv);
+  pop(scr);
+}
+async function useCandy(w) {
+  const before = calcStats(w)[0]; w.lvl++; w.exp = expFor(w.lvl); const after = calcStats(w)[0];
+  if (w.hp > 0) w.hp += after - before;
+  await say(`${wName(w).toUpperCase()} erreicht Level ${w.lvl}!`);
+  for (const mv of newMovesAt(w.sp, w.lvl)) await teachMove(w, mv);
+  while (canEvolve(w)) await evolve(w);
+}
+
+/* --- Kampf starten und auswerten --- */
+async function startBattle(o) {
+  await flash();
+  const b = new Battle(o);
+  const r = await b.run();
+  for (const w of state.team) if (b.leveled.has(w) && w.hp > 0) while (canEvolve(w)) await evolve(w);
+  if (r === 'lose') await blackout();
+  saveGame();
+  return r;
+}
+async function blackout() {
+  await fadeTo(4);
+  state.team.forEach(healWesen);
+  const lc = state.lastCenter;
+  if (lc && DOORS[lc]) setMap(lc, 4, 4, 'up'); else setMap('home:0', 4, 4, 'down');
+  await fadeTo(0);
+  await say(lc ? 'Deine Wesen wurden im Wesen-Center wieder gesund gepflegt. Pass das nächste Mal besser auf!' : 'Zu Hause hast du dich mit deinen Wesen ausgeruht.');
+}
+
+/* --- Trainer --- */
+const TRAINER_NAMES = ['Tim', 'Lea', 'Jonas', 'Mia', 'Ben', 'Emma', 'Paul', 'Lina', 'Finn', 'Nora', 'Max', 'Ida', 'Theo', 'Ella', 'Noah', 'Clara'];
+const TRAINER_INTROS = ['Lass uns kämpfen!', 'Meine Wesen sind die stärksten der Urzeit!', 'Ich habe dich schon von weitem gesehen!', 'Bereit für einen Kampf?', 'Hier kommt keiner ohne Kampf vorbei!'];
+const TRAINER_LOSES = ['Ich habe verloren...', 'Du bist echt stark!', 'Das nächste Mal gewinne ich!', 'Wow, was für ein Kampf!'];
+function routeTrainer(route, biome, k, cls, variant) {
+  // Eigener Zufall pro Trainer, damit die Welt-Erzeugung unverändert bleibt
+  const rng = mulberry32(7000 + route.n * 17 + k), pool = BIOME_POOL[biome], n = 1 + (route.n >= 4 ? 1 : 0) + (route.n >= 10 ? 1 : 0), lvl = 2 + route.n * 3;
+  const team = Array.from({ length: n }, (_, j) => { const l = lvl + (j === n - 1 ? 1 : 0); return { sp: speciesAtLevel(SPID[pool[Math.floor(rng() * pool.length)]], l), lvl: l }; });
+  const nm = TRAINER_NAMES[Math.floor(rng() * TRAINER_NAMES.length)];
+  return { id: `route:${route.n}:${k}`, name: `${cls} ${nm}`, team, money: lvl * 30, variant, intro: TRAINER_INTROS[Math.floor(rng() * TRAINER_INTROS.length)], lose: TRAINER_LOSES[Math.floor(rng() * TRAINER_LOSES.length)], after: 'Du bist wirklich stark. Trainiere weiter so!' };
+}
+function typedLines(type) { return SPECIES.filter(s => !isEvoTarget(s.id) && s.id > 9 && !LEGENDS.has(s.id) && lineOf(s.id).some(id => SPECIES[id - 1].types.includes(type))); }
+function gymTeam(i, n, base, seed) {
+  const t = TOWNS[i], rng = mulberry32(seed), lines = typedLines(t.type);
+  // Verschiedene Entwicklungslinien bevorzugen, damit kein Wesen doppelt vorkommt
+  const pool = lines.slice(); for (let k = pool.length - 1; k > 0; k--) { const j = Math.floor(rng() * (k + 1)); [pool[k], pool[j]] = [pool[j], pool[k]]; }
+  return Array.from({ length: n }, (_, k) => { const s = pool.length ? pool[k % pool.length] : SPECIES[10]; const lvl = base - (n - 1 - k) * 2; return { sp: speciesAtLevel(s.id, lvl), lvl }; });
+}
+function gymLeader(i) {
+  const t = TOWNS[i], n = i <= 4 ? 2 : i <= 10 ? 3 : 4, base = 8 + i * 4;
+  return { id: `gym:${i}`, name: t.leader, team: gymTeam(i, n, base, 900 + i * 37), money: base * 80, variant: 5, lose: `Unglaublich! Du hast dir den ${t.badge} verdient.` };
+}
+function gymTrainer(i, k) {
+  const t = TOWNS[i], base = 4 + i * 4;
+  return { id: `gymtr:${i}:${k}`, name: `${k ? 'Ass-Trainerin' : 'Trainer'} ${TRAINER_NAMES[(i * 3 + k) % TRAINER_NAMES.length]}`, team: gymTeam(i, 1 + (i > 6 ? 1 : 0), base, 500 + i * 13 + k), money: base * 40, variant: k + 1, intro: `Du willst zu ${t.leader}? Dann musst du erst an mir vorbei!`, lose: 'Du bist bereit für die Arenaleitung.', after: `${t.leader} wartet ganz hinten auf dich.` };
+}
+const CHAMPION = { id: 'champion', name: 'Champion Aurelia', variant: 5, money: 20000, lose: 'Du bist stärker als ich. Herzlichen Glückwunsch, neuer Champion!',
+  team: [['Smilodor', 74], ['Meteoros', 75], ['Gigafarnus', 76], ['Mosarok', 76], ['Infernorex', 78], ['Tyrannodrak', 80]].map(([n, lvl]) => ({ sp: SPID[n], lvl })) };
+
+// Trainer sehen den Spieler in Blickrichtung (bis 4 Felder) und kommen auf ihn zu
+const tickers = [];
+const waitTicks = n => new Promise(r => tickers.push({ n, r }));
+function trainerSees(n) {
+  const [dx, dy] = DIRS[n.dir];
+  for (let d = 1; d <= 4; d++) {
+    const x = n.x + dx * d, y = n.y + dy * d;
+    if (x === player.x && y === player.y) return true;
+    if (SOLID.has(tget(cur, x, y)) || npcAt(cur, x, y)) return false;
+  }
+  return false;
+}
+async function trainerEncounter(n, spotted) {
+  const tr = n.trainer;
+  if (state.flags['beat:' + tr.id]) return say(`${tr.name.toUpperCase()}: ${tr.after}`);
+  if (!state.team.some(w => w.hp > 0)) return say(`${tr.name.toUpperCase()}: Deine Wesen sind erschöpft. Geh erst ins Wesen-Center!`);
+  if (spotted) {
+    n.alert = 50; await waitTicks(50);
+    while (Math.abs(n.x - player.x) + Math.abs(n.y - player.y) > 1) { n.start(n.dir); while (n.moving) { n.update(1); await waitTicks(1); } }
+  }
+  n.dir = player.x > n.x ? 'right' : player.x < n.x ? 'left' : player.y > n.y ? 'down' : 'up';
+  player.dir = OPP[n.dir];
+  await say(`${tr.name.toUpperCase()}: ${tr.intro}`);
+  const r = await startBattle({ trainer: tr });
+  if (r === 'win') { state.flags['beat:' + tr.id] = 1; saveGame(); }
+}
+function checkTrainerSight() {
+  for (const n of cur.npcs) {
+    if (!n.trainer || !n.visible() || n.trainer.noSight || state.flags['beat:' + n.trainer.id]) continue;
+    if (trainerSees(n) && state.team.some(w => w.hp > 0)) { run(() => trainerEncounter(n, true)); return true; }
+  }
+  return false;
+}
+
+/* --- Tasche --- */
+class BagScreen {
+  full = true;
+  constructor(battle) { this.b = battle; this.sel = 0; this.scroll = 0; this.note = null; }
+  list() { return Object.keys(state.items).filter(k => state.items[k] > 0); }
+  setNote(t) { this.note = { t, n: 150 }; }
+  update() {
+    if (this.note && --this.note.n <= 0) this.note = null;
+    const L = this.list(), n = L.length;
+    if (pressed.B || pressed.START) { pop(this); this.done(null); return; }
+    if (!n) return;
+    if (pressed.up) this.sel = (this.sel + n - 1) % n;
+    if (pressed.down) this.sel = (this.sel + 1) % n;
+    this.sel = Math.min(this.sel, n - 1);
+    if (this.sel < this.scroll) this.scroll = this.sel; if (this.sel >= this.scroll + 7) this.scroll = this.sel - 6;
+    if (pressed.A) this.use(L[this.sel]);
+  }
+  async use(it) {
+    const info = ITEMS[it] || {};
+    if (this.b) {
+      if (info.capture) { if (!this.b.wild) return this.setNote('Wesen anderer Trainer kann man nicht fangen!'); pop(this); this.done({ item: it }); return; }
+      if (info.heal || info.cure) {
+        const t = await openScreen(new TeamScreen('pick', `${it}: für welches Wesen?`)); if (t < 0) return;
+        if (!canUse(info, state.team[t])) return this.setNote('Das hätte keine Wirkung.');
+        pop(this); this.done({ item: it, target: t }); return;
+      }
+      return this.setNote('Das kann man im Kampf nicht benutzen.');
+    }
+    if (info.heal || info.cure || info.level) {
+      const t = await openScreen(new TeamScreen('pick', `${it}: für welches Wesen?`)); if (t < 0) return;
+      const w = state.team[t];
+      if (!canUse(info, w)) return this.setNote('Das hätte keine Wirkung.');
+      takeItem(it);
+      if (info.level) await useCandy(w); else await say(applyItem(w, info));
+      return;
+    }
+    if (info.escape) { if (!cur.outdoor) return this.setNote('Das Fluchtseil funktioniert nur draußen.'); takeItem(it); pop(this); this.done('escape'); return; }
+    this.setNote(info.capture ? 'Kapseln wirft man im Kampf gegen wilde Wesen.' : 'Das kann man jetzt nicht benutzen.');
+  }
+  draw() {
+    bgPattern('#e8b860', '#e0b058');
+    header('TASCHE', `${state.money} Taler`);
+    const L = this.list();
+    box(4, 24, 180, 120);
+    if (!L.length) text('Die Tasche ist leer.', 16, 30, '#7888a0', null);
+    for (let r = 0; r < 7; r++) {
+      const i = this.scroll + r; if (i >= L.length) break;
+      const y = 29 + r * 16, sel = i === this.sel;
+      if (sel) rr(8, y + 1, 172, 15, 3, '#f8e0d8');
+      drawItemIcon(L[i], 11, y);
+      text(L[i], 30, y - 1, UI.text, null, 16, 118);
+      const c = `x${state.items[L[i]]}`; text(c, 174 - measure(c), y - 1, UI.text, null);
+    }
+    box(188, 24, 64, 120, UI.panel);
+    if (L.length) { const it = L[Math.min(this.sel, L.length - 1)]; ctx.save(); ctx.translate(196, 50); ctx.scale(3, 3); drawItemIcon(it, 0, 0); ctx.restore(); const c = `x${state.items[it]}`; text(c, 220 - measure(c) / 2, 104); }
+    box(2, 146, 252, 44);
+    if (this.note) wrapW(this.note.t, 228).slice(0, 2).forEach((l, i) => text(l, 12, 150 + i * 16, UI.red, null));
+    else if (L.length) wrapW((ITEMS[L[Math.min(this.sel, L.length - 1)]] || {}).desc || '', 228).slice(0, 2).forEach((l, i) => text(l, 12, 150 + i * 16));
+  }
+}
+
+/* --- Laden --- */
+class ShopScreen {
+  full = true;
+  constructor() { this.sel = 0; this.qty = 1; this.note = null; }
+  update() {
+    if (this.note && --this.note.n <= 0) this.note = null;
+    const n = SHOP_LIST.length;
+    if (pressed.up) { this.sel = (this.sel + n - 1) % n; this.qty = 1; }
+    if (pressed.down) { this.sel = (this.sel + 1) % n; this.qty = 1; }
+    if (pressed.right) this.qty = Math.min(99, this.qty + 1);
+    if (pressed.left) this.qty = Math.max(1, this.qty - 1);
+    if (pressed.A) {
+      const it = SHOP_LIST[this.sel], cost = ITEMS[it].price * this.qty;
+      if (state.money < cost) this.note = { t: 'Du hast nicht genug Taler.', n: 120, bad: 1 };
+      else { state.money -= cost; state.items[it] = (state.items[it] || 0) + this.qty; this.note = { t: `${this.qty}x ${it} gekauft!`, n: 120 }; this.qty = 1; }
+    }
+    if (pressed.B || pressed.START) { pop(this); this.done(); }
+  }
+  draw() {
+    bgPattern('#78a8d8', '#70a0d0');
+    header('TAUSCHLADEN', `${state.money} Taler`);
+    box(4, 24, 168, 120);
+    SHOP_LIST.forEach((it, i) => {
+      const y = 28 + i * 12.6, sel = i === this.sel;
+      if (sel) rr(8, y + 1, 160, 13, 3, '#f8e0d8');
+      text(it, 12, y - 2, UI.text, null, 16, 118);
+      const p = `${ITEMS[it].price}`; text(p, 164 - measure(p), y - 2, '#7888a0', null);
+    });
+    const it = SHOP_LIST[this.sel], total = `${ITEMS[it].price * this.qty} T.`;
+    box(176, 24, 76, 120, UI.panel);
+    ctx.save(); ctx.translate(190, 32); ctx.scale(3, 3); drawItemIcon(it, 0, 0); ctx.restore();
+    const q = `x ${this.qty}`; text(q, 214 - measure(q) / 2, 82);
+    ctx.fillStyle = UI.red; for (let k = 0; k < 4; k++) { ctx.fillRect(186 + k, 90 - k, 1, 1 + k * 2); ctx.fillRect(242 - k, 90 - k, 1, 1 + k * 2); }
+    text(total, 214 - measure(total) / 2, 100, UI.red, null);
+    if (state.items[it]) { const d = `Dabei ${state.items[it]}`; text(d, 214 - measure(d) / 2, 120, '#7888a0', null); }
+    box(2, 146, 252, 44);
+    if (this.note) text(this.note.t, 12, 150, this.note.bad ? UI.red : UI.text);
+    else text(wrapW(ITEMS[it].desc, 228)[0], 12, 150);
+    text('Links/Rechts: Anzahl · A: kaufen', 12, 166, '#7888a0', null);
+  }
+}
+
+/* --- Lager am Stein-PC --- */
+class BoxScreen {
+  full = true;
+  constructor() { this.sel = 0; this.scroll = 0; }
+  update() {
+    const n = state.box.length;
+    if (pressed.B || pressed.START || !n) { pop(this); this.done(-1); return; }
+    if (pressed.up) this.sel = (this.sel + n - 1) % n;
+    if (pressed.down) this.sel = (this.sel + 1) % n;
+    if (this.sel < this.scroll) this.scroll = this.sel; if (this.sel >= this.scroll + 7) this.scroll = this.sel - 6;
+    if (pressed.A) { pop(this); this.done(this.sel); }
+  }
+  draw() {
+    bgPattern('#88a0b8', '#8098b0');
+    header('WESEN-LAGER', `${state.box.length} Wesen`);
+    box(4, 24, 150, 120);
+    for (let r = 0; r < 7; r++) {
+      const i = this.scroll + r; if (i >= state.box.length) break;
+      const w = state.box[i], y = 29 + r * 16;
+      if (i === this.sel) rr(8, y + 1, 142, 15, 3, '#f8e0d8');
+      text(wName(w), 14, y - 1, UI.text, null, 16, 90); const l = `Lv.${w.lvl}`; text(l, 144 - measure(l), y - 1, '#7888a0', null);
+    }
+    box(158, 24, 94, 120, UI.panel);
+    const w = state.box[this.sel]; if (w) { drawWesen(w.sp, 173, 46); w.nick && text(SPECIES[w.sp - 1].name, 205 - Math.min(measure(SPECIES[w.sp - 1].name), 84) / 2, 116, '#7888a0', null, 16, 84); }
+    box(2, 146, 252, 44); text('A: ins Team holen   B: zurück', 12, 150);
+  }
+}
+async function usePC() {
+  for (;;) {
+    const c = await ask(`STEIN-PC · Im Lager: ${state.box.length} Wesen`, ['WESEN HOLEN', 'WESEN ABLEGEN', 'ZURÜCK']);
+    if (c === 0) {
+      if (!state.box.length) { await say('Das Lager ist leer.'); continue; }
+      if (state.team.length >= 6) { await say('Dein Team ist voll. Lege zuerst ein Wesen ab.'); continue; }
+      const i = await openScreen(new BoxScreen());
+      if (i >= 0) { const w = state.box.splice(i, 1)[0]; state.team.push(w); await say(`${wName(w).toUpperCase()} ist jetzt in deinem Team.`); }
+    } else if (c === 1) {
+      if (state.team.length <= 1) { await say('Du brauchst mindestens ein Wesen im Team.'); continue; }
+      const i = await openScreen(new TeamScreen('pick', 'Welches Wesen ins Lager?'));
+      if (i >= 0) { const w = state.team.splice(i, 1)[0]; healWesen(w); state.box.push(w); await say(`${wName(w).toUpperCase()} wurde ins Lager gebracht.`); }
+    } else return;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   SPIELABLÄUFE: Begegnungen, Heilen, Laden, Starter, Arenen, Champion
+   --------------------------------------------------------------------- */
 function encounterTable(x, y) {
   const b = bget(MAPS.world, x, y), area = aget(MAPS.world, x, y);
   const route = ROUTES.find(r => r.areaId === area);
-  const lvl = 2 + (route ? route.n : 1) * 3;
+  const lvl = 1 + (route ? route.n : 1) * 3;
   return BIOME_POOL[b].map(n => ({ sp: SPID[n], lvl }));
 }
 async function wildEncounter(x, y) {
-  // TODO: Kampf gegen ein Wesen aus encounterTable(x, y)
-  const t = encounterTable(x, y); const e = t[Math.floor(Math.random() * t.length)];
-  state.seen[e.sp] = 1;
-  await battle({ name: 'wildes ' + SPECIES[e.sp - 1].name, wild: e });
+  const t = encounterTable(x, y), e = t[Math.floor(Math.random() * t.length)];
+  const lvl = Math.max(2, e.lvl + Math.floor(Math.random() * 3) - 1);
+  await startBattle({ wild: { sp: speciesAtLevel(e.sp, lvl), lvl } });
 }
 async function healTeam(home) {
   if (!state.team.length) return say(home ? 'Ruh dich kurz aus... So, jetzt bist du wieder fit!' : 'Später werden hier deine Wesen geheilt. Noch hast du keine!');
-  state.team.forEach(w => { w.hp = calcStats(w)[0]; });
+  if (!home) state.lastCenter = cur.id;
+  state.team.forEach(healWesen);
   await say(home ? 'Du und deine Wesen ruhen euch aus. Alle sind wieder fit!' : 'Deine Wesen sind wieder vollständig geheilt. Bis bald!');
+  saveGame();
 }
-async function openShop(townIndex) { await say('Die Regale werden gerade eingeräumt. Komm bald wieder!'); }
+async function openShop() { await openScreen(new ShopScreen()); await say('Danke für deinen Besuch!'); }
 async function chooseStarter() {
   if (state.team.length) return say('Die übrigen Kapseln gehören anderen jungen Trainern.');
   for (;;) {
@@ -2110,27 +2995,32 @@ async function chooseStarter() {
       const nn = await new NameScreen(w.nick, state.profile.look, sp.id).run();
       if (nn) w.nick = nn;
     }
-    await say(`PROF. BERNSTEIN: Du und ${w.nick.toUpperCase()} seid jetzt ein Team! Mein Assistent auf Route 1 lässt euch durch.`);
+    state.items.Bernsteinkapsel = (state.items.Bernsteinkapsel || 0) + 5;
+    state.items.Trank = (state.items.Trank || 0) + 3;
+    await say(`PROF. BERNSTEIN: Nimm diese 5 BERNSTEINKAPSELN und 3 TRÄNKE mit. Damit kannst du wilde Wesen fangen!`);
+    await say(`Du und ${w.nick.toUpperCase()} seid jetzt ein Team! Mein Assistent auf Route 1 lässt euch durch.`);
     saveGame();
     return;
   }
 }
 async function showBag() {
-  const names = Object.keys(state.items);
-  if (!names.length) return say('Deine Tasche ist leer.');
-  await say('TASCHE: ' + names.map(n => `${n} x${state.items[n]}`).join(', '));
+  const r = await openScreen(new BagScreen(null));
+  if (r === 'escape') {
+    const d = (state.lastCenter && DOORS[state.lastCenter]) || DOORS['home:0'];
+    await say(`${PN()} benutzt das FLUCHTSEIL!`);
+    await fadeTo(4); setMap('world', d.x, d.y + 1, 'down'); await fadeTo(0);
+  }
 }
-
 async function leaderTalk(i) {
   const t = TOWNS[i];
   if (state.badges[i - 1]) return say(`${t.leader.toUpperCase()}: Du hast meinen ${t.badge} schon. Auf nach ${TOWNS[i + 1].name}!`);
   await say(`${t.leader.toUpperCase()}: Willkommen in der Arena von ${t.name}! Meine Wesen sind vom Typ ${t.type}.`);
+  if (!state.team.some(w => w.hp > 0)) return say('Deine Wesen sind erschöpft. Heile sie zuerst im Wesen-Center!');
   const c = await ask('Nimmst du die Herausforderung an?', ['JA', 'NEIN']);
   if (c !== 0) return say(`${t.leader.toUpperCase()}: Komm wieder, wenn du bereit bist.`);
-  const won = await battle({ name: `Arenaleitung ${t.leader}`, leader: i });
-  if (!won) return say(`${t.leader.toUpperCase()}: Trainiere weiter und versuche es noch einmal!`);
+  const r = await startBattle({ trainer: gymLeader(i) });
+  if (r !== 'win') return say(`${t.leader.toUpperCase()}: Trainiere weiter und versuche es noch einmal!`);
   state.badges[i - 1] = true;
-  await say(`${t.leader.toUpperCase()}: Unglaublich! Du hast dir das verdient.`);
   await say(`${PN()} erhält den ${t.badge.toUpperCase()}!`);
   const n = state.badges.filter(Boolean).length;
   if (i === 8) await say('Mit 8 Orden darfst du über die große Brücke nach KREIDARA!');
@@ -2145,7 +3035,7 @@ async function championTalk() {
   await say('CHAMPION AURELIA: Du hast es tatsächlich bis hierher geschafft.');
   const c = await ask('Bereit für den letzten Kampf?', ['JA', 'NEIN']);
   if (c !== 0) return say('Ich warte hier auf dich.');
-  if (await battle({ name: 'Champion Aurelia' })) {
+  if (await startBattle({ trainer: CHAMPION }) === 'win') {
     state.flags.champion = 1;
     await say(`${PN().toUpperCase()} ist der neue CHAMPION von Jurania und Kreidara!`);
     saveGame();
@@ -2192,10 +3082,11 @@ function onArrive() {
     if (a && a !== lastArea) showPopup(a);
     if (gfx(1) && (t === T.SAND || (b === 2 && (t === T.GRASS || t === T.PATH || t === T.TALL)) || (b === 3 && t === T.GRASS))) addPrint(player, b);
     if (t === T.TALL) rustleAt(player.x, player.y);
-    if (t === T.TALL && CONFIG.encounters && state.team.length && Math.random() < CONFIG.encounterRate) {
+    if (t === T.TALL && CONFIG.encounters && state.team.some(w => w.hp > 0) && Math.random() < CONFIG.encounterRate) {
       run(() => wildEncounter(player.x, player.y)); return true;
     }
   }
+  if (checkTrainerSight()) return true;
   return false;
 }
 function worldUpdate() {
@@ -2408,6 +3299,7 @@ function drawWorld() {
     ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(sx + 3, sy + 18, 10, 2); ctx.fillRect(sx + 4, sy + 17, 8, 4);
     const bob = a.moving && a.prog >= 4 && a.prog < 12 ? -1 : 0;
     ctx.drawImage(getChar(a.sprite, a.variant, a.dir, a.frame()), sx, sy + bob);
+    if (a.alert > 0) { a.alert--; rr(sx + 3, sy - 15, 10, 13, 3, '#283038'); rr(sx + 4, sy - 14, 8, 11, 2, '#ffffff'); ctx.fillStyle = UI.red; ctx.fillRect(sx + 7, sy - 12, 2, 5); ctx.fillRect(sx + 7, sy - 6, 2, 2); }
   }
   const gx = Math.round(player.px / TS), gy = Math.round(player.py / TS);
   if (tget(cur, gx, gy) === T.TALL) ctx.drawImage(atlas[bget(cur, gx, gy)][f], (rustle.has(K(gx, gy)) ? T.TALL_RUSTLE : T.TALL) * TS, 8, TS, 8, gx * TS - camX, gy * TS - camY + 8, TS, 8);
@@ -2462,6 +3354,7 @@ function render() {
 }
 function step() {
   tick++;
+  for (let i = tickers.length - 1; i >= 0; i--) if (--tickers[i].n <= 0) { const t = tickers[i]; tickers.splice(i, 1); t.r(); }
   if (fade !== fadeTarget) {
     if (tick % 3 === 0) fade += Math.sign(fadeTarget - fade);
     if (fade === fadeTarget && fadeRes) { const r = fadeRes; fadeRes = null; r(); }
@@ -2504,7 +3397,7 @@ function versionLabel() {
 const PROFILE_COUNT = 3;
 const slotKey = i => `wesenwelt.urzeit.slot${i + 1}`;
 let currentSlot = 0;
-function snapshot() { return { dexv: DEX_VERSION, slot: currentSlot, profile: state.profile, time: state.time, map: cur ? cur.id : 'home:0', x: player.x, y: player.y, dir: player.dir, badges: state.badges, flags: state.flags, items: state.items, steps: state.steps, team: state.team, seen: state.seen, caught: state.caught }; }
+function snapshot() { return { dexv: DEX_VERSION, money: state.money, box: state.box, lastCenter: state.lastCenter, slot: currentSlot, profile: state.profile, time: state.time, map: cur ? cur.id : 'home:0', x: player.x, y: player.y, dir: player.dir, badges: state.badges, flags: state.flags, items: state.items, steps: state.steps, team: state.team, seen: state.seen, caught: state.caught }; }
 function loadSlot(i) { try { const s = localStorage.getItem(slotKey(i)); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function writeSlot(i, d) { try { localStorage.setItem(slotKey(i), JSON.stringify(d)); return true; } catch (e) { return false; } }
 function deleteSlot(i) { try { localStorage.removeItem(slotKey(i)); } catch (e) {} }
@@ -2528,7 +3421,8 @@ function applySave(s) {
     const shift = o => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [+k + 9, v]));
     (s.team || []).forEach(w => { w.sp += 9; }); s.seen = shift(s.seen); s.caught = shift(s.caught);
   }
-  state.team = (s.team || []).filter(w => SPECIES[w.sp - 1]); state.seen = s.seen || {}; state.caught = s.caught || {};
+  state.team = (s.team || []).filter(w => SPECIES[w.sp - 1]).map(ensureWesen); state.seen = s.seen || {}; state.caught = s.caught || {};
+  state.box = (s.box || []).filter(w => SPECIES[w.sp - 1]).map(ensureWesen); state.money = s.money ?? 3000; state.lastCenter = s.lastCenter || null;
   lastArea = 0;
   setMap(s.map || 'home:0', s.x ?? 4, s.y ?? 6, s.dir || 'down');
 }
@@ -2543,7 +3437,7 @@ function placeName(d) {
    START
    --------------------------------------------------------------------- */
 async function newGame(profile) {
-  Object.assign(state, { profile, time: 0, badges: Array(16).fill(false), flags: {}, items: {}, steps: 0, team: [], seen: {}, caught: {} });
+  Object.assign(state, { profile, time: 0, money: 3000, box: [], lastCenter: null, badges: Array(16).fill(false), flags: {}, items: {}, steps: 0, team: [], seen: {}, caught: {} });
   lastArea = 0;
   setMap('home:0', 4, 4, 'down');
   mode = 'world';
@@ -2645,7 +3539,7 @@ function loop(now) {
   requestAnimationFrame(loop);
 }
 
-window.WW = { setTime: i => { timeMode = i; }, MAPS, TOWNS, SPECIES, TOWN_RECTS: () => TOWN_RECTS, ROUTES: () => ROUTES, state, player, T, SOLID, tget, aget, DOORS, wesenSprite, drawWesen, layers, screen: openScreen, DexScreen, TeamScreen, StarterScreen, makeWesen, setMap: (...a) => { setMap(...a); mode = 'world'; } };
+window.WW = { setTime: i => { timeMode = i; }, startBattle, gymLeader, MOVES, typeEff, learnset, movesAt, BagScreen, ShopScreen, TeamScreen, SummaryScreen, evolve, run: f => run(f), get cur() { return cur; }, MAPS, TOWNS, SPECIES, TOWN_RECTS: () => TOWN_RECTS, ROUTES: () => ROUTES, state, player, T, SOLID, tget, aget, DOORS, wesenSprite, drawWesen, layers, screen: openScreen, DexScreen, TeamScreen, StarterScreen, makeWesen, setMap: (...a) => { setMap(...a); mode = 'world'; } };
 boot();
 </script>
 
