@@ -99,7 +99,7 @@ const CONFIG = {
   // Adresse des Konto-Servers (worker/). Leer = nur Gast-Spielstände auf dem Gerät
   api: 'https://wesenwelt-api.edengrim67.workers.dev',
 };
-const GAME_VERSION = '202610281409'; // wird von build_app.py durch die Build-Zeit ersetzt
+const GAME_VERSION = '202610281428'; // wird von build_app.py durch die Build-Zeit ersetzt
 
 // Logische Bildgröße passt sich dem Bildschirm an (mindestens 256x192); SC = interne Auflösung für scharfe Schrift
 let VW = 256, VH = 192, OX = 0, OY = 0, RW = 256, RH = 192;
@@ -2014,7 +2014,7 @@ class ProfileScreen {
   }
   draw() {
     bgPattern('#e8dcc0', '#e2d4b4');
-    header('PROFIL WÄHLEN', !accountsReady() ? `${this.data.filter(Boolean).length}/${PROFILE_COUNT}` : account ? 'MIT KONTO' : 'GAST');
+    header('PROFIL WÄHLEN', !accountsReady() ? `${this.data.filter(Boolean).length}/${PROFILE_COUNT}` : account ? accName().toUpperCase() : '');
     this.data.forEach((d, i) => {
       const x = 6 + i * 84, y = 26, sel = i === this.sel;
       rr(x, y, 76, 112, 6, UI.dark); rr(x + 1, y + 1, 74, 110, 5, sel ? UI.red : '#a89878'); rr(x + 3, y + 3, 70, 106, 4, sel ? '#fff4e8' : '#f4ecdc');
@@ -2646,14 +2646,16 @@ const DEV_INFO = {
   'TEAM +5 LEVEL': 'Alle Team-Wesen steigen 5 Level auf.', 'TEAM HEILEN': 'KP, AP und Status voll.',
   'ITEMS & TALER': 'Von jedem Item 10 Stück und 10000 Taler.', 'URDEX FÜLLEN': 'Alle Wesen als gesehen und gefangen.',
   'DATENBANK': 'Alle Wesen mit Bild und Text ansehen.', 'TAGESZEIT': 'Tageszeit wechseln (auch Alt+T).',
-  'SPIELSTAND-CODE': 'Spielstand als Code für ein anderes Gerät.', 'SPIELER': 'Konten verwalten: Passwort, Rechte, löschen.', 'SPERREN': 'Entwicklermodus auf diesem Gerät ausschalten.',
+  'SPIELSTAND-CODE': 'Spielstand als Code für ein anderes Gerät.', 'SPIELER': 'Konten verwalten: Passwort, Rechte, löschen.', 'ZUGÄNGE': 'So viele Spieler dürfen ein Konto haben.', 'SPERREN': 'Entwicklermodus auf diesem Gerät ausschalten.',
 };
 async function devMenu() {
-  let sel = 0;
+  let sel = 0, slots = null;
+  const loadSlotsInfo = async () => { if (account && account.admin) try { slots = await api('/api/admin/settings'); } catch (e) { slots = null; } };
+  await loadSlotsInfo();
   for (;;) {
     const rows = [['SCHNELLREISE'], ['DURCH WÄNDE', noclip ? 'AN' : 'AUS'], ['KOORDINATEN', devCoords ? 'AN' : 'AUS'], ['WILDE WESEN', CONFIG.encounters ? 'AN' : 'AUS'],
       ['ORDEN', `${state.badges.filter(Boolean).length}/16`], ['WESEN HOLEN'], ['TEAM +5 LEVEL'], ['TEAM HEILEN'], ['ITEMS & TALER', String(state.money)], ['URDEX FÜLLEN'],
-      ['DATENBANK'], ['TAGESZEIT', TIMES[timeMode].toUpperCase()], ['SPIELSTAND-CODE'], ...(account && account.admin ? [['SPIELER', 'ADMIN']] : []), ['SPERREN']];
+      ['DATENBANK'], ['TAGESZEIT', TIMES[timeMode].toUpperCase()], ['SPIELSTAND-CODE'], ...(account && account.admin ? [['ZUGÄNGE', slots ? `${slots.players}/${slots.max_players < 0 ? 'OFFEN' : slots.max_players}` : '?'], ['SPIELER', 'ADMIN']] : []), ['SPERREN']];
     sel = await openScreen(new ListScreen('ENTWICKLER', rows, sel, i => DEV_INFO[rows[i][0]]));
     if (sel < 0) return;
     const it = rows[sel][0];
@@ -2685,7 +2687,21 @@ async function devMenu() {
     if (it === 'DATENBANK') await openScreen(new DexScreen(true));
     if (it === 'TAGESZEIT') { timeMode = OPTS.time = (timeMode + 1) % TIMES.length; saveOpts(); }
     if (it === 'SPIELSTAND-CODE') await exportCode();
-    if (it === 'SPIELER') await adminPlayers();
+    if (it === 'SPIELER') { await adminPlayers(); await loadSlotsInfo(); }
+    if (it === 'ZUGÄNGE') {
+      if (!slots) { await say('Keine Verbindung zum Server.'); continue; }
+      const N = [0, 1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 50, 100, -1];
+      const label = n => n < 0 ? 'UNBEGRENZT' : n === 0 ? 'NUR ICH' : `${n} SPIELER`;
+      const cur = Math.max(0, N.indexOf(slots.max_players));
+      const i = await openScreen(new ListScreen('ZUGÄNGE', N.map(n => [label(n), n === slots.max_players ? 'AKTUELL' : '']), cur, `Spieler mit Konto: ${slots.players}`));
+      if (i < 0) continue;
+      try {
+        slots = await api('/api/admin/settings', 'POST', { max_players: N[i] });
+        const free = slots.max_players < 0 ? 'Jeder kann ein Konto anlegen.' : (f => f === 1 ? 'Ein Platz ist noch frei.' : `${f} Plätze sind noch frei.`)(Math.max(0, slots.max_players - slots.players));
+        await say(`Gespeichert: ${label(N[i])}. ${free}`);
+        if (slots.max_players >= 0 && slots.players > slots.max_players) await say('Es gibt schon mehr Konten. Die bleiben bestehen, du kannst sie unter SPIELER löschen.');
+      } catch (e) { await say(e.message); }
+    }
     if (it === 'SPERREN') { if (await ask('Entwicklermodus ausschalten?', ['JA', 'NEIN'], 1) === 0) { devLock(); closeMenus(); return; } }
   }
 }
@@ -2761,23 +2777,30 @@ async function importCode(slot) {
    KONTEN – Anmeldung und Spielstände in der Cloud (Server: worker/)
    Ohne Konto spielt man als Gast, die Spielstände bleiben dann auf dem Gerät.
    --------------------------------------------------------------------- */
-const ACC_KEY = 'wesenwelt.account', GUEST_KEY = 'wesenwelt.guest';
+const ACC_KEY = 'wesenwelt.account', OWNER_KEY = 'wesenwelt.owner';
 let account = null;
 try { account = JSON.parse(localStorage.getItem(ACC_KEY) || 'null'); } catch (e) {}
 if (account && (account.dev || account.admin)) devOn = true;
 const accName = () => account ? account.name || account.email || '' : '';
 const accountsReady = () => !!CONFIG.api;
 function storeAccount() { try { if (account) localStorage.setItem(ACC_KEY, JSON.stringify(account)); else localStorage.removeItem(ACC_KEY); } catch (e) {} }
-function setGuest(on) { try { if (on) localStorage.setItem(GUEST_KEY, '1'); else localStorage.removeItem(GUEST_KEY); } catch (e) {} }
-function isGuest() { try { return localStorage.getItem(GUEST_KEY) === '1'; } catch (e) { return false; } }
+// Die Spielstände auf dem Gerät gehören immer zum angemeldeten Konto
+function clearLocalSlots() { for (let i = 0; i < PROFILE_COUNT; i++) try { localStorage.removeItem(slotKey(i)); } catch (e) {} }
+function claimDevice(name) {
+  try {
+    const prev = localStorage.getItem(OWNER_KEY);
+    if (prev && prev.toLowerCase() !== name.toLowerCase()) clearLocalSlots();
+    localStorage.setItem(OWNER_KEY, name);
+  } catch (e) {}
+}
 async function api(path, method = 'GET', body) {
   let r;
   try {
     r = await fetch(CONFIG.api + path, { method, headers: { 'content-type': 'application/json', ...(account ? { authorization: 'Bearer ' + account.token } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
   } catch (e) { throw new Error('Keine Verbindung zum Server. Bist du online?'); }
   const d = await r.json().catch(() => ({}));
-  // Abgelaufene Anmeldung: lokal abmelden, die Spielstände bleiben auf dem Gerät
-  if (r.status === 401 && account && path !== '/api/login') { account = null; storeAccount(); }
+  // Abgelaufene oder gelöschte Anmeldung: lokal abmelden
+  if (r.status === 401 && account && path !== '/api/login') forgetAccount();
   if (!r.ok) throw new Error(d.error || 'Serverfehler. Bitte später noch einmal versuchen.');
   return d;
 }
@@ -2852,20 +2875,28 @@ async function accountLogin(register) {
     onSubmit: async v => {
       const d = await api(register ? '/api/register' : '/api/login', 'POST', { name: v.name, password: v.password });
       account = { token: d.token, ...d.user }; storeAccount(); if (account.dev || account.admin) devOn = true;
+      claimDevice(account.name);
       return null;
     },
   });
   if (!done) return false;
-  setGuest(false);
   let msg = account.admin ? `Willkommen, Admin ${accName()}! Spielerverwaltung findest du im Menü unter ENTWICKLER.` : register ? 'Dein Konto ist bereit! Deine Spielstände werden ab jetzt in der Cloud gesichert.' : 'Du bist angemeldet. Deine Spielstände sind jetzt auf allen Geräten gleich.';
   try { await syncSaves(); } catch (e) { msg += ' (Abgleich später: ' + e.message + ')'; }
   await say(msg);
   return true;
 }
 async function accountLogout() {
+  // Vorher alles hochladen, dann die Spielstände vom Gerät nehmen (sie liegen sicher in der Cloud)
+  if (mode === 'world') saveGame();
+  let synced = true; try { await syncSaves(); } catch (e) { synced = false; }
+  if (!synced && await ask('Keine Verbindung. Ungesicherter Fortschritt geht verloren. Trotzdem abmelden?', ['ABMELDEN', 'ZURÜCK'], 1) !== 0) return false;
   try { await api('/api/logout', 'POST'); } catch (e) {}
-  account = null; storeAccount();
-  try { devOn = localStorage.getItem(DEV_KEY) === DEV_HASH; } catch (e) { devOn = false; }
+  forgetAccount();
+  return true;
+}
+function forgetAccount() {
+  account = null; storeAccount(); clearLocalSlots();
+  try { localStorage.removeItem(OWNER_KEY); devOn = localStorage.getItem(DEV_KEY) === DEV_HASH; } catch (e) { devOn = false; }
 }
 async function accountMenu() {
   if (!accountsReady()) return say('Konten sind noch nicht eingerichtet. Du spielst auf diesem Gerät.');
@@ -2891,12 +2922,15 @@ async function accountMenu() {
       onSubmit: async v => { await api('/api/password', 'POST', v); return null; } });
     if (ok) await say('Dein Passwort wurde geändert.');
   }
-  if (c === 2) { await accountLogout(); await say('Du bist abgemeldet. Deine Spielstände bleiben auf diesem Gerät.'); }
+  if (c === 2 && await accountLogout()) {
+    if (mode === 'world') { location.reload(); return; }
+    await say('Du bist abgemeldet.');
+  }
   if (c === 3) {
     if (await ask('Konto und Cloud-Spielstände löschen?', ['LÖSCHEN', 'ABBRECHEN'], 1) !== 0) return;
     const gone = await formModal({ title: 'Konto löschen', hint: 'Zur Sicherheit bitte dein Passwort eingeben.', fields: [{ name: 'password', label: 'Passwort', type: 'password', auto: 'current-password' }], ok: 'LÖSCHEN',
       onSubmit: async v => { await api('/api/me', 'DELETE', { password: v.password }); return null; } });
-    if (gone) { account = null; storeAccount(); await say('Dein Konto wurde gelöscht. Auf diesem Gerät bleibt alles erhalten.'); }
+    if (gone) { forgetAccount(); await say('Dein Konto wurde gelöscht.'); if (mode === 'world') location.reload(); }
   }
 }
 // Spielerverwaltung für Admins: Passwort zurücksetzen (es gibt keine E-Mail), Entwicklerrechte, löschen
@@ -2922,12 +2956,14 @@ async function adminPlayers() {
     } catch (e) { await say(e.message); }
   }
 }
-async function accountIntro() {
-  // Beim ersten Start fragen, ob man ein Konto nutzen oder als Gast spielen will
-  if (!accountsReady() || account || isGuest()) return;
-  const c = await ask('Willkommen! Wie möchtest du spielen?', ['ANMELDEN', 'NEUES KONTO', 'ALS GAST']);
-  if (c < 2 && await accountLogin(c === 1)) return;
-  if (c === 2) { setGuest(true); await say('Du spielst als Gast. Ein Konto kannst du jederzeit mit SELECT anlegen.'); }
+async function requireLogin() {
+  // Gespielt wird nur mit Konto. false = zurück zum Titelbild.
+  while (accountsReady() && !account) {
+    const c = await ask('Bitte melde dich an, um zu spielen.', ['ANMELDEN', 'NEUES KONTO', 'ZURÜCK'], 0);
+    if (c === 2) return false;
+    await accountLogin(c === 1);
+  }
+  return true;
 }
 
 for (const C of [Title, ProfileScreen, EditorScreen, NameScreen, TrainerCard, OptionsScreen, DexScreen, TeamScreen, SummaryScreen, StarterScreen, BadgeScreen, MapScreen, ListScreen]) C.prototype.full = true;
@@ -4297,11 +4333,14 @@ async function newGame(profile) {
 async function profileFlow() {
   const ps = new ProfileScreen(); layers.push(ps);
   try {
-    await accountIntro();
+    if (!await requireLogin()) return null;
     if (account) { try { await syncSaves(); } catch (e) {} }
+    // Wurde das Konto inzwischen gelöscht oder ist die Anmeldung abgelaufen, neu anmelden
+    if (!await requireLogin()) return null;
+    ps.refresh();
     for (;;) {
       const slot = await ps.pick();
-      if (slot === -2) { await accountMenu(); ps.refresh(); continue; }
+      if (slot === -2) { await accountMenu(); ps.refresh(); if (!await requireLogin()) return null; ps.refresh(); continue; }
       if (slot < 0) return null;
       const data = loadSlot(slot);
       if (!data) {

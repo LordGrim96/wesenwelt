@@ -69,6 +69,11 @@ async function currentUser(req, db) {
   return db.prepare('SELECT u.id, u.name, u.dev, u.admin, u.pw_hash, u.pw_salt FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?')
     .bind(await sha256(m[1]), Date.now()).first();
 }
+async function playerSlots(db) {
+  const r = await db.prepare("SELECT v FROM settings WHERE k = 'max_players'").first();
+  const n = await db.prepare('SELECT COUNT(*) AS n FROM users WHERE admin = 0').first();
+  return { max_players: r ? +r.v : -1, players: n.n };
+}
 const publicUser = u => ({ name: u.name, dev: !!(u.dev || u.admin), admin: !!u.admin });
 const checkPassword = async (u, pw) => sameText(await pbkdf2(String(pw || ''), u.pw_salt), u.pw_hash);
 
@@ -85,6 +90,9 @@ async function handle(req, env) {
     if (RESERVED.has(name.toLowerCase())) return fail(400, 'Dieser Name ist reserviert. Bitte einen anderen wählen.');
     if (!validPassword(b.password)) return fail(400, 'Das Passwort braucht mindestens 8 Zeichen.');
     if (await db.prepare('SELECT 1 FROM users WHERE name = ? COLLATE NOCASE').bind(name).first()) return fail(409, 'Diesen Namen gibt es schon. Bitte einen anderen wählen.');
+    // Der Admin legt fest, wie viele Spieler ein Konto bekommen
+    const slots = await playerSlots(db);
+    if (slots.max_players >= 0 && slots.players >= slots.max_players) return fail(403, 'Es sind gerade keine Plätze frei. Frag den Entwickler nach einem Zugang.');
     const salt = rand(16), hash = await pbkdf2(b.password, salt);
     const r = await db.prepare('INSERT INTO users (name, pw_hash, pw_salt, created_at) VALUES (?, ?, ?, ?)').bind(name, hash, salt, Date.now()).run();
     return json({ token: await newSession(db, r.meta.last_row_id), user: { name, dev: false, admin: false } });
@@ -150,6 +158,13 @@ async function handle(req, env) {
   // Spielerverwaltung, nur für Admins
   if (path.startsWith('/api/admin/')) {
     if (!user.admin) return fail(403, 'Nur für Admins.');
+    if (path === '/api/admin/settings' && method === 'GET') return json(await playerSlots(db));
+    if (path === '/api/admin/settings' && method === 'POST') {
+      const b = await readJson(req), max = Number(b.max_players);
+      if (!Number.isInteger(max) || max < -1 || max > 10000) return fail(400, 'Ungültige Zahl.');
+      await db.prepare("INSERT OR REPLACE INTO settings (k, v) VALUES ('max_players', ?)").bind(String(max)).run();
+      return json(await playerSlots(db));
+    }
     if (path === '/api/admin/users' && method === 'GET') {
       const r = await db.prepare('SELECT u.id, u.name, u.dev, u.admin, u.created_at, (SELECT COUNT(*) FROM saves s WHERE s.user_id = u.id) AS saves, (SELECT MAX(saved_at) FROM saves s WHERE s.user_id = u.id) AS last_save FROM users u ORDER BY u.created_at DESC LIMIT 500').all();
       return json({ users: r.results.map(u => ({ ...u, dev: !!u.dev, admin: !!u.admin })) });
