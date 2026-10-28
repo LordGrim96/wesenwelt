@@ -36,6 +36,6 @@ Auf dem Handy die Seite öffnen und „App installieren“ (Android) bzw. „Zum
 
 Die Wesen, Orte und Grafiken sind eigene Entwürfe und stammen nicht aus offiziellen Spielen.
 
-## Rechte
+## Lizenz
 
-Alle Rechte vorbehalten (siehe `LICENSE`). Spielen ist kostenlos erlaubt; Änderungen am Spiel macht nur der Urheber.
+[CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/deed.de) (siehe `LICENSE`): kostenlos spielen und unverändert teilen, mit Namensnennung und ohne Geld damit zu verdienen. Veränderte Versionen sind nicht erlaubt – Änderungen am Spiel macht nur der Urheber.

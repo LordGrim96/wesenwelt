@@ -2503,6 +2503,7 @@ class Title {
     ctx.fillStyle = '#1a1014'; ctx.fillRect(-OX, 152, RW, 40 + OY);
     if (!document.body.classList.contains('touch')) { const hlp = 'Pfeile laufen · Z = A · X = B · Enter = Menü'; text(hlp, 128 - measure(hlp) / 2, 175, '#8a7460', null); }
     const vl = versionLabel(); if (vl) text(vl, VW - 6 - measure(vl), document.body.classList.contains('touch') ? 175 : 140, '#8a7460', null);
+    const cr = '© LordGrim96 · CC BY-NC-ND'; text(cr, VW - 6 - measure(cr), -2, '#7a3220', null);
     if ((tick >> 5) & 1) text('START DRÜCKEN', 128 - measure('START DRÜCKEN') / 2, 158, '#f8e8b0', '#3a1a10');
   }
 }
