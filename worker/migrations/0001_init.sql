@@ -1,4 +1,4 @@
--- Tabellen für Konten, Anmeldungen und Spielstände (wird bei jedem Veröffentlichen ausgeführt, ändert nichts Bestehendes)
+-- Grundtabellen für Konten, Anmeldungen und Spielstände
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   email TEXT UNIQUE NOT NULL,

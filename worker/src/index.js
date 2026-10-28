@@ -50,8 +50,11 @@ async function readJson(req, limit = 4096) {
   if (text.length > limit) throw new Error('too_large');
   try { return JSON.parse(text || '{}'); } catch (e) { throw new Error('bad_json'); }
 }
-const cleanEmail = e => String(e || '').trim().toLowerCase();
-const validEmail = e => e.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(e);
+const cleanName = n => String(n || '').trim();
+// Benutzernamen: 3 bis 20 Zeichen aus Buchstaben, Ziffern, _ und -. Groß/klein zählt beim Anmelden nicht.
+const validName = n => /^[A-Za-z0-9ÄÖÜäöüß_-]{3,20}$/.test(n);
+const RESERVED = new Set(['admin', 'administrator', 'entwickler', 'developer', 'system', 'support', 'wesenwelt', 'moderator', 'mod']);
+const tempPassword = () => { const a = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789', b = crypto.getRandomValues(new Uint8Array(10)); return [...b].map(x => a[x % a.length]).join(''); };
 const validPassword = p => typeof p === 'string' && p.length >= 8 && p.length <= 200;
 
 async function newSession(db, userId) {
@@ -63,10 +66,11 @@ async function newSession(db, userId) {
 async function currentUser(req, db) {
   const m = /^Bearer ([0-9a-f]{64})$/.exec(req.headers.get('authorization') || '');
   if (!m) return null;
-  return db.prepare('SELECT u.id, u.email, u.dev, u.pw_hash, u.pw_salt FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?')
+  return db.prepare('SELECT u.id, u.name, u.dev, u.admin, u.pw_hash, u.pw_salt FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?')
     .bind(await sha256(m[1]), Date.now()).first();
 }
-const publicUser = u => ({ email: u.email, dev: !!u.dev });
+const publicUser = u => ({ name: u.name, dev: !!(u.dev || u.admin), admin: !!u.admin });
+const checkPassword = async (u, pw) => sameText(await pbkdf2(String(pw || ''), u.pw_salt), u.pw_hash);
 
 async function handle(req, env) {
   const db = env.DB, url = new URL(req.url), path = url.pathname.replace(/\/+$/, ''), method = req.method;
@@ -76,23 +80,23 @@ async function handle(req, env) {
 
   if (path === '/api/register' && method === 'POST') {
     if (!await allow(db, 'reg:' + ip, 10, 3600e3)) return fail(429, 'Zu viele neue Konten. Bitte später noch einmal versuchen.');
-    const b = await readJson(req), email = cleanEmail(b.email);
-    if (!validEmail(email)) return fail(400, 'Bitte eine gültige E-Mail-Adresse eingeben.');
+    const b = await readJson(req), name = cleanName(b.name);
+    if (!validName(name)) return fail(400, 'Der Name braucht 3 bis 20 Zeichen: Buchstaben, Zahlen, _ oder -.');
+    if (RESERVED.has(name.toLowerCase())) return fail(400, 'Dieser Name ist reserviert. Bitte einen anderen wählen.');
     if (!validPassword(b.password)) return fail(400, 'Das Passwort braucht mindestens 8 Zeichen.');
-    if (await db.prepare('SELECT 1 FROM users WHERE email = ?').bind(email).first()) return fail(409, 'Mit dieser E-Mail gibt es schon ein Konto. Bitte anmelden.');
+    if (await db.prepare('SELECT 1 FROM users WHERE name = ? COLLATE NOCASE').bind(name).first()) return fail(409, 'Diesen Namen gibt es schon. Bitte einen anderen wählen.');
     const salt = rand(16), hash = await pbkdf2(b.password, salt);
-    const r = await db.prepare('INSERT INTO users (email, pw_hash, pw_salt, created_at) VALUES (?, ?, ?, ?)').bind(email, hash, salt, Date.now()).run();
-    const id = r.meta.last_row_id;
-    return json({ token: await newSession(db, id), user: { email, dev: false } });
+    const r = await db.prepare('INSERT INTO users (name, pw_hash, pw_salt, created_at) VALUES (?, ?, ?, ?)').bind(name, hash, salt, Date.now()).run();
+    return json({ token: await newSession(db, r.meta.last_row_id), user: { name, dev: false, admin: false } });
   }
 
   if (path === '/api/login' && method === 'POST') {
-    const b = await readJson(req), email = cleanEmail(b.email);
-    if (!await allow(db, 'login-ip:' + ip, 30, 900e3) || !await allow(db, 'login:' + email, 10, 900e3)) return fail(429, 'Zu viele Versuche. Bitte in 15 Minuten noch einmal.');
-    const u = await db.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
+    const b = await readJson(req), name = cleanName(b.name);
+    if (!await allow(db, 'login-ip:' + ip, 30, 900e3) || !await allow(db, 'login:' + name.toLowerCase(), 10, 900e3)) return fail(429, 'Zu viele Versuche. Bitte in 15 Minuten noch einmal.');
+    const u = name ? await db.prepare('SELECT * FROM users WHERE name = ? COLLATE NOCASE').bind(name).first() : null;
     // Auch ohne Konto wird gerechnet, damit die Antwortzeit nichts verrät
     const hash = await pbkdf2(String(b.password || ''), u ? u.pw_salt : '00'.repeat(16));
-    if (!u || !sameText(hash, u.pw_hash)) return fail(401, 'E-Mail oder Passwort stimmt nicht.');
+    if (!u || !sameText(hash, u.pw_hash)) return fail(401, 'Name oder Passwort stimmt nicht.');
     return json({ token: await newSession(db, u.id), user: publicUser(u) });
   }
 
@@ -111,7 +115,8 @@ async function handle(req, env) {
   if (path === '/api/me' && method === 'DELETE') {
     const b = await readJson(req);
     if (!await allow(db, 'del:' + user.id, 10, 3600e3)) return fail(429, 'Zu viele Versuche.');
-    if (!sameText(await pbkdf2(String(b.password || ''), user.pw_salt), user.pw_hash)) return fail(403, 'Das Passwort stimmt nicht.');
+    if (!await checkPassword(user, b.password)) return fail(403, 'Das Passwort stimmt nicht.');
+    if (user.admin) return fail(403, 'Das Admin-Konto kann nicht gelöscht werden.');
     await db.batch([
       db.prepare('DELETE FROM saves WHERE user_id = ?').bind(user.id),
       db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(user.id),
@@ -125,7 +130,57 @@ async function handle(req, env) {
     const b = await readJson(req);
     if (await sha256('wesenwelt:' + String(b.password || '')) !== DEV_HASH) return fail(403, 'Falsches Passwort.');
     await db.prepare('UPDATE users SET dev = 1 WHERE id = ?').bind(user.id).run();
-    return json({ user: { email: user.email, dev: true } });
+    return json({ user: { ...publicUser(user), dev: true } });
+  }
+
+  if (path === '/api/password' && method === 'POST') {
+    if (!await allow(db, 'pw:' + user.id, 10, 3600e3)) return fail(429, 'Zu viele Versuche.');
+    const b = await readJson(req);
+    if (!await checkPassword(user, b.old)) return fail(403, 'Das alte Passwort stimmt nicht.');
+    if (!validPassword(b.password)) return fail(400, 'Das neue Passwort braucht mindestens 8 Zeichen.');
+    const salt = rand(16), token = (req.headers.get('authorization') || '').slice(7);
+    // Alle anderen Geräte werden abgemeldet, dieses bleibt angemeldet
+    await db.batch([
+      db.prepare('UPDATE users SET pw_hash = ?, pw_salt = ? WHERE id = ?').bind(await pbkdf2(b.password, salt), salt, user.id),
+      db.prepare('DELETE FROM sessions WHERE user_id = ? AND token_hash != ?').bind(user.id, await sha256(token)),
+    ]);
+    return json({ ok: true });
+  }
+
+  // Spielerverwaltung, nur für Admins
+  if (path.startsWith('/api/admin/')) {
+    if (!user.admin) return fail(403, 'Nur für Admins.');
+    if (path === '/api/admin/users' && method === 'GET') {
+      const r = await db.prepare('SELECT u.id, u.name, u.dev, u.admin, u.created_at, (SELECT COUNT(*) FROM saves s WHERE s.user_id = u.id) AS saves, (SELECT MAX(saved_at) FROM saves s WHERE s.user_id = u.id) AS last_save FROM users u ORDER BY u.created_at DESC LIMIT 500').all();
+      return json({ users: r.results.map(u => ({ ...u, dev: !!u.dev, admin: !!u.admin })) });
+    }
+    const am = /^\/api\/admin\/users\/(\d+)(?:\/(reset|dev))?$/.exec(path);
+    const target = am && await db.prepare('SELECT id, name, admin FROM users WHERE id = ?').bind(+am[1]).first();
+    if (!target) return fail(404, 'Diesen Spieler gibt es nicht.');
+    if (target.id === user.id) return fail(403, 'Dein eigenes Konto änderst du unter KONTO → PASSWORT ÄNDERN.');
+    if (target.admin) return fail(403, 'Andere Admins kann man hier nicht ändern.');
+    if (am[2] === 'reset' && method === 'POST') {
+      const pw = tempPassword(), salt = rand(16);
+      await db.batch([
+        db.prepare('UPDATE users SET pw_hash = ?, pw_salt = ? WHERE id = ?').bind(await pbkdf2(pw, salt), salt, target.id),
+        db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(target.id),
+      ]);
+      return json({ name: target.name, password: pw });
+    }
+    if (am[2] === 'dev' && method === 'POST') {
+      const b = await readJson(req);
+      await db.prepare('UPDATE users SET dev = ? WHERE id = ?').bind(b.dev ? 1 : 0, target.id).run();
+      return json({ ok: true });
+    }
+    if (!am[2] && method === 'DELETE') {
+      await db.batch([
+        db.prepare('DELETE FROM saves WHERE user_id = ?').bind(target.id),
+        db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(target.id),
+        db.prepare('DELETE FROM users WHERE id = ?').bind(target.id),
+      ]);
+      return json({ ok: true });
+    }
+    return fail(404, 'Unbekannte Anfrage.');
   }
 
   if (path === '/api/saves' && method === 'GET') {

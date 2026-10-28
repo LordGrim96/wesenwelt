@@ -19,9 +19,9 @@ Auf dem Handy die Seite öffnen und „App installieren“ (Android) bzw. „Zum
 
 | Taste | Funktion |
 | --- | --- |
-| Pfeile / WASD | laufen |
-| Z / Leertaste | A: sprechen, bestätigen |
-| X | B: zurück, gedrückt halten = rennen |
+| Pfeile (oder WASD) | laufen |
+| Leertaste (oder Z) | A: sprechen, bestätigen |
+| Umschalt (oder X, Esc) | B: zurück, gedrückt halten = rennen |
 | Enter | Menü |
 | M | Karte |
 | Alt+T | Tageszeit durchschalten (Test) |

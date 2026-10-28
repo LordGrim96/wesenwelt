@@ -99,7 +99,7 @@ const CONFIG = {
   // Adresse des Konto-Servers (worker/). Leer = nur Gast-Spielstände auf dem Gerät
   api: 'https://wesenwelt-api.edengrim67.workers.dev',
 };
-const GAME_VERSION = '202610281359'; // wird von build_app.py durch die Build-Zeit ersetzt
+const GAME_VERSION = '202610281409'; // wird von build_app.py durch die Build-Zeit ersetzt
 
 // Logische Bildgröße passt sich dem Bildschirm an (mindestens 256x192); SC = interne Auflösung für scharfe Schrift
 let VW = 256, VH = 192, OX = 0, OY = 0, RW = 256, RH = 192;
@@ -1869,14 +1869,17 @@ function healWesen(w) { w.hp = calcStats(w)[0]; w.status = null; w.sleep = 0; w.
 const held = {}, pressed = {};
 const KEYMAP = {
   ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
-  KeyZ: 'A', Space: 'A', KeyJ: 'A', KeyX: 'B', KeyK: 'B', Backspace: 'B', ShiftLeft: 'B', ShiftRight: 'B',
+  KeyZ: 'A', Space: 'A', KeyJ: 'A', KeyX: 'B', KeyK: 'B', Backspace: 'B', ShiftLeft: 'B', ShiftRight: 'B', Escape: 'B',
   Enter: 'START', KeyP: 'START', KeyM: 'SELECT', Tab: 'SELECT',
 };
 let noclip = false;
 addEventListener('keydown', e => {
   if (domModal) return; // Textfeld für Spielstand-Codes ist offen
   // Namenseingabe: echte Tastatur tippt direkt
-  if (textInput && textInput === topLayer() && !e.altKey && !e.ctrlKey && !e.metaKey && textInput.onKey(e)) { e.preventDefault(); return; }
+  if (textInput && textInput === topLayer() && !e.altKey && !e.ctrlKey && !e.metaKey) {
+    if (e.key === 'Shift') return; // Umschalt für Großbuchstaben, nicht als Zurück-Taste
+    if (textInput.onKey(e)) { e.preventDefault(); return; }
+  }
   if (e.code === 'KeyN' && e.altKey && devOn) { noclip = !noclip; return; } // Entwickler: Alt+N = durch Wände laufen
   if (e.code === 'KeyT' && e.altKey) { timeMode = OPTS.time = (timeMode + 1) % TIMES.length; saveOpts(); popup = { text: 'ZEIT: ' + TIMES[timeMode].toUpperCase(), t: 90 }; return; } // Alt+T = Tageszeit
   const k = KEYMAP[e.code]; if (!k) return;
@@ -2209,7 +2212,7 @@ class OptionsScreen {
     });
     box(2, 146, 252, 44);
     const key = this.rows[this.sel][0];
-    const info = { gfx: ['Alle Effekte: Wolken, Flugsaurier, Vignette.', 'Fast alle Effekte, schont den Akku.', 'Ohne Wetter und Effekte, für ältere Handys.'][OPTS.gfx], time: OPTS.time ? 'Feste Tageszeit für die ganze Welt.' : 'Tageszeit nach deiner echten Uhrzeit.', text: 'So schnell erscheinen die Texte.', code: 'Spielstand auf Handy oder PC mitnehmen.', konto: account ? account.email : 'Anmelden: Spielstände auf allen Geräten.', dev: devOn ? 'A: Entwicklermodus ausschalten.' : 'A: Passwort eingeben.', back: 'Einstellungen werden automatisch gespeichert.' }[key];
+    const info = { gfx: ['Alle Effekte: Wolken, Flugsaurier, Vignette.', 'Fast alle Effekte, schont den Akku.', 'Ohne Wetter und Effekte, für ältere Handys.'][OPTS.gfx], time: OPTS.time ? 'Feste Tageszeit für die ganze Welt.' : 'Tageszeit nach deiner echten Uhrzeit.', text: 'So schnell erscheinen die Texte.', code: 'Spielstand auf Handy oder PC mitnehmen.', konto: account ? `Angemeldet als ${accName()}` : 'Anmelden: Spielstände auf allen Geräten.', dev: devOn ? 'A: Entwicklermodus ausschalten.' : 'A: Passwort eingeben.', back: 'Einstellungen werden automatisch gespeichert.' }[key];
     text(info, 12, 150); text('Links/Rechts: ändern   B: zurück', 12, 166, '#7888a0', null);
   }
 }
@@ -2528,10 +2531,11 @@ class Title {
     textOutline('WESENWELT', 14, 10, '#f8e8b0', '#3a1a10', 40);
     textOutline('URZEIT-EDITION', 18, 50, '#f8a030', '#3a1a10', 16);
     ctx.fillStyle = '#1a1014'; ctx.fillRect(-OX, 152, RW, 40 + OY);
-    if (!document.body.classList.contains('touch')) { const hlp = 'Pfeile laufen · Z = A · X = B · Enter = Menü'; text(hlp, 128 - measure(hlp) / 2, 175, '#8a7460', null); }
+    const pc = !document.body.classList.contains('touch');
+    if (pc) ['Pfeile: laufen · Leertaste: OK', 'Umschalt: zurück/rennen · Enter: Menü'].forEach((h, k) => text(h, 128 - measure(h) / 2, 165 + k * 12, '#8a7460', null));
     const vl = versionLabel(); if (vl) text(vl, VW - 6 - measure(vl), document.body.classList.contains('touch') ? 175 : 140, '#8a7460', null);
     const cr = '© LordGrim96 · CC BY-NC-ND'; text(cr, VW - 6 - measure(cr), -2, '#7a3220', null);
-    if ((tick >> 5) & 1) text('START DRÜCKEN', 128 - measure('START DRÜCKEN') / 2, 158, '#f8e8b0', '#3a1a10');
+    if ((tick >> 5) & 1) { const st = pc ? 'LEERTASTE DRÜCKEN' : 'START DRÜCKEN'; text(st, 128 - measure(st) / 2, pc ? 150 : 158, '#f8e8b0', '#3a1a10'); }
   }
 }
 
@@ -2642,14 +2646,14 @@ const DEV_INFO = {
   'TEAM +5 LEVEL': 'Alle Team-Wesen steigen 5 Level auf.', 'TEAM HEILEN': 'KP, AP und Status voll.',
   'ITEMS & TALER': 'Von jedem Item 10 Stück und 10000 Taler.', 'URDEX FÜLLEN': 'Alle Wesen als gesehen und gefangen.',
   'DATENBANK': 'Alle Wesen mit Bild und Text ansehen.', 'TAGESZEIT': 'Tageszeit wechseln (auch Alt+T).',
-  'SPIELSTAND-CODE': 'Spielstand als Code für ein anderes Gerät.', 'SPERREN': 'Entwicklermodus auf diesem Gerät ausschalten.',
+  'SPIELSTAND-CODE': 'Spielstand als Code für ein anderes Gerät.', 'SPIELER': 'Konten verwalten: Passwort, Rechte, löschen.', 'SPERREN': 'Entwicklermodus auf diesem Gerät ausschalten.',
 };
 async function devMenu() {
   let sel = 0;
   for (;;) {
     const rows = [['SCHNELLREISE'], ['DURCH WÄNDE', noclip ? 'AN' : 'AUS'], ['KOORDINATEN', devCoords ? 'AN' : 'AUS'], ['WILDE WESEN', CONFIG.encounters ? 'AN' : 'AUS'],
       ['ORDEN', `${state.badges.filter(Boolean).length}/16`], ['WESEN HOLEN'], ['TEAM +5 LEVEL'], ['TEAM HEILEN'], ['ITEMS & TALER', String(state.money)], ['URDEX FÜLLEN'],
-      ['DATENBANK'], ['TAGESZEIT', TIMES[timeMode].toUpperCase()], ['SPIELSTAND-CODE'], ['SPERREN']];
+      ['DATENBANK'], ['TAGESZEIT', TIMES[timeMode].toUpperCase()], ['SPIELSTAND-CODE'], ...(account && account.admin ? [['SPIELER', 'ADMIN']] : []), ['SPERREN']];
     sel = await openScreen(new ListScreen('ENTWICKLER', rows, sel, i => DEV_INFO[rows[i][0]]));
     if (sel < 0) return;
     const it = rows[sel][0];
@@ -2681,6 +2685,7 @@ async function devMenu() {
     if (it === 'DATENBANK') await openScreen(new DexScreen(true));
     if (it === 'TAGESZEIT') { timeMode = OPTS.time = (timeMode + 1) % TIMES.length; saveOpts(); }
     if (it === 'SPIELSTAND-CODE') await exportCode();
+    if (it === 'SPIELER') await adminPlayers();
     if (it === 'SPERREN') { if (await ask('Entwicklermodus ausschalten?', ['JA', 'NEIN'], 1) === 0) { devLock(); closeMenus(); return; } }
   }
 }
@@ -2759,7 +2764,8 @@ async function importCode(slot) {
 const ACC_KEY = 'wesenwelt.account', GUEST_KEY = 'wesenwelt.guest';
 let account = null;
 try { account = JSON.parse(localStorage.getItem(ACC_KEY) || 'null'); } catch (e) {}
-if (account && account.dev) devOn = true;
+if (account && (account.dev || account.admin)) devOn = true;
+const accName = () => account ? account.name || account.email || '' : '';
 const accountsReady = () => !!CONFIG.api;
 function storeAccount() { try { if (account) localStorage.setItem(ACC_KEY, JSON.stringify(account)); else localStorage.removeItem(ACC_KEY); } catch (e) {} }
 function setGuest(on) { try { if (on) localStorage.setItem(GUEST_KEY, '1'); else localStorage.removeItem(GUEST_KEY); } catch (e) {} }
@@ -2779,6 +2785,7 @@ const newGid = () => Date.now().toString(36) + Math.random().toString(36).slice(
 async function syncSaves() {
   // Pro Platz gewinnt der neuere Stand. Liegt dort ein anderes Spiel, wandert das ältere auf einen freien Platz.
   if (!account) return;
+  try { const me = await api('/api/me'); Object.assign(account, me.user); storeAccount(); if (account.dev || account.admin) devOn = true; } catch (e) { if (!account) throw e; }
   const { saves } = await api('/api/saves');
   const remote = i => { const r = saves.find(s => s.slot === i); try { return r ? JSON.parse(r.data) : null; } catch (e) { return null; } };
   const free = () => [...Array(PROFILE_COUNT).keys()].find(k => !loadSlot(k) && !remote(k));
@@ -2803,7 +2810,7 @@ function cloudPush(slot) {
   clearTimeout(pushTimer);
   pushTimer = setTimeout(() => { const d = loadSlot(slot); if (d) api(`/api/saves/${slot}`, 'PUT', d).catch(() => {}); }, 1200);
 }
-// Echte Eingabefelder für E-Mail und Passwort, damit Handy-Tastatur und Passwort-Manager funktionieren
+// Echte Eingabefelder für Name und Passwort, damit Handy-Tastatur und Passwort-Manager funktionieren
 function formModal({ title, hint, fields, ok, onSubmit }) {
   return new Promise(res => {
     domModal = true; for (const k in held) held[k] = false;
@@ -2814,6 +2821,7 @@ function formModal({ title, hint, fields, ok, onSubmit }) {
     const inputs = fields.map(f => {
       const l = document.createElement('label'); l.style.cssText = 'display:block;margin:8px 0 2px'; l.textContent = f.label;
       const i = document.createElement('input'); i.type = f.type; i.name = f.name; i.autocomplete = f.auto || 'off'; i.required = true;
+      i.autocapitalize = 'off'; i.spellcheck = false; if (f.max) i.maxLength = f.max;
       i.style.cssText = 'width:100%;box-sizing:border-box;font:18px ui-monospace,monospace;padding:8px;border:2px solid #a89878;border-radius:6px;background:#fff;color:#2a221c';
       box.append(l, i); return i;
     });
@@ -2838,18 +2846,18 @@ function formModal({ title, hint, fields, ok, onSubmit }) {
 async function accountLogin(register) {
   const done = await formModal({
     title: register ? 'Neues Konto' : 'Anmelden',
-    hint: register ? 'Mit einem Konto sind deine Spielstände auf Handy und PC gleich. Das Passwort braucht mindestens 8 Zeichen.' : 'Melde dich mit deinem Wesenwelt-Konto an.',
-    fields: [{ name: 'email', label: 'E-Mail', type: 'email', auto: 'email' }, { name: 'password', label: 'Passwort', type: 'password', auto: register ? 'new-password' : 'current-password' }],
+    hint: register ? 'Mit einem Konto sind deine Spielstände auf Handy und PC gleich. Name: 3 bis 20 Zeichen (Buchstaben, Zahlen, _ oder -). Passwort: mindestens 8 Zeichen.' : 'Melde dich mit deinem Benutzernamen an.',
+    fields: [{ name: 'name', label: 'Benutzername', type: 'text', auto: 'username', max: 254 }, { name: 'password', label: 'Passwort', type: 'password', auto: register ? 'new-password' : 'current-password' }],
     ok: register ? 'ERSTELLEN' : 'ANMELDEN',
     onSubmit: async v => {
-      const d = await api(register ? '/api/register' : '/api/login', 'POST', { email: v.email, password: v.password });
-      account = { token: d.token, ...d.user }; storeAccount(); if (account.dev) devOn = true;
+      const d = await api(register ? '/api/register' : '/api/login', 'POST', { name: v.name, password: v.password });
+      account = { token: d.token, ...d.user }; storeAccount(); if (account.dev || account.admin) devOn = true;
       return null;
     },
   });
   if (!done) return false;
   setGuest(false);
-  let msg = register ? 'Dein Konto ist bereit! Deine Spielstände werden ab jetzt in der Cloud gesichert.' : 'Du bist angemeldet. Deine Spielstände sind jetzt auf allen Geräten gleich.';
+  let msg = account.admin ? `Willkommen, Admin ${accName()}! Spielerverwaltung findest du im Menü unter ENTWICKLER.` : register ? 'Dein Konto ist bereit! Deine Spielstände werden ab jetzt in der Cloud gesichert.' : 'Du bist angemeldet. Deine Spielstände sind jetzt auf allen Geräten gleich.';
   try { await syncSaves(); } catch (e) { msg += ' (Abgleich später: ' + e.message + ')'; }
   await say(msg);
   return true;
@@ -2866,7 +2874,7 @@ async function accountMenu() {
     if (c < 2) await accountLogin(c === 1);
     return;
   }
-  const c = await ask(`Angemeldet: ${account.email}`, ['ABGLEICHEN', 'ABMELDEN', 'KONTO LÖSCHEN', 'ZURÜCK'], 3);
+  const c = await ask(`Angemeldet als ${accName()}${account.admin ? ' (Admin)' : ''}`, ['ABGLEICHEN', 'PASSWORT ÄNDERN', 'ABMELDEN', 'KONTO LÖSCHEN', 'ZURÜCK'], 4);
   if (c === 0) {
     // Während des Spiels: erst schauen, ob ein anderes Gerät neuer ist, sonst den aktuellen Stand hochladen
     const before = mode === 'world' ? (loadSlot(currentSlot) || {}).savedAt || 0 : 0;
@@ -2878,12 +2886,40 @@ async function accountMenu() {
     if (mode === 'world') saveGame();
     await say('Deine Spielstände sind abgeglichen.');
   }
-  if (c === 1) { await accountLogout(); await say('Du bist abgemeldet. Deine Spielstände bleiben auf diesem Gerät.'); }
-  if (c === 2) {
+  if (c === 1) {
+    const ok = await formModal({ title: 'Passwort ändern', hint: 'Andere Geräte werden danach abgemeldet.', fields: [{ name: 'old', label: 'Altes Passwort', type: 'password', auto: 'current-password' }, { name: 'password', label: 'Neues Passwort (mindestens 8 Zeichen)', type: 'password', auto: 'new-password' }], ok: 'ÄNDERN',
+      onSubmit: async v => { await api('/api/password', 'POST', v); return null; } });
+    if (ok) await say('Dein Passwort wurde geändert.');
+  }
+  if (c === 2) { await accountLogout(); await say('Du bist abgemeldet. Deine Spielstände bleiben auf diesem Gerät.'); }
+  if (c === 3) {
     if (await ask('Konto und Cloud-Spielstände löschen?', ['LÖSCHEN', 'ABBRECHEN'], 1) !== 0) return;
     const gone = await formModal({ title: 'Konto löschen', hint: 'Zur Sicherheit bitte dein Passwort eingeben.', fields: [{ name: 'password', label: 'Passwort', type: 'password', auto: 'current-password' }], ok: 'LÖSCHEN',
       onSubmit: async v => { await api('/api/me', 'DELETE', { password: v.password }); return null; } });
     if (gone) { account = null; storeAccount(); await say('Dein Konto wurde gelöscht. Auf diesem Gerät bleibt alles erhalten.'); }
+  }
+}
+// Spielerverwaltung für Admins: Passwort zurücksetzen (es gibt keine E-Mail), Entwicklerrechte, löschen
+async function adminPlayers() {
+  let sel = 0;
+  for (;;) {
+    let users; try { users = (await api('/api/admin/users')).users; } catch (e) { await say(e.message); return; }
+    const day = t => { const d = new Date(t); return `${d.getDate()}.${d.getMonth() + 1}.${String(d.getFullYear()).slice(2)}`; };
+    const tag = u => u.admin ? 'ADMIN' : u.dev ? 'ENTW.' : u.last_save ? day(u.last_save) : 'neu';
+    sel = await openScreen(new ListScreen('SPIELER', users.map(u => [u.name, tag(u)]), sel, i => `Seit ${day(users[i].created_at)} · ${users[i].saves} Spielstände`));
+    if (sel < 0) return;
+    const u = users[sel];
+    if (u.admin) { await say('Admins kann man hier nicht ändern. Dein Passwort änderst du unter OPTIONEN → KONTO.'); continue; }
+    const c = await ask(`Spieler ${u.name}`, ['NEUES PASSWORT', u.dev ? 'ENTW. WEGNEHMEN' : 'ENTW. GEBEN', 'LÖSCHEN', 'ZURÜCK'], 3);
+    try {
+      if (c === 0 && await ask(`${u.name} ein neues Passwort geben?`, ['JA', 'NEIN'], 1) === 0) {
+        const d = await api(`/api/admin/users/${u.id}/reset`, 'POST');
+        await say(`Neues Passwort für ${d.name}: ${d.password}`);
+        await say('Schreib es dir auf und gib es dem Spieler. Er kann es danach unter OPTIONEN → KONTO ändern.');
+      }
+      if (c === 1) { await api(`/api/admin/users/${u.id}/dev`, 'POST', { dev: !u.dev }); await say(u.dev ? `${u.name} hat keine Entwicklerrechte mehr.` : `${u.name} hat jetzt Entwicklerrechte.`); }
+      if (c === 2 && await ask(`${u.name} mit allen Spielständen löschen?`, ['LÖSCHEN', 'ABBRECHEN'], 1) === 0) { await api(`/api/admin/users/${u.id}`, 'DELETE'); await say(`${u.name} wurde gelöscht.`); sel = 0; }
+    } catch (e) { await say(e.message); }
   }
 }
 async function accountIntro() {

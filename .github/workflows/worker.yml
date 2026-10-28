@@ -44,9 +44,9 @@ jobs:
           if [ -z "$ID" ]; then npx wrangler d1 create wesenwelt --location weur; ID="$(find_id)"; fi
           test -n "$ID"
           sed -i "s/__D1_ID__/$ID/" wrangler.toml
-      - name: Tabellen anlegen
+      - name: Datenbank aktualisieren (neue Änderungen aus worker/migrations)
         if: steps.check.outputs.skip != '1'
-        run: npx wrangler d1 execute wesenwelt --remote --file schema.sql
+        run: npx wrangler d1 migrations apply wesenwelt --remote
       - name: Server hochladen
         if: steps.check.outputs.skip != '1'
         run: |

@@ -9,3 +9,4 @@ binding = "DB"
 database_name = "wesenwelt"
 # Wird beim Veröffentlichen automatisch durch die echte Datenbank-ID ersetzt
 database_id = "__D1_ID__"
+migrations_dir = "migrations"
