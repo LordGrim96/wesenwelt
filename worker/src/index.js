@@ -72,7 +72,7 @@ async function handle(req, env) {
   const db = env.DB, url = new URL(req.url), path = url.pathname.replace(/\/+$/, ''), method = req.method;
   const ip = req.headers.get('cf-connecting-ip') || 'lokal';
   if (method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
-  if (path === '' || path === '/api') return json({ ok: true, name: 'Wesenwelt-Server' });
+  if (path === '' || path === '/api') return json({ ok: true, name: 'Wesenwelt-Server', version: 1 });
 
   if (path === '/api/register' && method === 'POST') {
     if (!await allow(db, 'reg:' + ip, 10, 3600e3)) return fail(429, 'Zu viele neue Konten. Bitte später noch einmal versuchen.');
