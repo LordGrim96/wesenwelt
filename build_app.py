@@ -21,6 +21,10 @@ src = re.sub(r'<title>.*?</title>\s*<meta name="claude:viewport-fit-sides"[^>]*>
 # Versionsnummer ins Spiel schreiben (steht auf dem Titelbild und wird mit dem Offline-Speicher verglichen)
 src, n = re.subn(r"const GAME_VERSION = '[^']*';", f"const GAME_VERSION = '{VERSION}';", src, count=1)
 assert n == 1, "GAME_VERSION nicht gefunden"
+# Konto-Server nur in der echten App (in der Vorschau bleibt das Spiel reines Gast-Spiel)
+API = os.environ.get("WW_API", "https://wesenwelt-api.edengrim67.workers.dev")
+src, n = re.subn(r"  api: '',", f"  api: '{API}',", src, count=1)
+assert n == 1, "CONFIG.api nicht gefunden"
 
 head = """<!doctype html>
 <html lang="de">
