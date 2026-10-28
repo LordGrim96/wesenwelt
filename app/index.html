@@ -99,7 +99,7 @@ const CONFIG = {
   // Adresse des Konto-Servers (worker/). Leer = nur Gast-Spielstände auf dem Gerät
   api: 'https://wesenwelt-api.edengrim67.workers.dev',
 };
-const GAME_VERSION = '202610281428'; // wird von build_app.py durch die Build-Zeit ersetzt
+const GAME_VERSION = '202610281445'; // wird von build_app.py durch die Build-Zeit ersetzt
 
 // Logische Bildgröße passt sich dem Bildschirm an (mindestens 256x192); SC = interne Auflösung für scharfe Schrift
 let VW = 256, VH = 192, OX = 0, OY = 0, RW = 256, RH = 192;
@@ -193,8 +193,11 @@ const T = {
   LAB_FLOOR: 37, LAB_WALL: 38, LAB_MACHINE: 39, LAB_TANK: 40, LAB_BENCH: 41, CAPSULE_TABLE: 42,
   CLIFF_TOP: 43, CLIFF: 44, CAVE_DOOR: 45, CAVE_WINDOW: 46, CAMPFIRE: 47,
   STAIRS: 48, ROOF_THATCH: 49, ROOF_SLATE: 50, ROOF_HIDE: 51, WALL_STONE: 52, WINDOW_STONE: 53, DOOR_STONE: 54,
+  CFLOOR: 55, CCOUNTER: 56, CWALL: 57, FOS0: 58, FOS1: 59, FOS2: 60, FOS3: 61, FOS4: 62, FOS5: 63, CSOFA: 64, CPLANT: 65, CPC: 66,
+  FLOOR_STONE: 67, FLOOR_STRAW: 68, FLOOR_FUR: 69, FLOOR_DIRT: 70, IWALL_STONE: 71, IWALL_HUT: 72, IWALL_TENT: 73, IWALL_CAVE: 74,
+  BED: 75, HEARTH: 76, POTS: 77, RUG: 78, FOSDISP: 79, BARREL: 80, GF0: 81, GD0: 97,
 };
-const TREE_Q = 60, NT = 64;
+const TREE_Q = 124, NT = 128;
 const SOLID = new Set([T.TREE, T.WATER, T.ROOF, T.WALL, T.WINDOW, T.SIGN, T.FENCE, T.IWALL, T.COUNTER,
   T.SHELF, T.TABLE, T.PLANT, T.ROOF_GYM, T.ROOF_CENTER, T.ROOF_SHOP, T.ROCK, T.PC, T.STATUE, T.VOID,
   T.WALL_CENTER, T.WALL_SHOP, T.WALL_GYM, T.FERN, T.BONES, T.TORCH,
@@ -365,16 +368,16 @@ const TILE_ART = {
   },
   [T.FLOOR]: P => floorWood(P),
   [T.IWALL]: P => { P.r(0, 0, 16, 16, '#f0e0c0'); for (let y = 0; y < 10; y++) for (let x = 0; x < 16; x++) if (hash(x, y, 21) < 0.06) P.p(x, y, '#e0ccaa'); P.r(0, 10, 16, 6, '#a87448'); P.r(0, 10, 16, 1, '#5a3820'); P.r(0, 11, 16, 1, '#c8956a'); P.r(0, 15, 16, 1, '#5a3820'); for (let x = 3; x < 16; x += 6) P.r(x, 12, 1, 3, '#7a4e30'); },
-  [T.COUNTER]: P => { floorWood(P); P.r(0, 2, 16, 6, '#f0ece0'); P.r(0, 2, 16, 1, '#5a5048'); P.r(0, 8, 16, 7, '#c05040'); P.r(0, 8, 16, 1, '#7a2c22'); P.r(0, 15, 16, 1, '#4a1c16'); P.r(0, 3, 16, 1, '#ffffff'); },
-  [T.MAT]: P => { floorWood(P); P.r(1, 3, 14, 11, '#a03a2a'); P.r(2, 4, 12, 9, '#d05a3a'); P.r(3, 5, 10, 7, '#e8b040'); P.r(4, 6, 8, 5, '#d05a3a'); },
+  [T.COUNTER]: P => { P.r(0, 2, 16, 6, '#f0ece0'); P.r(0, 2, 16, 1, '#5a5048'); P.r(0, 8, 16, 7, '#c05040'); P.r(0, 8, 16, 1, '#7a2c22'); P.r(0, 15, 16, 1, '#4a1c16'); P.r(0, 3, 16, 1, '#ffffff'); },
+  [T.MAT]: P => { P.r(1, 3, 14, 11, '#a03a2a'); P.r(2, 4, 12, 9, '#d05a3a'); P.r(3, 5, 10, 7, '#e8b040'); P.r(4, 6, 8, 5, '#d05a3a'); },
   [T.SHELF]: P => {
     P.r(0, 0, 16, 16, '#7a4e2c'); P.r(1, 1, 14, 14, '#5a3820');
     for (const y of [5, 10]) P.r(1, y, 14, 1, '#a87448');
     const items = ['#78b8d8', '#e8e0c8', '#d0a040', '#a05aa0', '#68b060'];
     for (const y of [1, 6, 11]) for (let x = 2; x < 14; x += 3) P.r(x, y + 1, 2, 3, items[(x + y) % items.length]);
   },
-  [T.TABLE]: P => { floorWood(P); P.r(1, 2, 14, 10, '#6a4428'); P.r(2, 3, 12, 7, '#c89060'); P.r(2, 3, 12, 1, '#e0b080'); P.r(2, 12, 2, 3, '#6a4428'); P.r(12, 12, 2, 3, '#6a4428'); },
-  [T.PLANT]: P => { floorWood(P); P.r(5, 11, 6, 5, '#7a3a20'); P.r(6, 11, 4, 4, '#c06038'); blob(P, 8, 6.5, a => 4.5 + 1.6 * Math.abs(Math.sin(a * 3)), ['#1c4426', '#2a6634', '#3e8a42', '#68b25a']); },
+  [T.TABLE]: P => { P.r(1, 2, 14, 10, '#6a4428'); P.r(2, 3, 12, 7, '#c89060'); P.r(2, 3, 12, 1, '#e0b080'); P.r(2, 12, 2, 3, '#6a4428'); P.r(12, 12, 2, 3, '#6a4428'); },
+  [T.PLANT]: P => { P.r(5, 11, 6, 5, '#7a3a20'); P.r(6, 11, 4, 4, '#c06038'); blob(P, 8, 6.5, a => 4.5 + 1.6 * Math.abs(Math.sin(a * 3)), ['#1c4426', '#2a6634', '#3e8a42', '#68b25a']); },
   [T.GYMFLOOR]: P => { P.r(0, 0, 16, 16, '#c8c0b0'); P.r(0, 0, 16, 1, '#e4dccc'); P.r(0, 0, 1, 16, '#e4dccc'); P.r(0, 15, 16, 1, '#8a8274'); P.r(15, 0, 1, 16, '#8a8274'); P.r(7, 7, 2, 2, '#a8a090'); },
   [T.PC]: P => { P.r(0, 0, 16, 16, '#f0e0c0'); P.r(1, 2, 14, 13, '#3a4048'); P.r(2, 3, 12, 8, '#58c8f0'); P.r(3, 4, 6, 1, '#d0f4ff'); P.r(3, 6, 4, 1, '#d0f4ff'); P.r(3, 12, 10, 2, '#606870'); P.p(12, 12, '#48e070'); },
   [T.STATUE]: P => {
@@ -486,6 +489,122 @@ const TILE_ART = {
   },
 };
 
+/* --- Innenräume: modernes Center, Wohnungen je Bauweise, Arenen je Typ --- */
+// Gegenstände (OBJ) haben einen durchsichtigen Hintergrund und liegen auf dem Boden des Raums (m.floor)
+const GYM_TYPES = ['PFLANZE', 'GESTEIN', 'WASSER', 'ELEKTRO', 'GEIST', 'FEUER', 'FLUG', 'STAHL', 'NORMAL', 'EIS', 'GIFT', 'KAMPF', 'PSYCHO', 'KÄFER', 'BODEN', 'DRACHE'];
+const gymFloor = type => T.GF0 + GYM_TYPES.indexOf(type), gymDecor = type => T.GD0 + GYM_TYPES.indexOf(type);
+function noisy(P, base, cols, seed, p = 0.08) { P.r(0, 0, 16, 16, base); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const h = hash(x, y, seed); if (h < p) P.p(x, y, cols[0]); else if (h > 1 - p) P.p(x, y, cols[1]); } }
+function dot(P, cx, cy, r, col) { for (let y = Math.floor(cy - r); y <= cy + r; y++) for (let x = Math.floor(cx - r); x <= cx + r; x++) if ((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 <= r * r) P.p(x, y, col); }
+const GYM_FLOOR_ART = {
+  PFLANZE: (P, f) => { noisy(P, '#4f8a3c', ['#3e7230', '#6aa850'], 101, 0.12); for (const [x, y] of [[3, 4], [11, 11], [12, 3]]) { P.p(x, y, '#8ac868'); P.p(x + 1, y - 1, '#a6e07c'); P.p(x + 2, y, '#8ac868'); } },
+  GESTEIN: P => { P.r(0, 0, 16, 16, '#6e665c'); [[0, 0, 9, 7], [9, 0, 7, 7], [0, 7, 6, 9], [6, 7, 10, 9]].forEach(([x, y, w, h], i) => { P.r(x + 1, y + 1, w - 1, h - 1, ['#a89e8e', '#9a9080', '#b2a898', '#a09686'][i]); P.r(x + 1, y + 1, w - 1, 1, '#c8bea8'); }); },
+  WASSER: P => { P.r(0, 0, 16, 16, '#d8eef8'); P.r(0, 7, 16, 1, '#a8d0e8'); P.r(7, 0, 1, 16, '#a8d0e8'); P.r(0, 15, 16, 1, '#a8d0e8'); P.r(15, 0, 1, 16, '#a8d0e8'); P.r(2, 2, 3, 1, '#ffffff'); P.r(10, 10, 3, 1, '#ffffff'); },
+  ELEKTRO: (P, f) => { P.r(0, 0, 16, 16, '#3a4048'); for (let y = 1; y < 16; y += 3) P.r(1, y, 14, 1, '#2a2e34'); P.r(0, 0, 16, 1, '#5a626c'); P.r(0, 15, 16, 1, '#e8c020'); if (f % 2) P.r(4 + f * 2, 15, 3, 1, '#fff6a0'); },
+  GEIST: P => { P.r(0, 0, 16, 16, '#3c3048'); for (let y = 0; y < 16; y += 4) { P.r(0, y + 3, 16, 1, '#281e34'); P.p((y * 5) % 16, y + 1, '#4e4060'); } P.r(0, 0, 16, 1, '#4e4060'); },
+  FEUER: (P, f) => { noisy(P, '#3a2a26', ['#2a1e1a', '#4a3832'], 103); const glow = ['#e04818', '#f87828', '#f8a838', '#f87828'][f]; [[2, 3], [3, 4], [4, 4], [5, 5], [10, 9], [11, 10], [12, 10], [12, 11], [7, 13], [8, 13]].forEach(([x, y]) => P.p(x, y, glow)); },
+  FLUG: P => { P.r(0, 0, 16, 16, '#bcd8f4'); for (const [x, y, r] of [[4, 5, 2.5], [6.5, 4.5, 2], [12, 12, 2.5], [10, 12.5, 1.8]]) dot(P, x, y, r, '#eef6ff'); },
+  STAHL: P => { P.r(0, 0, 16, 16, '#9aa2ae'); P.r(0, 0, 16, 1, '#c4ccd6'); P.r(0, 0, 1, 16, '#c4ccd6'); P.r(0, 15, 16, 1, '#6a727e'); P.r(15, 0, 1, 16, '#6a727e'); for (const [x, y] of [[2, 2], [13, 2], [2, 13], [13, 13]]) { P.p(x, y, '#e8eef4'); P.p(x + 1, y + 1, '#5a626c'); } },
+  NORMAL: P => { P.r(0, 0, 16, 16, '#efe8da'); P.r(0, 15, 16, 1, '#d8ccb4'); P.r(15, 0, 1, 16, '#d8ccb4'); P.r(7, 7, 2, 2, '#e0d6c2'); },
+  EIS: P => { P.r(0, 0, 16, 16, '#c8ecf8'); for (let i = 0; i < 6; i++) P.p(3 + i, 10 - i, '#f4fcff'); for (let i = 0; i < 4; i++) P.p(10 + i, 14 - i, '#f4fcff'); P.r(0, 15, 16, 1, '#a0d4ec'); P.r(15, 0, 1, 16, '#a0d4ec'); },
+  GIFT: (P, f) => { P.r(0, 0, 16, 16, '#5a3c68'); P.r(0, 7, 16, 1, '#3e2848'); P.r(7, 0, 1, 16, '#3e2848'); dot(P, 11, 4, 2, '#78c840'); dot(P, 4, 11, 1.5 + (f % 2) * 0.5, '#78c840'); P.p(10, 3, '#b8f080'); },
+  KAMPF: P => { P.r(0, 0, 16, 16, '#c8b070'); P.r(0, 0, 16, 1, '#5a4a28'); P.r(0, 0, 1, 16, '#5a4a28'); for (let y = 2; y < 16; y += 2) P.r(1, y, 15, 1, '#b89c5c'); P.r(1, 1, 15, 1, '#e0cc90'); },
+  PSYCHO: P => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) P.p(x, y, ((x >> 3) + (y >> 3)) % 2 ? '#e8b8e0' : '#c890d8'); P.p(3, 3, '#ffffff'); P.p(11, 11, '#ffffff'); },
+  'KÄFER': P => { noisy(P, '#5a6a2c', ['#4a5824', '#7a8a3c'], 105, 0.1); for (const [x, y, c] of [[4, 4, '#a85a28'], [11, 10, '#c8a040'], [9, 3, '#7a8a3c']]) { P.p(x, y, c); P.p(x + 1, y, c); P.p(x, y + 1, c); } },
+  BODEN: P => { noisy(P, '#d8b06a', ['#c09858', '#ecc888'], 106, 0.1); for (let x = 0; x < 16; x++) P.p(x, 5 + Math.round(Math.sin(x * 0.7)), '#c49a58'); },
+  DRACHE: P => { P.r(0, 0, 16, 16, '#3c3058'); for (let y = 0; y < 16; y += 4) for (let x = (y % 8 ? 0 : 4); x < 16; x += 8) { for (let k = 0; k < 7; k++) P.p(x + k, y + 3 - Math.round(Math.sin(k / 6 * Math.PI) * 2), '#5a4a84'); } },
+};
+const GYM_DECOR_ART = {
+  // Farnbusch im Steintopf
+  PFLANZE: P => { P.r(4, 11, 8, 5, '#6a5a48'); P.r(5, 11, 6, 1, '#9a8a70'); blob(P, 8, 7, a => 5 + 1.6 * Math.abs(Math.sin(a * 3.5)), ['#1c4426', '#2a6634', '#3e8a42', '#68b25a']); },
+  // Felsbrocken mit Ammoniten-Fossil
+  GESTEIN: P => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = Math.hypot((x + 0.5 - 8) / 7, (y + 0.5 - 9) / 6.5); if (d < 1) P.p(x, y, d > 0.86 ? '#3e3a32' : x + y < 13 ? '#c8c0b0' : '#9a9284'); } for (let a = 0; a < 12; a++) P.p(8 + Math.round(Math.cos(a) * a / 4), 9 + Math.round(Math.sin(a) * a / 4), '#6a6256'); },
+  // Wasserbecken mit Steinrand
+  WASSER: (P, f) => { P.r(0, 1, 16, 15, '#6a7a8a'); P.r(1, 2, 14, 13, '#3a78c8'); for (let x = 1; x < 15; x++) if ((x + f * 2) % 6 < 2) P.p(x, 4 + ((x >> 2) % 3) * 3, '#88c0f0'); P.r(1, 2, 14, 1, '#2a5898'); },
+  // Hochspannungsspule mit Funken
+  ELEKTRO: (P, f) => { P.r(5, 13, 6, 3, '#4a505a'); P.r(7, 4, 2, 9, '#c8902a'); for (let y = 5; y < 13; y += 2) P.r(6, y, 4, 1, '#e8b040'); dot(P, 8, 3, 2.5, '#d8dee6'); P.p(7, 2, '#ffffff'); if (f % 2) { P.p(11, 2, '#fff6a0'); P.p(12, 1, '#f8e040'); P.p(4, 3, '#f8e040'); P.p(3, 2, '#fff6a0'); } },
+  // Grabstein mit Irrlicht
+  GEIST: (P, f) => { P.r(4, 6, 8, 10, '#7a7488'); P.r(5, 5, 6, 1, '#7a7488'); P.r(5, 6, 6, 1, '#9a94a8'); P.r(6, 9, 4, 1, '#5a546a'); P.r(7, 8, 2, 4, '#5a546a'); dot(P, 12, 3 - (f % 2), 1.6, '#a888f0'); P.p(12, 2 - (f % 2), '#e8e0ff'); },
+  // Feuerschale aus Stein
+  FEUER: (P, f) => { P.r(3, 10, 10, 3, '#5a4e48'); P.r(4, 13, 8, 2, '#3e342e'); P.r(3, 10, 10, 1, '#8a7a70'); const fl = [['..o..o..', '.oyo.oo.', 'oyyyoyyo', 'oyYyyYyo'], ['.o..o...', '.oo.oyo.', 'oyyoyyyo', 'oyYyyYyo'], ['...o..o.', '.oyo.oo.', 'oyyyyyyo', 'oyYyyYyo'], ['.o...o..', 'oyo.oyo.', 'oyyyoyyo', 'oyYyyYyo']][f]; pat(P, fl, { o: '#f06820', y: '#f8b030', Y: '#fff0a0' }, 4, 6); },
+  // Säule mit Flügel-Zierde
+  FLUG: P => { P.r(5, 2, 6, 14, '#e8ecf2'); P.r(5, 2, 1, 14, '#ffffff'); P.r(10, 2, 1, 14, '#b8c2d0'); P.r(4, 1, 8, 2, '#c8d2e0'); for (let i = 0; i < 4; i++) { P.p(4 - i, 6 + i, '#a890f0'); P.p(11 + i, 6 + i, '#a890f0'); } },
+  // Stahlkiste mit Nieten
+  STAHL: P => { P.r(2, 4, 12, 12, '#7a828e'); P.r(3, 5, 10, 10, '#a8b0bc'); P.r(3, 5, 10, 1, '#d0d8e2'); P.r(7, 5, 2, 10, '#7a828e'); for (const [x, y] of [[4, 6], [11, 6], [4, 13], [11, 13]]) P.p(x, y, '#e8eef4'); },
+  // Kreidesäule
+  NORMAL: P => { P.r(4, 3, 8, 13, '#f4efe4'); for (let x = 5; x < 12; x += 2) P.r(x, 4, 1, 11, '#ddd4c0'); P.r(3, 1, 10, 3, '#e4dccc'); P.r(3, 14, 10, 2, '#d4cab4'); },
+  // Eisblock
+  EIS: P => { P.r(2, 4, 12, 12, '#2e6a94'); P.r(3, 5, 10, 10, '#8ad0ee'); P.r(3, 10, 10, 5, '#6ab8e0'); P.r(3, 5, 10, 1, '#f4fcff'); for (let i = 0; i < 5; i++) P.p(4 + i, 12 - i, '#f4fcff'); },
+  // Giftfass, das blubbert
+  GIFT: (P, f) => { P.r(3, 6, 10, 10, '#5a4a3a'); for (const y of [8, 12]) P.r(3, y, 10, 1, '#3a2e24'); P.r(3, 5, 10, 2, '#78c840'); dot(P, 6 + f, 4, 1.4, '#a8f070'); dot(P, 10, 3 - (f % 2), 1, '#c8ff90'); },
+  // Sandsack am Gestell
+  KAMPF: P => { P.r(2, 0, 12, 2, '#5a3820'); P.r(7, 2, 2, 2, '#3a2a1a'); P.r(5, 4, 6, 10, '#b03828'); P.r(5, 4, 1, 10, '#d85848'); P.r(5, 7, 6, 1, '#e8d0a0'); P.r(5, 11, 6, 1, '#e8d0a0'); P.r(6, 14, 4, 1, '#802418'); },
+  // Kristallkugel auf Sockel
+  PSYCHO: (P, f) => { P.r(5, 12, 6, 4, '#6a4a7a'); P.r(4, 11, 8, 1, '#8a6a9a'); dot(P, 8, 7, 4.5, ['#d880e0', '#e898f0', '#f0b0f8', '#e898f0'][f]); dot(P, 6.5, 5.5, 1.3, '#ffffff'); },
+  // Riesenblatt mit Marienkäfer
+  'KÄFER': P => { for (let y = 1; y < 16; y++) { const w = Math.round(Math.sin(y / 15 * Math.PI) * 6); P.r(8 - w, y, w * 2, 1, y % 3 ? '#4a9a38' : '#5aae44'); } P.r(8, 1, 1, 15, '#2e6a24'); dot(P, 11, 6, 2, '#d83828'); P.p(11, 6, '#202020'); P.p(10, 5, '#202020'); },
+  // Sandsteinfelsen
+  BODEN: P => { P.r(3, 5, 10, 11, '#c08a50'); P.r(4, 3, 7, 2, '#c08a50'); P.r(4, 4, 6, 1, '#e0b070'); P.r(3, 9, 10, 1, '#a07040'); P.r(3, 13, 10, 1, '#a07040'); P.r(12, 5, 1, 11, '#8a5c34'); },
+  // Drachenkristall
+  DRACHE: (P, f) => { P.r(3, 14, 10, 2, '#2a2040'); for (const [x, h, w] of [[5, 11, 3], [8, 13, 3], [11, 8, 2]]) { P.r(x - 1, 15 - h, w, h, '#7048c8'); P.r(x - 1, 15 - h, 1, h, '#a890f0'); P.p(x, 14 - h, '#c8b8ff'); } if (f === 2) P.p(9, 4, '#ffffff'); },
+};
+// Fossil-Heilmaschine: 3x2 Kacheln, ein Skelett in einer Glasvitrine mit Leuchtband
+const FOSSIL_SKELETON = [
+  '....bbbb..........................',
+  '...bbbbbb.........................',
+  '..bb.bbbbb........................',
+  '..bbbbbbbbb.......................',
+  '...b.b.b.bbb..bbbbbbbbbbbb........',
+  '..........bbbbbbbbbbbbbbbbbbbb....',
+  '............b.b.b.b.b.b.b.b..bbbbb',
+  '...........bb.b.b.b.b.b.b.b......b',
+  '............b.b.b.b.b.b.b.b.......',
+  '.............b.b.b.b.b.b.b........',
+  '..............bbb.......bb........',
+  '..............b.b.......b.b.......',
+  '.............bb..b.....bb..b......',
+  '............bbb..bb...bbb..bb.....',
+];
+function fossilMachine(f) {
+  const c = document.createElement('canvas'); c.width = 48; c.height = 32;
+  const g = c.getContext('2d'), r = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+  r(0, 0, 48, 32, '#e8edf2'); r(0, 0, 48, 1, '#ffffff');
+  r(1, 1, 46, 26, '#4a5868'); r(3, 3, 42, 22, '#bfe6f2'); r(3, 3, 42, 6, '#d8f2fa');
+  r(3, 3 + ((f * 5) % 20), 42, 1, '#ecfaff');
+  FOSSIL_SKELETON.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] === 'b') { r(x + 7, y + 8, 1, 1, '#8a7e64'); } });
+  FOSSIL_SKELETON.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] === 'b' && (FOSSIL_SKELETON[y - 1] || '')[x] === 'b') r(x + 7, y + 8, 1, 1, '#f2ead6'); else if (row[x] === 'b') r(x + 7, y + 7, 1, 1, '#fffaf0'); });
+  r(0, 27, 48, 5, '#b8c2cc'); r(0, 27, 48, 1, '#8a96a2'); r(2, 29, 44, 1, '#f06a8a');
+  for (let i = 0; i < 6; i++) r(5 + i * 7, 28, 2, 2, (i + f) % 4 === 0 ? '#58f0a0' : '#2a8a58');
+  return c;
+}
+const ART2 = {
+  [T.CFLOOR]: P => { P.r(0, 0, 16, 16, '#f2f5f8'); P.r(0, 7, 16, 1, '#dde3ea'); P.r(7, 0, 1, 16, '#dde3ea'); P.r(0, 15, 16, 1, '#dde3ea'); P.r(15, 0, 1, 16, '#dde3ea'); P.p(7, 7, '#f4a8b8'); P.r(1, 1, 3, 1, '#ffffff'); },
+  [T.CWALL]: P => { P.r(0, 0, 16, 16, '#e8edf2'); P.r(0, 0, 16, 1, '#ffffff'); P.r(0, 1, 1, 8, '#d4dbe3'); P.r(8, 1, 1, 8, '#d4dbe3'); P.r(0, 9, 16, 2, '#f06a8a'); P.r(0, 9, 16, 1, '#f8a0b8'); P.r(0, 11, 16, 4, '#b8c2cc'); P.r(0, 11, 16, 1, '#8a96a2'); P.r(0, 15, 16, 1, '#5a6672'); },
+  [T.CCOUNTER]: P => { P.r(0, 2, 16, 5, '#ffffff'); P.r(0, 2, 16, 1, '#c8d0d8'); P.r(0, 7, 16, 8, '#f06a8a'); P.r(0, 7, 16, 1, '#c84868'); P.r(0, 10, 16, 1, '#ffd0dc'); P.r(0, 15, 16, 1, '#8a3048'); },
+  [T.CSOFA]: P => { P.r(1, 4, 14, 11, '#3a78c8'); P.r(2, 5, 12, 4, '#5a98e0'); P.r(1, 9, 14, 1, '#2a58a0'); P.r(1, 14, 14, 1, '#1e3e70'); P.r(2, 15, 2, 1, '#404850'); P.r(12, 15, 2, 1, '#404850'); },
+  [T.CPLANT]: P => { P.r(5, 11, 6, 5, '#e8edf2'); P.r(5, 11, 6, 1, '#ffffff'); P.r(5, 14, 6, 2, '#b8c2cc'); blob(P, 8, 6.5, a => 4.5 + 1.6 * Math.abs(Math.sin(a * 3)), ['#1c4426', '#2a6634', '#3e8a42', '#68b25a']); },
+  [T.CPC]: P => { P.r(1, 2, 14, 13, '#3a4048'); P.r(2, 3, 12, 8, '#58c8f0'); P.r(3, 4, 6, 1, '#d0f4ff'); P.r(3, 6, 4, 1, '#d0f4ff'); P.r(3, 12, 10, 2, '#606870'); P.p(12, 12, '#48e070'); },
+  [T.FLOOR_STONE]: P => { P.r(0, 0, 16, 16, '#8a8478'); [[0, 0, 8, 8], [8, 0, 8, 8], [0, 8, 8, 8], [8, 8, 8, 8]].forEach(([x, y, w, h], i) => { P.r(x + 1, y + 1, w - 1, h - 1, ['#b4ac9c', '#aaa292', '#a8a090', '#b8b0a0'][i]); P.r(x + 1, y + 1, w - 1, 1, '#ccc4b2'); }); },
+  [T.FLOOR_STRAW]: P => { noisy(P, '#c8a868', ['#a88848', '#e0c888'], 111, 0.14); for (let y = 2; y < 16; y += 5) for (let x = 0; x < 16; x += 3) P.p(x + (y % 2), y, '#9a7a3c'); },
+  [T.FLOOR_FUR]: P => { noisy(P, '#d8d0c4', ['#b8b0a4', '#f4eee6'], 112, 0.16); },
+  [T.FLOOR_DIRT]: P => { noisy(P, '#8a7058', ['#6e5844', '#a68a6e'], 113, 0.1); },
+  [T.IWALL_STONE]: P => { wallStone(P); P.r(0, 10, 16, 6, '#7a6a5a'); P.r(0, 10, 16, 1, '#4a3e32'); P.r(0, 15, 16, 1, '#3e342a'); },
+  [T.IWALL_HUT]: P => { P.r(0, 0, 16, 16, '#a88a58'); for (let y = 0; y < 16; y += 3) { P.r(0, y, 16, 1, '#8a6c40'); for (let x = (y % 2) * 2; x < 16; x += 4) P.r(x, y + 1, 2, 1, '#c8a870'); } P.r(0, 15, 16, 1, '#5a4428'); },
+  [T.IWALL_TENT]: P => { P.r(0, 0, 16, 16, '#c09468'); for (let x = 0; x < 16; x += 5) { P.r(x, 0, 1, 16, '#7a5634'); for (let y = 1; y < 16; y += 3) P.p(x + 1, y, '#e8c8a0'); } P.r(0, 6, 16, 2, '#8a3a28'); P.r(0, 15, 16, 1, '#5a3a20'); },
+  [T.IWALL_CAVE]: P => { noisy(P, '#6a5a48', ['#4e4234', '#857360'], 114, 0.14); P.r(0, 14, 16, 2, '#3e342a'); for (const [x, y] of [[3, 4], [11, 8]]) { P.p(x, y, '#3e342a'); P.p(x + 1, y + 1, '#3e342a'); } },
+  [T.BED]: P => { P.r(1, 1, 14, 15, '#6a4428'); P.r(2, 2, 12, 4, '#f4f0e8'); P.r(2, 6, 12, 9, '#4878c8'); P.r(2, 6, 12, 1, '#78a0e0'); P.r(2, 10, 12, 1, '#3a60a8'); },
+  [T.HEARTH]: (P, f) => { P.r(1, 2, 14, 14, '#7a7068'); P.r(1, 2, 14, 2, '#9a9088'); P.r(4, 7, 8, 9, '#201814'); const fl = [['.o..o.', 'oyooyo', 'oyyyyo'], ['..o.o.', 'oyoyyo', 'oyyyyo'], ['.o.o..', 'oyyoyo', 'oyyyyo'], ['o..o..', 'oyoyoo', 'oyyyyo']][f]; pat(P, fl, { o: '#f06820', y: '#f8c840' }, 5, 11); P.r(5, 14, 6, 1, '#5a3820'); },
+  [T.POTS]: P => { for (const [x, w, h, c] of [[1, 6, 9, '#b8683a'], [8, 7, 11, '#9a5430']]) { P.r(x, 16 - h, w, h, c); P.r(x + 1, 16 - h, w - 2, 1, '#e0a070'); P.r(x, 16 - h + 3, w, 1, '#6a3418'); } },
+  [T.RUG]: P => { P.r(1, 2, 14, 12, '#7a3a68'); P.r(2, 3, 12, 10, '#b85a98'); P.r(4, 5, 8, 6, '#e8c050'); P.r(6, 7, 4, 2, '#b85a98'); },
+  [T.FOSDISP]: P => { P.r(3, 12, 10, 4, '#5a4a38'); P.r(3, 12, 10, 1, '#8a7a60'); pat(P, ['..bbbb..', '.bboobb.', 'bbo..obb', 'bo.bb.ob', 'bo.bo.ob', 'bbo..obb', '.bbbbbb.'], { b: '#e8dcc0', o: '#8a7a60' }, 4, 4); },
+  [T.BARREL]: P => { P.r(3, 3, 10, 13, '#8a5a30'); P.r(3, 3, 10, 2, '#b07848'); for (const y of [6, 11]) P.r(3, y, 10, 1, '#4a3a2a'); P.r(4, 5, 1, 10, '#a06a3c'); },
+};
+GYM_TYPES.forEach((t, k) => { ART2[T.GF0 + k] = GYM_FLOOR_ART[t]; ART2[T.GD0 + k] = GYM_DECOR_ART[t]; });
+Object.assign(TILE_ART, ART2);
+const OBJ = new Set([T.COUNTER, T.MAT, T.TABLE, T.PLANT, T.CCOUNTER, T.CSOFA, T.CPLANT, T.CPC, T.BED, T.HEARTH, T.POTS, T.RUG, T.FOSDISP, T.BARREL, ...GYM_TYPES.map((t, k) => T.GD0 + k)]);
+for (const t of [T.CCOUNTER, T.CWALL, T.FOS0, T.FOS1, T.FOS2, T.FOS3, T.FOS4, T.FOS5, T.CSOFA, T.CPLANT, T.CPC, T.IWALL_STONE, T.IWALL_HUT, T.IWALL_TENT, T.IWALL_CAVE, T.BED, T.HEARTH, T.POTS, T.FOSDISP, T.BARREL, ...GYM_TYPES.map((t, k) => T.GD0 + k)]) SOLID.add(t);
+for (const t of [T.CFLOOR, T.FLOOR_STONE, T.FLOOR_STRAW, T.FLOOR_FUR, T.FLOOR_DIRT, ...GYM_TYPES.map((t, k) => T.GF0 + k)]) SHADOW_RECV.add(t);
+for (const t of [T.CWALL, T.IWALL_STONE, T.IWALL_HUT, T.IWALL_TENT, T.IWALL_CAVE, T.FOS3, T.FOS4, T.FOS5]) TOP_CASTERS.add(t);
+
 /* --- Überlagerungen: Graskanten, Uferschaum, Dachkanten, Schatten, Bodendetails --- */
 const OV = { fT: 0, wT: 4, rL: 8, rR: 9, rT: 10, rB: 11, sT: 12, sL: 13, d1: 14, eL: 17, eR: 18 };
 const NOV = 19;
@@ -542,6 +661,8 @@ function buildAtlas() {
     for (let t = 0; t < NT; t++) { const art = TILE_ART[t]; if (art) art(painter(g, t * TS), f, b); }
     const tree = bigTree(b, f);
     for (let q = 0; q < 4; q++) g.drawImage(tree, (q & 1) * 16, (q >> 1) * 16, 16, 16, (TREE_Q + q) * TS, 0, 16, 16);
+    const fos = fossilMachine(f);
+    for (let q = 0; q < 6; q++) g.drawImage(fos, (q % 3) * 16, Math.floor(q / 3) * 16, 16, 16, (T.FOS0 + q) * TS, 0, 16, 16);
     return c;
   }));
 }
@@ -1635,6 +1756,7 @@ function buildTown(m, i, r) {
     m.objs.set(K(X + 8, Y + 14), { text: 'Das Lagerfeuer von Farnweiler. Abends erzählen sich hier alle Geschichten aus der Urzeit.' });
   }
   if (t.name === 'Vulkanheim') return buildVolcanoTown(m, i, X, Y);
+  if (TOWN_MAPS[i]) return buildMappedTown(m, i, X, Y, TOWN_MAPS[i]);
   const style = t.start ? 'cave' : HOUSE_STYLE[i] || 'wood';
 
   const slots = {
@@ -1664,6 +1786,27 @@ function placeBuilding(m, i, kind, x, y, w, h, roof, doorX, emblem, style) {
   const door = building(m, x, y, w, h, roof, doorX, emblem, style), id = `${kind}:${i}`;
   DOORS[id] = door;
   m.warps.set(K(door.x, door.y), { to: id, x: 4, y: ROOM_H[kind] - 2, dir: 'up' });
+}
+// Städte mit eigenem Grundriss (22x18, Legende siehe MAP_TILES; @ = Gebäude, Türbuchstaben siehe DOOR_KIND)
+const MAP_TILES = { '.': T.GRASS, '#': T.PAVE, ':': T.PATH, s: T.SAND, f: T.FLOWER, b: T.BRIDGE, H: T.STAIRS, F: T.FERN, R: T.ROCK, B: T.BONES, t: T.TORCH, '=': T.FENCE, S: T.SIGN, W: T.WATER, C: T.CLIFF_TOP, c: T.CLIFF, n: T.GRASS };
+const DOOR_KIND = { Z: 'center', L: 'shop', A: 'gym', h: 'house', k: 'house2' };
+const TOWN_MAPS = /*TOWN_MAPS*/{};
+function buildMappedTown(m, i, X, Y, def) {
+  const t = TOWNS[i], rows = def.rows, style = HOUSE_STYLE[i] || 'wood';
+  rows.forEach((row, y) => { for (let x = 0; x < TW; x++) { const tt = MAP_TILES[row[x]]; if (tt !== undefined) tset(m, X + x, Y + y, tt); } });
+  rows.forEach((row, y) => {
+    for (let x = 0; x < TW; x++) {
+      let kind = DOOR_KIND[row[x]]; if (!kind) continue;
+      if (kind === 'gym' && t.league) kind = 'league';
+      const inB = (xx, yy) => yy >= 0 && rows[yy] && (rows[yy][xx] === '@' || (xx === x && yy === y));
+      let x0 = x, x1 = x, y0 = y;
+      while (inB(x0 - 1, y)) x0--; while (inB(x1 + 1, y)) x1++; while (inB(x, y0 - 1)) y0--;
+      const [roof, emblem, st] = { center: [T.ROOF_CENTER, T.WALL_CENTER, 'wood'], shop: [T.ROOF_SHOP, T.WALL_SHOP, 'wood'], gym: [T.ROOF_GYM, T.WALL_GYM, style === 'stone' || style === 'cave' ? 'stone' : 'wood'], league: [T.ROOF_GYM, T.WALL_GYM, 'stone'], house: [T.ROOF, null, style], house2: [T.ROOF, null, style] }[kind];
+      placeBuilding(m, i, kind, X + x0, Y + y0, x1 - x0 + 1, y - y0 + 1, roof, x - x0, emblem, st);
+    }
+  });
+  rows.forEach((row, y) => { const x = row.indexOf('S'); if (x >= 0) m.objs.set(K(X + x, Y + y), { text: def.sign || `${t.name.toUpperCase()}\n${t.line}` }); });
+  (def.npcs || []).forEach(([x, y, line], k) => m.npcs.push(new Actor({ x: X + x, y: Y + y, dir: 'down', variant: 1 + k % 4, wander: true, id: `villager:${i}:${k}`, talk: line })));
 }
 /* Vulkanheim: zwei Terrassen am Hang, die Arena ganz oben, ein Lavastrom fließt mitten durch den Ort */
 function buildVolcanoTown(m, i, X, Y) {
@@ -1707,11 +1850,18 @@ function buildVolcanoTown(m, i, X, Y) {
 const ROOM_H = { center: 8, shop: 8, house: 8, house2: 8, home: 8, lab: 10, gym: 14, league: 12 };
 function room(id, w, h, fl) {
   const m = newMap(id, w, h, fl);
-  m.outside = T.VOID;
+  m.outside = T.VOID; m.floor = fl;
   for (let x = 0; x < w; x++) { tset(m, x, 0, T.IWALL); tset(m, x, 1, T.IWALL); }
   tset(m, 4, h - 1, T.MAT);
   return m;
 }
+// Arena-Grundrisse (Zeilen 2-13, Tür bei x=4 ganz unten). # = Typ-Deko, S = Schild, 1-3 = Trainer
+const GYM_PLANS = [
+  { rows: ['#...L....#', '#........#', '######.###', '#..1.....#', '#........#', '###.######', '#.....2..#', '#........#', '#####.####', '#.......3#', '#S......S#', '#.........'], dirs: ['right', 'left', 'left'] },
+  { rows: ['#...L....#', '#........#', '###.######', '#.....1..#', '#........#', '######.###', '#..2.....#', '#........#', '####.#####', '#3.......#', '#S......S#', '#.........'], dirs: ['left', 'right', 'right'] },
+  { rows: ['#...L....#', '#.#....#.#', '#.#.##.#.#', '#...##...#', '##.1...#.#', '#..#.###.#', '#.##...2.#', '#....#...#', '#.##.#.#.#', '#3.......#', '#S......S#', '#.........'], dirs: ['right', 'left', 'right'] },
+];
+const GYM_TIPS = { PFLANZE: 'Feuer, Eis und Flug helfen dir hier.', GESTEIN: 'Wasser, Pflanze und Kampf sind stark gegen Gestein.', WASSER: 'Pflanze und Elektro sind deine Freunde.', ELEKTRO: 'Boden-Wesen spüren keinen Strom!', GEIST: 'Geist-Attacken wirken gut gegen Geister.', FEUER: 'Wasser, Gestein und Boden löschen jedes Feuer.', FLUG: 'Elektro, Eis und Gestein holen sie vom Himmel.', STAHL: 'Feuer, Kampf und Boden verbiegen Stahl.', NORMAL: 'Kampf-Wesen haben hier die besten Chancen.', EIS: 'Feuer, Kampf, Gestein und Stahl schmelzen das Eis.', GIFT: 'Boden und Psycho sind stark gegen Gift.', KAMPF: 'Psycho, Flug und Fee halten Kämpfer auf.', PSYCHO: 'Käfer und Geist verwirren die Psycho-Wesen.', 'KÄFER': 'Feuer, Flug und Gestein sind gut gegen Käfer.', BODEN: 'Wasser, Pflanze und Eis sind stark gegen Boden.', DRACHE: 'Eis, Drache und Fee bezwingen Drachen.' };
 function getMap(id) { if (!MAPS[id]) MAPS[id] = makeInterior(id); return MAPS[id]; }
 function makeInterior(id) {
   const [kind, si] = id.split(':'); const i = +si; const t = TOWNS[i];
@@ -1719,11 +1869,15 @@ function makeInterior(id) {
   const npc = o => m.npcs.push(new Actor(o));
   switch (kind) {
     case 'center':
-      m = room(id, 10, H, T.FLOOR);
-      tset(m, 0, 3, T.PLANT); tset(m, 9, 3, T.PLANT);
-      for (let x = 1; x <= 8; x++) tset(m, x, 3, T.COUNTER);
-      tset(m, 9, 5, T.PC); m.objs.set(K(9, 5), { fn: () => usePC() });
-      tset(m, 1, 5, T.TABLE); tset(m, 1, 6, T.PLANT);
+      // Modernes Wesen-Center: hinter der Pflegerin steht die Fossil-Heilmaschine
+      m = room(id, 10, H, T.CFLOOR);
+      for (let x = 0; x < 10; x++) { tset(m, x, 0, T.CWALL); tset(m, x, 1, T.CWALL); }
+      for (let q = 0; q < 6; q++) { tset(m, 3 + q % 3, Math.floor(q / 3), T.FOS0 + q); m.objs.set(K(3 + q % 3, Math.floor(q / 3)), { text: 'Die Fossil-Heilmaschine. Ein uraltes Skelett speist das Heil-Leuchtband mit Urzeit-Energie.' }); }
+      m.fossil = { x: 3, y: 0 };
+      tset(m, 0, 3, T.CPLANT); tset(m, 9, 3, T.CPLANT);
+      for (let x = 1; x <= 8; x++) tset(m, x, 3, T.CCOUNTER);
+      tset(m, 9, 5, T.CPC); m.objs.set(K(9, 5), { fn: () => usePC() });
+      tset(m, 0, 5, T.CSOFA); tset(m, 0, 6, T.CSOFA); tset(m, 9, 7, T.CPLANT);
       npc({ x: 4, y: 2, dir: 'down', variant: 6, id: 'nurse', talk: async () => { await say('Willkommen im Wesen-Center!'); await healTeam(); } });
       npc({ x: 7, y: 6, dir: 'left', variant: 1, wander: true, talk: 'Im Center ruhen sich Trainer aus. Hier riecht es nach Kräutertee.' });
       break;
@@ -1735,11 +1889,21 @@ function makeInterior(id) {
       npc({ x: 1, y: 2, dir: 'down', variant: 4, id: 'clerk', talk: async () => { await say('Willkommen im Tauschladen! Was darf es sein?'); await openShop(i); } });
       break;
     case 'house': case 'house2': case 'home': {
-      m = room(id, 10, H, T.FLOOR);
-      tset(m, 1, 1, T.SHELF); tset(m, 2, 1, T.SHELF); tset(m, 8, 1, T.SHELF);
-      tset(m, 4, 3, T.TABLE); tset(m, 5, 3, T.TABLE); tset(m, 0, 2, T.PLANT); tset(m, 9, 6, T.PLANT);
+      // Boden, Wände und Einrichtung passen zur Bauweise der Stadt
+      const style = i === 0 ? 'cave' : HOUSE_STYLE[i] || 'wood';
+      const [wall, floor] = { wood: [T.IWALL, T.FLOOR], stone: [T.IWALL_STONE, T.FLOOR_STONE], hut: [T.IWALL_HUT, T.FLOOR_STRAW], tent: [T.IWALL_TENT, T.FLOOR_FUR], cave: [T.IWALL_CAVE, T.FLOOR_DIRT] }[style];
+      m = room(id, 10, H, floor);
+      for (let x = 0; x < 10; x++) { tset(m, x, 0, wall); tset(m, x, 1, wall); }
+      const FURN = [
+        [[T.HEARTH, 1, 2], [T.BED, 8, 2], [T.TABLE, 4, 3], [T.TABLE, 5, 3], [T.RUG, 4, 5], [T.POTS, 0, 6], [T.SHELF, 6, 1]],
+        [[T.SHELF, 1, 1], [T.SHELF, 2, 1], [T.FOSDISP, 8, 2], [T.TABLE, 4, 4], [T.BED, 0, 3], [T.PLANT, 9, 6], [T.RUG, 5, 6]],
+        [[T.BED, 1, 2], [T.BED, 2, 2], [T.HEARTH, 7, 2], [T.BARREL, 9, 3], [T.TABLE, 5, 4], [T.POTS, 0, 6], [T.PLANT, 9, 6]],
+        [[T.SHELF, 7, 1], [T.SHELF, 8, 1], [T.FOSDISP, 1, 2], [T.BARREL, 0, 5], [T.TABLE, 3, 3], [T.TABLE, 4, 3], [T.BED, 9, 4], [T.RUG, 6, 5]],
+      ][(i * 3 + kind.length) % 4];
+      for (const [tt, x, y] of FURN) tset(m, x, y, tt);
+      for (const [tt, x, y] of FURN) if (tt === T.FOSDISP) m.objs.set(K(x, y), { text: 'Ein kleines Fossil auf einem Sockel. Der ganze Stolz der Familie.' });
       if (kind === 'home') {
-        npc({ x: 7, y: 4, dir: 'left', variant: 2, id: 'mom', talk: async () => {
+        npc({ x: 6, y: 4, dir: 'left', variant: 2, id: 'mom', talk: async () => {
           await say(`MAMA: ${PN()}, pass gut auf dich auf! Die Urzeit da draußen ist wild.`);
           await healTeam(true);
         } });
@@ -1750,7 +1914,7 @@ function makeInterior(id) {
           'Mein Opa sagt, es gibt über 60 Arten von Urzeit-Wesen.',
           'Zwei Regionen, 16 Orden. Wer alle hat, darf auf den Meteorgipfel.',
         ];
-        npc({ x: 2, y: 4, dir: 'down', variant: 1 + (i + (kind === 'house2' ? 1 : 0)) % 2, wander: true, talk: lines[(i + kind.length) % lines.length] });
+        npc({ x: 3, y: 5, dir: 'down', variant: 1 + (i + (kind === 'house2' ? 1 : 0)) % 2, wander: true, talk: lines[(i + kind.length) % lines.length] });
       }
       break;
     }
@@ -1780,21 +1944,23 @@ function makeInterior(id) {
       } });
       npc({ x: 2, y: 7, dir: 'right', variant: 3, wander: true, talk: 'ASSISTENT: Der Professor erforscht, wie die Wesen die Urzeit überlebt haben.' });
       break;
-    case 'gym':
-      m = room(id, 10, H, T.GYMFLOOR);
-      tset(m, 3, H - 3, T.STATUE); tset(m, 6, H - 3, T.STATUE);
-      for (const y of [4, 7]) { tset(m, 1, y, T.STATUE); tset(m, 8, y, T.STATUE); }
-      for (const x of [3, 6]) m.objs.set(K(x, H - 3), { text: `ARENA ${t.name.toUpperCase()}\nLeitung: ${t.leader} · Typ: ${t.type}` });
+    case 'gym': {
+      // Jede Arena ist nach ihrem Typ eingerichtet: eigener Boden, eigene Deko, eigener Weg
+      m = room(id, 10, H, gymFloor(t.type));
+      const deco = gymDecor(t.type), plan = GYM_PLANS[(i + 1) % GYM_PLANS.length], dirs = plan.dirs, trainers = [];
+      plan.rows.forEach((row, r) => { for (let x = 0; x < 10; x++) { const c = row[x], y = r + 2; if (c === '#' || c === 'S') tset(m, x, y, deco); if (c === 'S') m.objs.set(K(x, y), { text: `ARENA ${t.name.toUpperCase()}\nLeitung: ${t.leader} · Typ: ${t.type}` }); if ('123'.includes(c)) trainers.push([+c - 1, x, y]); } });
       npc({ x: 4, y: 2, dir: 'down', variant: 5, id: 'leader', talk: () => leaderTalk(i) });
-      for (const [k, x, y, dir] of [[0, 2, 8, 'right'], [1, 7, 5, 'left']]) {
-        const tr = gymTrainer(i, k), a = new Actor({ x, y, dir, variant: tr.variant, trainer: tr, still: true });
+      for (const [k, x, y] of trainers) {
+        if (k === 2 && i <= 8) continue; // ab der 9. Arena wartet ein dritter Trainer
+        const tr = gymTrainer(i, k), a = new Actor({ x, y, dir: dirs[k], variant: tr.variant, trainer: tr, still: true });
         a.talk = () => trainerEncounter(a, false); m.npcs.push(a);
       }
-      npc({ x: 6, y: H - 2, dir: 'left', variant: 4, talk: `Hey, Herausforderer! ${t.leader} setzt auf ${t.type}-Wesen. Bereite dich gut vor!` });
+      npc({ x: 7, y: H - 1, dir: 'left', variant: 4, talk: `Hey, Herausforderer! ${t.leader} setzt auf ${t.type}-Wesen. ${GYM_TIPS[t.type]}` });
       break;
+    }
     case 'league':
-      m = room(id, 10, H, T.GYMFLOOR);
-      for (const y of [3, 5, 7]) { tset(m, 2, y, T.STATUE); tset(m, 7, y, T.STATUE); }
+      m = room(id, 10, H, gymFloor('DRACHE'));
+      for (const y of [3, 5, 7, 9]) { tset(m, 2, y, gymDecor('FEUER')); tset(m, 7, y, gymDecor('FEUER')); }
       npc({ x: 4, y: 2, dir: 'down', variant: 5, id: 'champion', talk: championTalk });
       break;
   }
@@ -1816,7 +1982,7 @@ class Actor {
   visible() { return !(this.hidden && this.hidden()); }
   start(dir) { const [dx, dy] = DIRS[dir]; this.dir = dir; this.tx = this.x + dx; this.ty = this.y + dy; this.moving = true; this.prog = 0; this.parity ^= 1; }
   update(spd) { if (!this.moving) return false; this.prog += spd; if (this.prog >= TS) { this.x = this.tx; this.y = this.ty; this.moving = false; this.prog = 0; return true; } return false; }
-  frame() { if (this.moving && this.prog < 8) return this.parity ? 1 : 2; return 0; }
+  frame() { if (this.work) return [1, 0, 2, 0][(tick >> 3) & 3]; if (this.moving && this.prog < 8) return this.parity ? 1 : 2; return 0; }
 }
 
 const state = { profile: { name: 'Spieler', look: { ...DEFAULT_LOOK } }, time: 0, money: 3000, box: [], lastCenter: null, badges: Array(16).fill(false), flags: {}, items: {}, steps: 0, team: [], seen: {}, caught: {} };
@@ -3844,6 +4010,15 @@ async function wildEncounter(x, y) {
 async function healTeam(home) {
   if (!state.team.length) return say(home ? 'Ruh dich kurz aus... So, jetzt bist du wieder fit!' : 'Später werden hier deine Wesen geheilt. Noch hast du keine!');
   if (!home) state.lastCenter = cur.id;
+  const nurse = !home && cur.npcs.find(n => n.id === 'nurse');
+  if (nurse && cur.fossil) {
+    // Die Pflegerin dreht sich zur Fossil-Heilmaschine, legt die Kapseln auf und arbeitet am Fossil
+    await say('Ich lege deine Wesen kurz in die Fossil-Heilmaschine.');
+    nurse.dir = 'up'; await waitTicks(16);
+    nurse.work = true; cur.heal = { start: tick, n: state.team.length };
+    await waitTicks(30 + state.team.length * 14 + 70);
+    nurse.work = false; cur.heal = null; await waitTicks(8); nurse.dir = 'down'; await waitTicks(10);
+  }
   state.team.forEach(healWesen);
   await say(home ? 'Du und deine Wesen ruhen euch aus. Alle sind wieder fit!' : 'Deine Wesen sind wieder vollständig geheilt. Bis bald!');
   saveGame();
@@ -4137,6 +4312,7 @@ function drawTile(tx, ty, sx, sy, f) {
   const t = tget(cur, tx, ty), b = bget(cur, tx, ty);
   let ti = tileIndex(t, tx, ty);
   if (t === T.TALL && rustle.has(K(tx, ty))) ti = T.TALL_RUSTLE;
+  if (OBJ.has(t) && cur.floor != null) ctx.drawImage(atlas[b][f], cur.floor * TS, 0, TS, TS, sx, sy, TS, TS);
   ctx.drawImage(atlas[b][f], ti * TS, 0, TS, TS, sx, sy, TS, TS);
   const O = i => ctx.drawImage(ovl[b][f], i * TS, 0, TS, TS, sx, sy, TS, TS);
   const n = [tget(cur, tx, ty - 1), tget(cur, tx + 1, ty), tget(cur, tx, ty + 1), tget(cur, tx - 1, ty)];
@@ -4150,6 +4326,18 @@ function drawTile(tx, ty, sx, sy, f) {
     if (TOP_CASTERS.has(n[0])) O(OV.sT);
   }
 }
+function drawHealFx(fx, fy, t, n) {
+  // Kapseln nacheinander auf das Leuchtband, dann leuchtet das Fossil und es funkelt
+  for (let i = 0; i < n; i++) if (t > 20 + i * 14) { const x = fx + 6 + i * 7, y = fy + 26; ctx.fillStyle = '#6a3a10'; ctx.fillRect(x, y, 5, 5); ctx.fillStyle = '#f0a020'; ctx.fillRect(x + 1, y + 1, 3, 3); ctx.fillStyle = '#fff0b0'; ctx.fillRect(x + 1, y + 1, 1, 1); }
+  const go = t - (24 + n * 14);
+  if (go <= 0) return;
+  ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.25 + 0.2 * Math.sin(go / 3);
+  ctx.fillStyle = '#ffe8a0'; ctx.fillRect(fx + 3, fy + 3, 42, 22); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  for (let k = 0; k < 6; k++) {
+    const p = (go + k * 11) % 40, x = fx + 6 + Math.floor(hash(k, Math.floor((go + k * 11) / 40), 9) * 36), y = fy + 22 - p / 2, r = p < 20 ? p >> 3 : (40 - p) >> 3;
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y - r, 1, r * 2 + 1); ctx.fillRect(x - r, y, r * 2 + 1, 1);
+  }
+}
 function drawWorld() {
   const camX = Math.round(player.px) + 8 - (VW >> 1), camY = Math.round(player.py) + 6 - (VH >> 1);
   const x0 = Math.floor(camX / TS), y0 = Math.floor(camY / TS);
@@ -4159,7 +4347,7 @@ function drawWorld() {
   if (fancy) { drawPrints(camX, camY); drawRipples(camX, camY); drawFlock(camX, camY, true); }
   const actors = cur.npcs.filter(n => n.visible()).concat(player).sort((a, b) => a.py - b.py);
   for (const a of actors) {
-    const sx = Math.round(a.px) - camX, sy = Math.round(a.py) - camY - 4;
+    const sx = Math.round(a.px) - camX + (a.work ? [0, 1, 0, -1][(tick >> 4) & 3] : 0), sy = Math.round(a.py) - camY - 4;
     if (sx < -16 || sy < -24 || sx > VW || sy > VH) continue;
     if (a.sprite === 'item') {
       ctx.drawImage(getChar('item', 0, 'down', 0), sx, sy + 4 + (((tick >> 5) + a.x) & 1));
@@ -4172,6 +4360,7 @@ function drawWorld() {
     ctx.drawImage(img, sx, top + bob);
     if (a.alert > 0) { a.alert--; rr(sx + 3, top - 14, 10, 13, 3, '#283038'); rr(sx + 4, top - 13, 8, 11, 2, '#ffffff'); ctx.fillStyle = UI.red; ctx.fillRect(sx + 7, top - 11, 2, 5); ctx.fillRect(sx + 7, top - 5, 2, 2); }
   }
+  if (cur.heal && cur.fossil) drawHealFx(cur.fossil.x * TS - camX, cur.fossil.y * TS - camY, tick - cur.heal.start, cur.heal.n);
   const gx = Math.round(player.px / TS), gy = Math.round(player.py / TS);
   if (tget(cur, gx, gy) === T.TALL) ctx.drawImage(atlas[bget(cur, gx, gy)][f], (rustle.has(K(gx, gy)) ? T.TALL_RUSTLE : T.TALL) * TS, 8, TS, 8, gx * TS - camX, gy * TS - camY + 8, TS, 8);
   if (fancy) drawFlock(camX, camY, false);
