@@ -99,7 +99,7 @@ const CONFIG = {
   // Adresse des Konto-Servers (worker/). Leer = nur Gast-Spielstände auf dem Gerät
   api: 'https://wesenwelt-api.edengrim67.workers.dev',
 };
-const GAME_VERSION = '202610281505'; // wird von build_app.py durch die Build-Zeit ersetzt
+const GAME_VERSION = '202610281521'; // wird von build_app.py durch die Build-Zeit ersetzt
 
 // Logische Bildgröße passt sich dem Bildschirm an (mindestens 256x192); SC = interne Auflösung für scharfe Schrift
 let VW = 256, VH = 192, OX = 0, OY = 0, RW = 256, RH = 192;
@@ -197,6 +197,7 @@ const T = {
   FLOOR_STONE: 67, FLOOR_STRAW: 68, FLOOR_FUR: 69, FLOOR_DIRT: 70, IWALL_STONE: 71, IWALL_HUT: 72, IWALL_TENT: 73, IWALL_CAVE: 74,
   BED: 75, HEARTH: 76, POTS: 77, RUG: 78, FOSDISP: 79, BARREL: 80, GF0: 81, GD0: 97,
   GH0: 113, GE0: 129, CROOF: 145, CWALLX: 146, CDOOR: 147, CSIGN: 148, GROOF: 149, GWALL: 150, GDOOR: 151,
+  SKEL0: 152, WFALL: 158, MENHIR: 159, METEOR: 160, GEYSER: 161, CACTUS: 162, SPIRE: 163,
 };
 const TREE_Q = 188, NT = 192;
 const SOLID = new Set([T.TREE, T.WATER, T.ROOF, T.WALL, T.WINDOW, T.SIGN, T.FENCE, T.IWALL, T.COUNTER,
@@ -670,6 +671,29 @@ for (const t of [T.GROOF, T.CROOF]) { ROOFS.add(t); SOLID.add(t); }
 for (const t of [T.GWALL, T.GDOOR, T.CWALLX, T.CDOOR, T.CSIGN, ...GYM_TYPES.map((t, k) => T.GE0 + k)]) { WALLS.add(t); if (t !== T.GDOOR && t !== T.CDOOR) SOLID.add(t); }
 for (const t of [T.CWALLX, T.CDOOR, T.CSIGN]) GLOWS.add(t);
 
+/* --- Sehenswürdigkeiten draußen: Riesenskelett, Wasserfall, Hinkelstein, Meteorit, Geysir, Kaktus, Felsnadel --- */
+function skeletonLandmark(b) {
+  const c = document.createElement('canvas'); c.width = 48; c.height = 32; const g = c.getContext('2d');
+  const P = painter(g, 0), P2 = painter(g, 16), P3 = painter(g, 32);
+  for (const [pp, oy] of [[P, 0], [P2, 0], [P3, 0]]) { grass(pp, b); }
+  g.drawImage(c, 0, 0, 48, 16, 0, 16, 48, 16);
+  const bone = (x, y, col) => { g.fillStyle = col; g.fillRect(x, y, 1, 1); };
+  FOSSIL_SKELETON.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] === 'b') for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) bone(x + 7 + dx, y * 2 + 3 + dy, '#5a5040'); });
+  FOSSIL_SKELETON.forEach((row, y) => { for (let x = 0; x < row.length; x++) if (row[x] === 'b') { bone(x + 7, y * 2 + 3, '#f2ead6'); bone(x + 7, y * 2 + 4, '#d8ccb0'); } });
+  return c;
+}
+const ART4 = {
+  [T.WFALL]: (P, f, b) => { TILE_ART[T.CLIFF](P, f, b); P.r(3, 0, 10, 16, b.w[1]); for (let k = 0; k < 4; k++) { const x = 4 + k * 2 + (k > 1); for (let y = 0; y < 16; y++) if ((y + f * 4 + k * 3) % 8 < 3) P.p(x, y, b.w[3]); } P.r(3, 0, 1, 16, b.w[0]); P.r(12, 0, 1, 16, b.w[0]); P.r(2, 14, 12, 2, b.w[3]); },
+  [T.MENHIR]: (P, f, b) => { grass(P, b); P.r(5, 1, 6, 14, '#7a7468'); P.r(6, 0, 4, 1, '#7a7468'); P.r(5, 1, 2, 14, '#9a9488'); P.r(10, 2, 1, 13, '#5a544a'); for (let a = 0; a < 9; a++) P.p(8 + Math.round(Math.cos(a) * a / 4), 6 + Math.round(Math.sin(a) * a / 4), '#4a463e'); P.p(6, 11, b.g[2]); P.p(7, 12, b.g[2]); P.r(4, 15, 8, 1, b.g[0]); },
+  [T.METEOR]: (P, f, b) => { grass(P, b); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const d = Math.hypot((x + 0.5 - 8) / 7, (y + 0.5 - 9) / 6); if (d < 1) P.p(x, y, d > 0.85 ? '#1a1418' : '#3e3438'); } const glow = ['#f86828', '#f8a030', '#ffd060', '#f8a030'][f]; for (const [x, y] of [[5, 7], [6, 8], [7, 8], [8, 9], [9, 9], [10, 8], [8, 11], [7, 12], [11, 11]]) P.p(x, y, glow); P.p(6, 5, '#7a6a70'); },
+  [T.GEYSER]: (P, f, b) => { P.r(0, 0, 16, 16, b.d[1]); dot(P, 8, 11, 5, '#5a544c'); dot(P, 8, 11, 3, '#2a2622'); dot(P, 8, 11, 1.6, '#6a9ab8'); for (let k = 0; k < 3; k++) { const y = 8 - ((f * 3 + k * 4) % 9), r = 1.2 + ((f + k) % 3) * 0.6; dot(P, 7 + (k % 2) * 2, y, r, k % 2 ? '#e8f0f4' : '#ffffff'); } },
+  [T.CACTUS]: P => { TILE_ART[T.SAND](P); P.r(7, 2, 3, 13, '#3a8a3a'); P.r(7, 2, 1, 13, '#5aae4a'); P.r(3, 6, 2, 5, '#3a8a3a'); P.r(3, 10, 4, 2, '#3a8a3a'); P.r(11, 4, 2, 5, '#3a8a3a'); P.r(10, 8, 3, 2, '#3a8a3a'); P.p(8, 1, '#f878a0'); P.r(6, 15, 5, 1, '#c8a868'); },
+  [T.SPIRE]: (P, f, b) => { grass(P, b); for (let y = 0; y < 16; y++) { const w = Math.round(1 + y * 0.4); P.r(8 - w, y, w * 2, 1, y % 4 === 0 ? '#3a3036' : '#2a2226'); P.p(8 - w, y, '#5a4e54'); } P.p(9, 6, '#f86828'); P.p(7, 11, '#f86828'); },
+};
+Object.assign(TILE_ART, ART4);
+for (const t of [T.SKEL0, T.SKEL0 + 1, T.SKEL0 + 2, T.SKEL0 + 3, T.SKEL0 + 4, T.SKEL0 + 5, T.WFALL, T.MENHIR, T.METEOR, T.GEYSER, T.CACTUS, T.SPIRE]) SOLID.add(t);
+GLOWS.add(T.METEOR);
+
 /* --- Überlagerungen: Graskanten, Uferschaum, Dachkanten, Schatten, Bodendetails --- */
 const OV = { fT: 0, wT: 4, rL: 8, rR: 9, rT: 10, rB: 11, sT: 12, sL: 13, d1: 14, eL: 17, eR: 18 };
 const NOV = 19;
@@ -726,6 +750,8 @@ function buildAtlas() {
     for (let t = 0; t < NT; t++) { const art = TILE_ART[t]; if (art) art(painter(g, t * TS), f, b); }
     const tree = bigTree(b, f);
     for (let q = 0; q < 4; q++) g.drawImage(tree, (q & 1) * 16, (q >> 1) * 16, 16, 16, (TREE_Q + q) * TS, 0, 16, 16);
+    const skel = skeletonLandmark(b);
+    for (let q = 0; q < 6; q++) g.drawImage(skel, (q % 3) * 16, Math.floor(q / 3) * 16, 16, 16, (T.SKEL0 + q) * TS, 0, 16, 16);
     const fos = fossilMachine(f);
     for (let q = 0; q < 6; q++) g.drawImage(fos, (q % 3) * 16, Math.floor(q / 3) * 16, 16, 16, (T.FOS0 + q) * TS, 0, 16, 16);
     return c;
@@ -1542,11 +1568,13 @@ const TOWNS = [
   { name: 'Drachenfels', leader: 'Draco', type: 'DRACHE', badge: 'Drachen-Orden', biome: 1, line: 'Nur die Stärksten erklimmen den Drachenfels.' },
   { name: 'Meteorgipfel', league: true, biome: 1, line: 'Hier wartet der Champion. Bist du bereit?' },
 ];
+// Weltgröße: Die Städte liegen weit auseinander, dazwischen kurvige Routen mit Abzweigungen zum Erkunden
+const WORLD_SCALE = 3, WORLD_VERSION = 2;
 const SLOTS = [[20, 112], [68, 112], [116, 112], [116, 66], [68, 66], [20, 66], [20, 20], [68, 20], [116, 20],
-  [176, 20], [224, 20], [272, 20], [272, 66], [224, 66], [176, 66], [176, 112], [224, 112], [272, 112]];
+  [176, 20], [224, 20], [272, 20], [272, 66], [224, 66], [176, 66], [176, 112], [224, 112], [272, 112]].map(([x, y]) => [x * WORLD_SCALE, y * WORLD_SCALE]);
 const TW = 22, TH = 18, TCX = 11, TCY = 9;
-const WORLD_W = 292, WORLD_H = 132;
-const SEA_X0 = 136, SEA_X1 = 154;
+const WORLD_W = 292 * WORLD_SCALE, WORLD_H = 132 * WORLD_SCALE;
+const SEA_X0 = 146 * WORLD_SCALE - 18, SEA_X1 = 146 * WORLD_SCALE + 18;
 const ITEM_POOL = ['Trank', 'Bernsteinkapsel', 'Supertrank', 'Gegengift', 'Fluchtseil', 'Beere', 'Sonderbonbon', 'Fossil'];
 const TRAINER_CLASSES = ['Wanderer', 'Forscherin', 'Fossiljäger', 'Anglerin', 'Bergsteiger', 'Ass-Trainerin', 'Jungspund', 'Paläontologin'];
 const HINTS = [
@@ -1598,10 +1626,91 @@ function building(m, x, y, w, h, roof, doorX, emblem, style = 'wood') {
 let TOWN_RECTS = [];
 let ROUTES = [];
 
-// Routen mit Umweg: Routenindex -> wie weit der Bogen nach oben (-) oder unten (+) führt
-const DETOURS = { 3: -22, 6: 23, 12: 23, 15: -23 };
 const HAMLETS = [];
-const HAMLET_NAMES = ['Farnrast', 'Aschenrast', 'Kreiderast', 'Dünenrast'];
+const HAMLET_NAMES = ['Farnrast', 'Moosrast', 'Kieselrast', 'Muschelrast', 'Nebelrast', 'Aschenrast', 'Windrast', 'Erzrast', 'Kreiderast', 'Frostrast', 'Sumpfrast', 'Knochenrast', 'Sternrast', 'Libellenrast', 'Dünenrast', 'Glutrast', 'Gipfelrast'];
+// Landschaft je Route: Fluss, Schlucht, Wiese, Lavafeld, Eisteich, Dünen, Sumpf – und Schätze auf den Lichtungen
+const SPUR_TEXT = {
+  skel: 'Das Skelett eines riesigen Urwesens. Forscher aus Fossilfurt würden hier gern graben.',
+  ring: 'Ein uralter Steinkreis. Niemand weiß, wer die Steine aufgestellt hat.',
+  meteor: 'Ein Meteorit! Er glüht noch immer ein wenig.',
+  geyser: 'Ein Geysir. Er zischt und dampft in regelmäßigen Abständen.',
+};
+function decorateRoute(m, route, core, inAnyTown) {
+  const rng = mulberry32(4242 + route.n * 31), pts = route.pts;
+  const npcAt0 = new Set(m.npcs.map(n => K(n.x, n.y)));
+  const mine = (x, y) => !inAnyTown(x, y) && !core.has(K(x, y)) && !npcAt0.has(K(x, y)) && (aget(m, x, y) === route.areaId || tget(m, x, y) === T.TREE) && tget(m, x, y) !== T.WATER;
+  const put = (x, y, t) => { if (mine(x, y)) { tset(m, x, y, t); if (!SOLID.has(t) || t === T.WATER) aset(m, x, y, route.areaId); return true; } return false; };
+  const biomeAt = (x, y) => bget(m, x, y);
+  // 1) Lichtungen am Ende der Abzweigungen
+  route.spurs.forEach((sp, k) => {
+    const b = biomeAt(sp.x, sp.y), kind = b === 1 ? 'meteor' : b === 2 ? 'geyser' : b === 3 ? 'skel' : b === 4 ? 'ring' : ['skel', 'ring', 'meteor'][(route.n + k) % 3];
+    // die erste Lichtung wird zu einer großen Wildnis mit hohem Gras
+    if (k === 0) {
+      let ok = true;
+      for (let y = sp.y - 10; y <= sp.y + 10 && ok; y++) for (let x = sp.x - 10; x <= sp.x + 10; x++) if ((x - sp.x) ** 2 + (y - sp.y) ** 2 <= 100 && (x - sp.x) ** 2 + (y - sp.y) ** 2 > 20 && (inAnyTown(x, y) || (tget(m, x, y) !== T.TREE && aget(m, x, y) !== route.areaId))) { ok = false; break; }
+      if (ok) for (let y = sp.y - 9; y <= sp.y + 9; y++) for (let x = sp.x - 9; x <= sp.x + 9; x++) {
+        const r = Math.hypot(x - sp.x, y - sp.y) + (hash(x, y, 61) - 0.5) * 3;
+        if (r < 8) { tset(m, x, y, r > 3.5 && hash(x, y, 62) < 0.55 ? T.TALL : T.GRASS); aset(m, x, y, route.areaId); }
+      }
+    }
+    if (kind === 'skel') { for (let q = 0; q < 6; q++) tset(m, sp.x - 1 + q % 3, sp.y - 1 + Math.floor(q / 3), T.SKEL0 + q); for (let q = 0; q < 6; q++) m.objs.set(K(sp.x - 1 + q % 3, sp.y - 1 + Math.floor(q / 3)), { text: SPUR_TEXT.skel }); }
+    else if (kind === 'ring') { for (let a = 0; a < 8; a++) { const x = Math.round(sp.x + Math.cos(a / 8 * Math.PI * 2) * 3), y = Math.round(sp.y + Math.sin(a / 8 * Math.PI * 2) * 3); if (a % 2 === 0 || rng() < 0.6) { tset(m, x, y, T.MENHIR); m.objs.set(K(x, y), { text: SPUR_TEXT.ring }); } } }
+    else if (kind === 'meteor') { tset(m, sp.x, sp.y - 1, T.METEOR); m.objs.set(K(sp.x, sp.y - 1), { text: SPUR_TEXT.meteor }); for (const [dx, dy] of [[-2, 0], [2, 0], [-1, -3], [1, 2]]) tset(m, sp.x + dx, sp.y + dy, b === 1 ? T.SPIRE : T.ROCK); }
+    else { for (const [dx, dy] of [[-2, -1], [2, 1]]) { tset(m, sp.x + dx, sp.y + dy, T.GEYSER); m.objs.set(K(sp.x + dx, sp.y + dy), { text: SPUR_TEXT.geyser }); } tset(m, sp.x, sp.y - 2, T.ROCK); }
+    const ix = sp.x + (kind === 'skel' ? 0 : 0), iy = sp.y + (kind === 'skel' ? 2 : 1);
+    if (!SOLID.has(tget(m, ix, iy))) addItem(m, ix, iy, ['Supertrank', 'Sonderbonbon', 'Fossil', 'Bernsteinkapsel'][(route.n + k) % 4], `spur${route.n}_${k}`);
+  });
+  // 2) Ein Landschaftsthema auf einem geraden Stück der Route
+  const flatAt = (idx, r) => idx - r >= 0 && idx + r < pts.length && pts.slice(idx - r, idx + r + 1).every(q => q.dx === pts[idx].dx && q.dy === pts[idx].dy);
+  const far = idx => idx > 45 && idx < pts.length - 30 && route.spurs.every(sp => Math.abs(sp.idx - idx) > 14) && !HAMLETS.some(h => Math.abs(h.x - pts[idx].x) < 16 && Math.abs(h.y - pts[idx].y) < 12);
+  for (let tries = 0, done = 0; tries < 40 && done < 2; tries++) {
+    const idx = Math.floor(pts.length * (0.25 + rng() * 0.5)); if (!far(idx) || !flatAt(idx, 7)) continue;
+    const p = pts[idx], horiz = p.dy === 0, b = biomeAt(p.x, p.y);
+    const at = (along, o) => horiz ? [p.x + along, p.y + o] : [p.x + o, p.y + along]; // along = entlang des Weges, o = quer dazu
+    const theme = b === 1 ? 'lava' : b === 2 ? 'ice' : b === 3 ? 'dunes' : b === 4 ? 'swamp' : ['river', 'canyon', 'meadow'][(route.n + done) % 3];
+    if (theme === 'river') {
+      for (let o = -16; o <= 17; o++) { const w = Math.round(Math.sin(o / 3) * 1.2); for (let t = 0; t < 3; t++) { const [x, y] = at(w + t - 1, o); if (core.has(K(x, y))) tset(m, x, y, T.BRIDGE); else put(x, y, T.WATER); } }
+    } else if (theme === 'canyon') {
+      for (let along = -7; along <= 7; along++) for (const o of [-5, -4, 5, 6]) { const [x, y] = at(along, o); put(x, y, horiz && o === -4 ? T.CLIFF : T.CLIFF_TOP); }
+      if (!horiz) for (let o = -3; o <= 4; o++) { const [x1, y1] = at(-1, o), [x2, y2] = at(0, o); if (core.has(K(x1, y1))) { tset(m, x1, y1, T.STAIRS); tset(m, x2, y2, T.STAIRS); } else { put(x1, y1, T.CLIFF_TOP); put(x2, y2, T.CLIFF); } }
+      const [wx, wy] = at(3, horiz ? -4 : -5); if (horiz && put(wx, wy, T.WFALL)) { const [px2, py2] = at(3, -3); put(px2, py2, T.WATER); }
+    } else if (theme === 'meadow') {
+      for (let along = -7; along <= 7; along++) for (const o of [-4, -3, 3, 4, 5]) if (rng() < 0.6) { const [x, y] = at(along, o); put(x, y, T.FLOWER); }
+      for (const [al, o] of [[-5, -4], [4, 5]]) { const [x, y] = at(al, o); if (put(x, y, T.MENHIR)) m.objs.set(K(x, y), { text: SPUR_TEXT.ring }); }
+    } else if (theme === 'lava') {
+      for (const side of [-1, 1]) for (let along = -6; along <= 6; along++) for (let o = 3; o <= 6; o++) { const r = Math.hypot(along / 6, (o - 4.5) / 2) + (hash(along, o * side, 63) - 0.5) * 0.4; const [x, y] = at(along, o * side); if (r < 0.9) put(x, y, T.WATER); }
+      for (const [al, o] of [[-7, 3], [7, -3], [0, 7], [2, -7]]) { const [x, y] = at(al, o); put(x, y, T.SPIRE); }
+    } else if (theme === 'ice') {
+      for (let along = -5; along <= 5; along++) for (let o = 3; o <= 7; o++) { const [x, y] = at(along, o); if (Math.hypot(along / 5, (o - 5) / 2) < 1) put(x, y, T.WATER); }
+      for (const [al, o] of [[-6, -3], [6, -4]]) { const [x, y] = at(al, o); if (put(x, y, T.GEYSER)) m.objs.set(K(x, y), { text: SPUR_TEXT.geyser }); }
+    } else if (theme === 'dunes') {
+      for (let along = -7; along <= 7; along++) for (let o = -4; o <= 5; o++) { const [x, y] = at(along, o); if (!core.has(K(x, y)) && mine(x, y) && !SOLID.has(tget(m, x, y))) tset(m, x, y, T.SAND); }
+      for (const [al, o] of [[-6, -3], [-2, 4], [3, -4], [7, 3]]) { const [x, y] = at(al, o); put(x, y, T.CACTUS); }
+    } else if (theme === 'swamp') {
+      for (const side of [-1, 1]) for (let along = -6; along <= 6; along++) for (let o = 3; o <= 5; o++) { const [x, y] = at(along, o * side); if (hash(along, o * side, 64) < 0.55) put(x, y, T.WATER); }
+      for (const [al, o] of [[-3, 3], [5, -3]]) { const [x, y] = at(al, o); put(x, y, T.BONES); }
+    }
+    (route.themes = route.themes || []).push({ theme, x: p.x, y: p.y });
+    done++;
+  }
+}
+function carveSpurs(m, route, rng, inAnyTown) {
+  // Abzweigungen: schmale Pfade ins Dickicht, am Ende eine versteckte Lichtung
+  const pts = route.pts, want = pts.length > 60 ? 2 + (pts.length > 110 ? 1 : 0) : 1;
+  for (let tries = 0; tries < 30 && route.spurs.length < want; tries++) {
+    const idx = Math.floor(pts.length * (0.2 + rng() * 0.6)), p = pts[idx];
+    if (!p || pts.slice(Math.max(0, idx - 8), idx + 9).some(q => q.dx !== p.dx || q.dy !== p.dy)) continue;
+    if (route.spurs.some(s => Math.abs(s.idx - idx) < 20)) continue;
+    const side = rng() < 0.5 ? -1 : 1, len = 14 + Math.floor(rng() * 10), [px, py] = p.dy === 0 ? [0, side] : [side, 0];
+    const ex = p.x + px * (len + 5), ey = p.y + py * (len + 5);
+    let ok = true;
+    for (let o = 6; o <= len + 10 && ok; o++) for (let w = -6; w <= 6; w++) { const x = p.x + px * o + py * w, y = p.y + py * o + px * w; if (x < 2 || y < 2 || x >= m.w - 2 || y >= m.h - 2 || inAnyTown(x, y) || tget(m, x, y) !== T.TREE) { ok = false; break; } }
+    if (!ok) continue;
+    for (let o = 5; o <= len + 5; o++) for (let w = -1; w <= 2; w++) { const x = p.x + px * o + Math.abs(py) * w, y = p.y + py * o + Math.abs(px) * w; tset(m, x, y, w === 0 || w === 1 ? (o % 5 < 3 ? T.PATH : T.GRASS) : T.GRASS); aset(m, x, y, route.areaId); }
+    for (let y = ey - 4; y <= ey + 4; y++) for (let x = ex - 4; x <= ex + 4; x++) if ((x - ex) ** 2 + (y - ey) ** 2 <= 18) { tset(m, x, y, T.GRASS); aset(m, x, y, route.areaId); }
+    route.spurs.push({ idx, x: ex, y: ey, side, dir: [px, py], len, px0: p.x, py0: p.y });
+  }
+}
 function buildHamlet(m, route) {
   // Zwischendorf mitten auf dem Bogen: Forscherstation, Rasthütte, Lagerfeuer
   const pts = route.pts, flat = idx => pts.slice(idx - 10, idx + 11).every(q => q.dy === 0 && q.y === pts[idx].y);
@@ -1667,12 +1776,23 @@ function genWorld() {
       let x = x0, y = y0;
       for (;;) { pts.push({ x, y, dx, dy }); if (x === x1 && y === y1) break; x += dx; y += dy; }
     };
-    // Manche Routen machen einen weiten Bogen durch die Wildnis (mit Rastplatz in der Mitte)
-    if (DETOURS[i]) { const sx = Math.sign(b.x - a.x), x1 = a.x + sx * 15, x2 = b.x - sx * 15, wy = a.y + DETOURS[i]; seg(a.x, a.y, x1, a.y); seg(x1, a.y, x1, wy); seg(x1, wy, x2, wy); seg(x2, wy, x2, b.y); seg(x2, b.y, b.x, b.y); }
-    else if (mode === 'H') { const mx = Math.round((a.x + b.x) / 2); seg(a.x, a.y, mx, a.y); seg(mx, a.y, mx, b.y); seg(mx, b.y, b.x, b.y); }
-    else { const my = Math.round((a.y + b.y) / 2); seg(a.x, a.y, a.x, my); seg(a.x, my, b.x, my); seg(b.x, my, b.x, b.y); }
+    // Gerade aus der Stadt hinaus (dort steht die Sperre), dann in Kurven durch die Wildnis, gerade in die Zielstadt
+    const H = mode === 'H', d = H ? Math.sign(b.x - a.x) : Math.sign(b.y - a.y), out = 28, inn = 20;
+    const way = [[a.x, a.y], H ? [a.x + d * out, a.y] : [a.x, a.y + d * out]];
+    const n = i === 8 ? 0 : 2 + (rng() < 0.5 ? 1 : 0); // Route 9 führt als lange Brücke gerade übers Urmeer
+    for (let k = 1; k <= n; k++) {
+      const off = (rng() < 0.5 ? -1 : 1) * (10 + Math.floor(rng() * 16));
+      if (H) { const x0 = a.x + d * out, x1 = b.x - d * inn; way.push([Math.round(x0 + (x1 - x0) * k / (n + 1)), a.y + off]); }
+      else { const y0 = a.y + d * out, y1 = b.y - d * inn; way.push([a.x + off, Math.round(y0 + (y1 - y0) * k / (n + 1))]); }
+    }
+    way.push(H ? [b.x - d * inn, b.y] : [b.x, b.y - d * inn], [b.x, b.y]);
+    for (let k = 1; k < way.length; k++) {
+      const [xa, ya] = way[k - 1], [xb, yb] = way[k];
+      if (H) { seg(xa, ya, xa, yb); seg(xa, yb, xb, yb); } else { seg(xa, ya, xb, ya); seg(xb, ya, xb, yb); }
+    }
     const areaId = AREA_NAMES.length; AREA_NAMES.push('ROUTE ' + (i + 1));
-    const route = { i, n: i + 1, from: i, to: i + 1, detour: !!DETOURS[i], pts: pts.filter(p => !inRect(TOWN_RECTS[i], p.x, p.y) && !inRect(TOWN_RECTS[i + 1], p.x, p.y)), areaId };
+    const route = { i, n: i + 1, from: i, to: i + 1, spurs: [], pts: pts.filter(p => !inRect(TOWN_RECTS[i], p.x, p.y) && !inRect(TOWN_RECTS[i + 1], p.x, p.y)), areaId };
+    route.detour = route.pts.length >= 90 && route.n % 2 === 0; // jede zweite lange Route bekommt einen Rastplatz
     ROUTES.push(route);
     for (const p of route.pts) {
       for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
@@ -1690,6 +1810,7 @@ function genWorld() {
         core.add(K(x, y));
       }
     }
+    carveSpurs(m, route, rng, inAnyTown);
   }
 
   TOWNS.forEach((t, i) => buildTown(m, i, TOWN_RECTS[i]));
@@ -1700,8 +1821,7 @@ function genWorld() {
     const src = TOWN_RECTS[route.from];
     const perp = p => (p.dy === 0 ? [0, 1] : [1, 0]);
     const nearCorner = idx => { for (let q = Math.max(0, idx - 6); q < Math.min(pts.length, idx + 6); q++) if (pts[q].dx !== pts[idx].dx || pts[q].dy !== pts[idx].dy) return true; return false; };
-    // Bei Umwegen steht die Sperre mitten im ersten Bogenstück, damit man nicht an der Ecke vorbeilaufen kann
-    let gateIdx = route.detour ? pts.findIndex(p => p.dx === 0 && Math.abs(p.y - src.cy) >= 10) : pts.findIndex(p => rectDist(src, p.x, p.y) === 5);
+    let gateIdx = pts.findIndex(p => rectDist(src, p.x, p.y) === 5);
     if (gateIdx < 0) gateIdx = Math.min(4, pts.length - 1);
 
     // See neben der Route (im Vulkangebiet wird daraus ein Lavasee)
@@ -1777,6 +1897,7 @@ function genWorld() {
     }
 
     if (route.detour) buildHamlet(m, route);
+    decorateRoute(m, route, core, inAnyTown);
 
     // Sperre am Routenanfang: Route 1 braucht ein Wesen, alle anderen den Orden der Startstadt
     {
@@ -1811,6 +1932,14 @@ function genWorld() {
     }
   }
 
+  // Jeder Abzweig bleibt begehbar, auch wenn Flüsse oder Seen ihn kreuzen (dann mit Steg)
+  for (const r of ROUTES) for (const sp of r.spurs) {
+    const [px, py] = sp.dir;
+    for (let o = 5; o <= sp.len + 5; o++) for (let w = 0; w <= 1; w++) {
+      const x = sp.px0 + px * o + Math.abs(py) * w, y = sp.py0 + py * o + Math.abs(px) * w, t = tget(m, x, y);
+      if (SOLID.has(t) && !m.objs.has(K(x, y))) tset(m, x, y, t === T.WATER ? T.BRIDGE : T.PATH);
+    }
+  }
   const sand = [];
   for (let y = 0; y < m.h; y++) for (let x = 0; x < m.w; x++) {
     const t = tget(m, x, y);
@@ -5081,7 +5210,7 @@ function versionLabel() {
 const PROFILE_COUNT = 3;
 const slotKey = i => `wesenwelt.urzeit.slot${i + 1}`;
 let currentSlot = 0;
-function snapshot() { return { dexv: DEX_VERSION, savedAt: Date.now(), gid: state.gid, money: state.money, box: state.box, lastCenter: state.lastCenter, slot: currentSlot, profile: state.profile, time: state.time, map: cur ? cur.id : 'home:0', x: player.x, y: player.y, dir: player.dir, badges: state.badges, flags: state.flags, items: state.items, steps: state.steps, team: state.team, seen: state.seen, caught: state.caught }; }
+function snapshot() { return { wv: WORLD_VERSION, dexv: DEX_VERSION, savedAt: Date.now(), gid: state.gid, money: state.money, box: state.box, lastCenter: state.lastCenter, slot: currentSlot, profile: state.profile, time: state.time, map: cur ? cur.id : 'home:0', x: player.x, y: player.y, dir: player.dir, badges: state.badges, flags: state.flags, items: state.items, steps: state.steps, team: state.team, seen: state.seen, caught: state.caught }; }
 function loadSlot(i) { try { const s = localStorage.getItem(slotKey(i)); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function writeSlot(i, d) { try { localStorage.setItem(slotKey(i), JSON.stringify(d)); return true; } catch (e) { return false; } }
 function deleteSlot(i) { try { localStorage.removeItem(slotKey(i)); } catch (e) {} if (account) api(`/api/saves/${i}`, 'DELETE').catch(() => {}); }
@@ -5113,8 +5242,14 @@ function applySave(s) {
   state.team = (s.team || []).filter(w => SPECIES[w.sp - 1]).map(ensureWesen); state.seen = s.seen || {}; state.caught = s.caught || {};
   state.box = (s.box || []).filter(w => SPECIES[w.sp - 1]).map(ensureWesen); state.money = s.money ?? 3000; state.lastCenter = s.lastCenter || null;
   lastArea = 0;
+  if (s.map === 'world' && (s.wv || 1) < WORLD_VERSION) {
+    // Die Welt ist neu vermessen: vor dem zuletzt besuchten Center (oder zu Hause) weiterspielen
+    const d = (s.lastCenter && DOORS[s.lastCenter]) || DOORS['home:0'];
+    s = { ...s, x: d.x, y: d.y + 1, dir: 'down' };
+  }
   setMap(s.map || 'home:0', s.x ?? 4, s.y ?? 6, s.dir || 'down');
   unstick();
+  if (SOLID.has(tget(cur, player.x, player.y))) { const d = DOORS['home:0']; setMap('world', d.x, d.y + 1, 'down'); }
 }
 const fmtTime = sec => `${Math.floor(sec / 3600)}:${String(Math.floor(sec / 60) % 60).padStart(2, '0')}`;
 function placeName(d) {
