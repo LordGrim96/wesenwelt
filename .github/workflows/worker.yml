@@ -19,6 +19,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     defaults:
       run:
+        shell: bash
         working-directory: worker
     steps:
       - uses: actions/checkout@v4
@@ -52,4 +53,12 @@ jobs:
           npx wrangler deploy | tee deploy.log
           URL="$(grep -o 'https://[a-zA-Z0-9.-]*workers\.dev' deploy.log | head -1)"
           echo "Server-Adresse: $URL"
+          test -n "$URL"
+          echo "URL=$URL" >> "$GITHUB_ENV"
+      - name: Server testen
+        if: steps.check.outputs.skip != '1'
+        run: |
+          # Kurz warten, bis die neue Version weltweit verteilt ist
+          for i in 1 2 3 4 5 6; do curl -fsS "$URL/api" && break; sleep 5; done
+          curl -fsS "$URL/api" | grep -q '"ok":true'
           echo "### Server ist online: $URL" >> "$GITHUB_STEP_SUMMARY"
