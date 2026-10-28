@@ -99,7 +99,7 @@ const CONFIG = {
   // Adresse des Konto-Servers (worker/). Leer = nur Gast-Spielstände auf dem Gerät
   api: 'https://wesenwelt-api.edengrim67.workers.dev',
 };
-const GAME_VERSION = '202610281521'; // wird von build_app.py durch die Build-Zeit ersetzt
+const GAME_VERSION = '202610281727'; // wird von build_app.py durch die Build-Zeit ersetzt
 
 // Logische Bildgröße passt sich dem Bildschirm an (mindestens 256x192); SC = interne Auflösung für scharfe Schrift
 let VW = 256, VH = 192, OX = 0, OY = 0, RW = 256, RH = 192;
@@ -2985,7 +2985,7 @@ class TrainerCard {
 }
 
 class OptionsScreen {
-  constructor() { this.sel = 0; this.rows = [['gfx', 'GRAFIK', GFX_NAMES], ['time', 'TAGESZEIT', ['AUTOMATISCH', 'MORGEN', 'TAG', 'ABEND', 'NACHT']], ['text', 'TEXTTEMPO', TEXT_NAMES], ['konto', 'KONTO'], ['code', 'SPIELSTAND-CODE'], ['dev', 'ENTWICKLER'], ['back', 'ZURÜCK']]; }
+  constructor() { this.sel = 0; this.rows = [['gfx', 'GRAFIK', GFX_NAMES], ['time', 'TAGESZEIT', ['AUTOMATISCH', 'MORGEN', 'TAG', 'ABEND', 'NACHT']], ['text', 'TEXTTEMPO', TEXT_NAMES], ['konto', 'KONTO'], ['offline', 'OFFLINE-MODUS', ['AUS', 'AN']], ['code', 'SPIELSTAND-CODE'], ['dev', 'ENTWICKLER'], ['back', 'ZURÜCK']]; }
   update() {
     const n = this.rows.length, [key, , vals] = this.rows[this.sel];
     if (pressed.up) this.sel = (this.sel + n - 1) % n;
@@ -2993,6 +2993,7 @@ class OptionsScreen {
     if (vals && (pressed.left || pressed.right || pressed.A)) {
       OPTS[key] = (OPTS[key] + (pressed.left ? vals.length - 1 : 1)) % vals.length;
       timeMode = OPTS.time; CONFIG.textSpeed = TEXT_SPEEDS[OPTS.text]; saveOpts();
+      if (key === 'offline' && !OPTS.offline) { pendingSync = true; syncWhenOnline(); }
     }
     if (pressed.A && key === 'dev') run(devToggle);
     if (pressed.A && key === 'code') run(() => exportCode());
@@ -3004,8 +3005,8 @@ class OptionsScreen {
     header('OPTIONEN');
     box(4, 24, 248, 120);
     this.rows.forEach(([key, label, vals], r) => {
-      const y = 29 + r * 16, sel = r === this.sel;
-      if (sel) rr(10, y + 1, 236, 16, 4, '#f8e0d8');
+      const y = 28 + r * 14, sel = r === this.sel;
+      if (sel) rr(10, y + 2, 236, 14, 4, '#f8e0d8');
       text(label, 20, y + 1, sel ? UI.red : UI.text, null);
       if (key === 'konto') { const v = account ? 'ANGEMELDET' : 'GAST'; text(v, 186 - measure(v) / 2, y + 1, account ? '#2f8a3a' : '#7888a0', null); }
       if (key === 'dev') { const v = devOn ? 'AN' : 'AUS'; text(v, 186 - measure(v) / 2, y + 1, devOn ? '#2f8a3a' : '#7888a0', null); }
@@ -3015,7 +3016,7 @@ class OptionsScreen {
     });
     box(2, 146, 252, 44);
     const key = this.rows[this.sel][0];
-    const info = { gfx: ['Alle Effekte: Wolken, Flugsaurier, Vignette.', 'Fast alle Effekte, schont den Akku.', 'Ohne Wetter und Effekte, für ältere Handys.'][OPTS.gfx], time: OPTS.time ? 'Feste Tageszeit für die ganze Welt.' : 'Tageszeit nach deiner echten Uhrzeit.', text: 'So schnell erscheinen die Texte.', code: 'Spielstand auf Handy oder PC mitnehmen.', konto: account ? `Angemeldet als ${accName()}` : 'Anmelden: Spielstände auf allen Geräten.', dev: devOn ? 'A: Entwicklermodus ausschalten.' : 'A: Passwort eingeben.', back: 'Einstellungen werden automatisch gespeichert.' }[key];
+    const info = { gfx: ['Alle Effekte: Wolken, Flugsaurier, Vignette.', 'Fast alle Effekte, schont den Akku.', 'Ohne Wetter und Effekte, für ältere Handys.'][OPTS.gfx], time: OPTS.time ? 'Feste Tageszeit für die ganze Welt.' : 'Tageszeit nach deiner echten Uhrzeit.', text: 'So schnell erscheinen die Texte.', code: 'Spielstand auf Handy oder PC mitnehmen.', konto: account ? `Angemeldet als ${accName()}` : 'Anmelden: Spielstände auf allen Geräten.', offline: OPTS.offline ? 'Spielstände nur auf dem Gerät.' : 'An: ohne Internet, Abgleich später.', dev: devOn ? 'A: Entwicklermodus ausschalten.' : 'A: Passwort eingeben.', back: 'Einstellungen werden automatisch gespeichert.' }[key];
     text(info, 12, 150); text('Links/Rechts: ändern   B: zurück', 12, 166, '#7888a0', null);
   }
 }
@@ -3597,7 +3598,15 @@ function claimDevice(name) {
     localStorage.setItem(OWNER_KEY, name);
   } catch (e) {}
 }
+// Offline: entweder von Hand eingeschaltet (spart Internet) oder ohne Konto gestartet, weil der Server nicht erreichbar war
+let offlineSession = false, pendingSync = false;
+const isOffline = () => !!OPTS.offline || offlineSession || !navigator.onLine;
+async function serverReachable() {
+  if (OPTS.offline || !navigator.onLine) return false;
+  try { const c = new AbortController(), t = setTimeout(() => c.abort(), 5000); const r = await fetch(CONFIG.api + '/api', { cache: 'no-store', signal: c.signal }); clearTimeout(t); return r.ok; } catch (e) { return false; }
+}
 async function api(path, method = 'GET', body) {
+  if (OPTS.offline) throw new Error('Der Offline-Modus ist an. Schalte ihn unter OPTIONEN aus.');
   let r;
   try {
     r = await fetch(CONFIG.api + path, { method, headers: { 'content-type': 'application/json', ...(account ? { authorization: 'Bearer ' + account.token } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -3635,8 +3644,15 @@ let pushTimer = 0;
 function cloudPush(slot) {
   if (!account || !accountsReady()) return;
   clearTimeout(pushTimer);
-  pushTimer = setTimeout(() => { const d = loadSlot(slot); if (d) api(`/api/saves/${slot}`, 'PUT', d).catch(() => {}); }, 1200);
+  if (OPTS.offline || !navigator.onLine) { pendingSync = true; return; }
+  pushTimer = setTimeout(() => { const d = loadSlot(slot); if (d) api(`/api/saves/${slot}`, 'PUT', d).then(() => { pendingSync = false; }, () => { pendingSync = true; }); }, 1200);
 }
+// Wieder online: offline Gespeichertes automatisch hochladen
+async function syncWhenOnline() {
+  if (!account || !accountsReady() || OPTS.offline || !pendingSync) return;
+  try { if (mode === 'world') saveGame(); await syncSaves(); pendingSync = false; popup = { text: 'CLOUD ABGEGLICHEN', t: 120 }; } catch (e) {}
+}
+addEventListener('online', () => setTimeout(syncWhenOnline, 1500));
 // Echte Eingabefelder für Name und Passwort, damit Handy-Tastatur und Passwort-Manager funktionieren
 function formModal({ title, hint, fields, ok, onSubmit }) {
   return new Promise(res => {
@@ -3684,6 +3700,7 @@ async function accountLogin(register) {
     },
   });
   if (!done) return false;
+  offlineSession = false;
   let msg = account.admin ? `Willkommen, Admin ${accName()}! Spielerverwaltung findest du im Menü unter ENTWICKLER.` : register ? 'Dein Konto ist bereit! Deine Spielstände werden ab jetzt in der Cloud gesichert.' : 'Du bist angemeldet. Deine Spielstände sind jetzt auf allen Geräten gleich.';
   try { await syncSaves(); } catch (e) { msg += ' (Abgleich später: ' + e.message + ')'; }
   await say(msg);
@@ -3762,7 +3779,14 @@ async function adminPlayers() {
 }
 async function requireLogin() {
   // Gespielt wird nur mit Konto. false = zurück zum Titelbild.
-  while (accountsReady() && !account) {
+  while (accountsReady() && !account && !offlineSession) {
+    if (!(await serverReachable())) {
+      // Ohne Internet: offline auf diesem Gerät spielen, beim nächsten Anmelden wird alles hochgeladen
+      const c = await ask('Kein Internet. Du kannst offline auf diesem Gerät spielen.', ['OFFLINE SPIELEN', 'NOCHMAL VERSUCHEN', 'ZURÜCK'], 0);
+      if (c === 2) return false;
+      if (c === 0) { offlineSession = true; pendingSync = true; await say('Offline-Modus: Deine Spielstände bleiben auf diesem Gerät. Melde dich später unter OPTIONEN → KONTO an, dann wird alles gesichert.'); }
+      continue;
+    }
     const c = await ask('Bitte melde dich an, um zu spielen.', ['ANMELDEN', 'NEUES KONTO', 'ZURÜCK'], 0);
     if (c === 2) return false;
     await accountLogin(c === 1);
@@ -4848,7 +4872,7 @@ let tick = 0;
 let mode = 'title';
 const tileIndex = (t, x, y) => (t === T.TREE ? TREE_Q + (x & 1) + ((y & 1) << 1) : t);
 /* --- Optionen: Grafikstufe, Tageszeit, Textgeschwindigkeit --- */
-const OPTS = { gfx: 0, time: 0, text: 1 };
+const OPTS = { gfx: 0, time: 0, text: 1, offline: 0 };
 const GFX_NAMES = ['ULTRA', 'HOCH', 'EINFACH'], TEXT_NAMES = ['LANGSAM', 'NORMAL', 'SCHNELL'], TEXT_SPEEDS = [0.5, 1, 2];
 const gfx = lvl => OPTS.gfx <= lvl; // gfx(0): nur ULTRA, gfx(1): ULTRA und HOCH
 function loadOpts() { try { Object.assign(OPTS, JSON.parse(localStorage.getItem('wesenwelt.options') || '{}')); } catch (e) {} timeMode = OPTS.time; CONFIG.textSpeed = TEXT_SPEEDS[OPTS.text]; }
@@ -5144,6 +5168,7 @@ function drawWorld() {
     text(popup.text, 12, 3 - slide);
   }
   if (noclip) text('NOCLIP', VW - 52, 2, '#ffffff', '#000000');
+  if (accountsReady() && isOffline()) { const o = 'OFFLINE'; rr(VW - measure(o) - 14, VH - 17, measure(o) + 10, 14, 3, 'rgba(0,0,0,.5)'); text(o, VW - measure(o) - 9, VH - 20, '#f8d0a0', null); }
   if (devOn && devCoords) {
     const s = `${cur.id}  ${player.x},${player.y}` + (cur.outdoor ? `  ${AREA_NAMES[aget(cur, player.x, player.y)] || '-'}  ${BIOMES[bget(cur, player.x, player.y)].name}` : '');
     rr(2, VH - 18, measure(s) + 12, 16, 3, 'rgba(0,0,0,.62)'); text(s, 8, VH - 20, '#ffffff', null);
