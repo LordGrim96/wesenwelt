@@ -74,6 +74,8 @@ const CONFIG = {
   encounterRate: 1 / 10,
   textSpeed: 1,
   saveKey: 'wesenwelt.urzeit.v1',
+  // Adresse des Konto-Servers (worker/). Leer = nur Gast-Spielstände auf dem Gerät
+  api: '',
 };
 const GAME_VERSION = 'dev'; // wird von build_app.py durch die Build-Zeit ersetzt
 
@@ -1983,10 +1985,11 @@ class ProfileScreen {
     const r = this.res; if (!r) return;
     if (pressed.A || pressed.START) { this.res = null; r(this.sel); }
     else if (pressed.B) { this.res = null; r(-1); }
+    else if (pressed.SELECT && accountsReady()) { this.res = null; r(-2); }
   }
   draw() {
     bgPattern('#e8dcc0', '#e2d4b4');
-    header('PROFIL WÄHLEN', `${this.data.filter(Boolean).length}/${PROFILE_COUNT}`);
+    header('PROFIL WÄHLEN', !accountsReady() ? `${this.data.filter(Boolean).length}/${PROFILE_COUNT}` : account ? 'MIT KONTO' : 'GAST');
     this.data.forEach((d, i) => {
       const x = 6 + i * 84, y = 26, sel = i === this.sel;
       rr(x, y, 76, 112, 6, UI.dark); rr(x + 1, y + 1, 74, 110, 5, sel ? UI.red : '#a89878'); rr(x + 3, y + 3, 70, 106, 4, sel ? '#fff4e8' : '#f4ecdc');
@@ -2009,7 +2012,7 @@ class ProfileScreen {
     const d = this.data[this.sel];
     if (d) text(`${(d.profile || {}).name || 'Spieler'} · ${placeName(d)}`, 12, 150, UI.text, UI.shadow, 16, 230);
     else text('Leerer Platz für ein neues Abenteuer.', 12, 150);
-    text('A: auswählen   B: zurück', 12, 166, '#7888a0', null);
+    text(accountsReady() ? 'A: wählen  B: zurück  SELECT: Konto' : 'A: auswählen   B: zurück', 12, 166, '#7888a0', null, 16, 232);
   }
 }
 
@@ -2154,7 +2157,7 @@ class TrainerCard {
 }
 
 class OptionsScreen {
-  constructor() { this.sel = 0; this.rows = [['gfx', 'GRAFIK', GFX_NAMES], ['time', 'TAGESZEIT', ['AUTOMATISCH', 'MORGEN', 'TAG', 'ABEND', 'NACHT']], ['text', 'TEXTTEMPO', TEXT_NAMES], ['code', 'SPIELSTAND-CODE'], ['dev', 'ENTWICKLER'], ['back', 'ZURÜCK']]; }
+  constructor() { this.sel = 0; this.rows = [['gfx', 'GRAFIK', GFX_NAMES], ['time', 'TAGESZEIT', ['AUTOMATISCH', 'MORGEN', 'TAG', 'ABEND', 'NACHT']], ['text', 'TEXTTEMPO', TEXT_NAMES], ['konto', 'KONTO'], ['code', 'SPIELSTAND-CODE'], ['dev', 'ENTWICKLER'], ['back', 'ZURÜCK']]; }
   update() {
     const n = this.rows.length, [key, , vals] = this.rows[this.sel];
     if (pressed.up) this.sel = (this.sel + n - 1) % n;
@@ -2165,6 +2168,7 @@ class OptionsScreen {
     }
     if (pressed.A && key === 'dev') run(devToggle);
     if (pressed.A && key === 'code') run(() => exportCode());
+    if (pressed.A && key === 'konto') run(accountMenu);
     if (pressed.B || pressed.START || (pressed.A && key === 'back')) { pop(this); this.done(); }
   }
   draw() {
@@ -2172,9 +2176,10 @@ class OptionsScreen {
     header('OPTIONEN');
     box(4, 24, 248, 120);
     this.rows.forEach(([key, label, vals], r) => {
-      const y = 30 + r * 18, sel = r === this.sel;
-      if (sel) rr(10, y, 236, 18, 4, '#f8e0d8');
+      const y = 29 + r * 16, sel = r === this.sel;
+      if (sel) rr(10, y + 1, 236, 16, 4, '#f8e0d8');
       text(label, 20, y + 1, sel ? UI.red : UI.text, null);
+      if (key === 'konto') { const v = account ? 'ANGEMELDET' : 'GAST'; text(v, 186 - measure(v) / 2, y + 1, account ? '#2f8a3a' : '#7888a0', null); }
       if (key === 'dev') { const v = devOn ? 'AN' : 'AUS'; text(v, 186 - measure(v) / 2, y + 1, devOn ? '#2f8a3a' : '#7888a0', null); }
       if (!vals) return;
       const v = vals[OPTS[key]]; text(v, 186 - measure(v) / 2, y + 1, UI.text, null);
@@ -2182,7 +2187,7 @@ class OptionsScreen {
     });
     box(2, 146, 252, 44);
     const key = this.rows[this.sel][0];
-    const info = { gfx: ['Alle Effekte: Wolken, Flugsaurier, Vignette.', 'Fast alle Effekte, schont den Akku.', 'Ohne Wetter und Effekte, für ältere Handys.'][OPTS.gfx], time: OPTS.time ? 'Feste Tageszeit für die ganze Welt.' : 'Tageszeit nach deiner echten Uhrzeit.', text: 'So schnell erscheinen die Texte.', code: 'Spielstand auf Handy oder PC mitnehmen.', dev: devOn ? 'A: Entwicklermodus ausschalten.' : 'A: Passwort eingeben.', back: 'Einstellungen werden automatisch gespeichert.' }[key];
+    const info = { gfx: ['Alle Effekte: Wolken, Flugsaurier, Vignette.', 'Fast alle Effekte, schont den Akku.', 'Ohne Wetter und Effekte, für ältere Handys.'][OPTS.gfx], time: OPTS.time ? 'Feste Tageszeit für die ganze Welt.' : 'Tageszeit nach deiner echten Uhrzeit.', text: 'So schnell erscheinen die Texte.', code: 'Spielstand auf Handy oder PC mitnehmen.', konto: account ? account.email : 'Anmelden: Spielstände auf allen Geräten.', dev: devOn ? 'A: Entwicklermodus ausschalten.' : 'A: Passwort eingeben.', back: 'Einstellungen werden automatisch gespeichert.' }[key];
     text(info, 12, 150); text('Links/Rechts: ändern   B: zurück', 12, 166, '#7888a0', null);
   }
 }
@@ -2580,6 +2585,7 @@ async function devToggle() {
   if (pw === null) return;
   if (sha256('wesenwelt:' + pw) !== DEV_HASH) { await say('Falsches Passwort.'); return; }
   devOn = true; try { localStorage.setItem(DEV_KEY, DEV_HASH); } catch (e) {}
+  if (account) { try { const d = await api('/api/dev', 'POST', { password: pw }); account.dev = d.user.dev; storeAccount(); } catch (e) {} }
   await say('Entwicklermodus aktiv! Im START-Menü gibt es jetzt den Punkt ENTWICKLER, und auf der KARTE reist du mit A sofort an jeden Ort.');
 }
 function devLock() { devOn = false; noclip = false; devCoords = false; try { localStorage.removeItem(DEV_KEY); } catch (e) {} }
@@ -2678,14 +2684,17 @@ async function unpackSave(code) {
   } catch (e) { return null; }
 }
 let domModal = false;
+const MODAL_WRAP = 'position:fixed;inset:0;z-index:1000;background:rgba(10,8,6,.72);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
+const MODAL_BOX = 'width:min(440px,100%);background:#f8f0e0;border:4px solid #2a221c;border-radius:10px;padding:14px;box-sizing:border-box;font:20px VT323,monospace;color:#2a221c';
+const MODAL_BTN = 'font:20px VT323,monospace;padding:8px 14px;border-radius:6px;border:2px solid #2a221c;background:#f8f0e0;color:#2a221c;cursor:pointer';
 function codeModal({ title, hint, value = '', readOnly = false, ok }) {
   // Echtes Textfeld über dem Spiel, damit man Codes kopieren und einfügen kann
   return new Promise(res => {
     domModal = true; for (const k in held) held[k] = false;
     const wrap = document.createElement('div');
-    wrap.style.cssText = 'position:fixed;inset:0;z-index:1000;background:rgba(10,8,6,.72);display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box';
-    const btn = 'font:20px VT323,monospace;padding:8px 14px;border-radius:6px;border:2px solid #2a221c;background:#f8f0e0;color:#2a221c;cursor:pointer';
-    wrap.innerHTML = `<div style="width:min(440px,100%);background:#f8f0e0;border:4px solid #2a221c;border-radius:10px;padding:14px;box-sizing:border-box;font:20px VT323,monospace;color:#2a221c">
+    wrap.style.cssText = MODAL_WRAP;
+    const btn = MODAL_BTN;
+    wrap.innerHTML = `<div style="${MODAL_BOX}">
       <div style="font-size:26px;margin-bottom:6px"></div><div style="margin-bottom:8px;color:#5a5048"></div>
       <textarea spellcheck="false" style="width:100%;height:120px;box-sizing:border-box;font:12px ui-monospace,monospace;word-break:break-all;border:2px solid #a89878;border-radius:6px;padding:6px;background:#fff"></textarea>
       <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:10px"></div><div style="margin-top:6px;color:#2f8a3a;min-height:20px"></div></div>`;
@@ -2716,9 +2725,151 @@ async function importCode(slot) {
   if (v === null) return false;
   const d = await unpackSave(v);
   if (!d) { await say('Dieser Code ist leider ungültig.'); return false; }
-  d.slot = slot; writeSlot(slot, d);
+  d.slot = slot; d.savedAt = Date.now(); writeSlot(slot, d); cloudPush(slot);
   await say(`Der Spielstand von ${d.profile.name || 'Spieler'} ist jetzt auf diesem Gerät!`);
   return true;
+}
+
+/* ---------------------------------------------------------------------
+   KONTEN – Anmeldung und Spielstände in der Cloud (Server: worker/)
+   Ohne Konto spielt man als Gast, die Spielstände bleiben dann auf dem Gerät.
+   --------------------------------------------------------------------- */
+const ACC_KEY = 'wesenwelt.account', GUEST_KEY = 'wesenwelt.guest';
+let account = null;
+try { account = JSON.parse(localStorage.getItem(ACC_KEY) || 'null'); } catch (e) {}
+if (account && account.dev) devOn = true;
+const accountsReady = () => !!CONFIG.api;
+function storeAccount() { try { if (account) localStorage.setItem(ACC_KEY, JSON.stringify(account)); else localStorage.removeItem(ACC_KEY); } catch (e) {} }
+function setGuest(on) { try { if (on) localStorage.setItem(GUEST_KEY, '1'); else localStorage.removeItem(GUEST_KEY); } catch (e) {} }
+function isGuest() { try { return localStorage.getItem(GUEST_KEY) === '1'; } catch (e) { return false; } }
+async function api(path, method = 'GET', body) {
+  let r;
+  try {
+    r = await fetch(CONFIG.api + path, { method, headers: { 'content-type': 'application/json', ...(account ? { authorization: 'Bearer ' + account.token } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
+  } catch (e) { throw new Error('Keine Verbindung zum Server. Bist du online?'); }
+  const d = await r.json().catch(() => ({}));
+  // Abgelaufene Anmeldung: lokal abmelden, die Spielstände bleiben auf dem Gerät
+  if (r.status === 401 && account && path !== '/api/login') { account = null; storeAccount(); }
+  if (!r.ok) throw new Error(d.error || 'Serverfehler. Bitte später noch einmal versuchen.');
+  return d;
+}
+const newGid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+async function syncSaves() {
+  // Pro Platz gewinnt der neuere Stand. Liegt dort ein anderes Spiel, wandert das ältere auf einen freien Platz.
+  if (!account) return;
+  const { saves } = await api('/api/saves');
+  const remote = i => { const r = saves.find(s => s.slot === i); try { return r ? JSON.parse(r.data) : null; } catch (e) { return null; } };
+  const free = () => [...Array(PROFILE_COUNT).keys()].find(k => !loadSlot(k) && !remote(k));
+  for (let i = 0; i < PROFILE_COUNT; i++) {
+    const L = loadSlot(i), R = remote(i), lt = L ? L.savedAt || 1 : 0, rt = R ? R.savedAt || 1 : 0;
+    if (R && rt > lt) {
+      if (L && L.gid !== R.gid) {
+        const k = free();
+        if (k !== undefined) { L.slot = k; writeSlot(k, L); await api(`/api/saves/${k}`, 'PUT', { ...L, savedAt: lt }); }
+        else try { localStorage.setItem(`wesenwelt.backup.slot${i + 1}`, JSON.stringify(L)); } catch (e) {}
+      }
+      writeSlot(i, R);
+    } else if (L && lt > rt) {
+      if (R && R.gid !== L.gid) { const k = free(); if (k !== undefined) { writeSlot(k, R); } }
+      await api(`/api/saves/${i}`, 'PUT', { ...L, savedAt: lt });
+    }
+  }
+}
+let pushTimer = 0;
+function cloudPush(slot) {
+  if (!account || !accountsReady()) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => { const d = loadSlot(slot); if (d) api(`/api/saves/${slot}`, 'PUT', d).catch(() => {}); }, 1200);
+}
+// Echte Eingabefelder für E-Mail und Passwort, damit Handy-Tastatur und Passwort-Manager funktionieren
+function formModal({ title, hint, fields, ok, onSubmit }) {
+  return new Promise(res => {
+    domModal = true; for (const k in held) held[k] = false;
+    const wrap = document.createElement('div'); wrap.style.cssText = MODAL_WRAP;
+    const box = document.createElement('form'); box.style.cssText = MODAL_BOX; box.noValidate = true; wrap.appendChild(box);
+    const h = document.createElement('div'); h.style.cssText = 'font-size:26px;margin-bottom:6px'; h.textContent = title; box.appendChild(h);
+    if (hint) { const p = document.createElement('div'); p.style.cssText = 'margin-bottom:6px;color:#5a5048'; p.textContent = hint; box.appendChild(p); }
+    const inputs = fields.map(f => {
+      const l = document.createElement('label'); l.style.cssText = 'display:block;margin:8px 0 2px'; l.textContent = f.label;
+      const i = document.createElement('input'); i.type = f.type; i.name = f.name; i.autocomplete = f.auto || 'off'; i.required = true;
+      i.style.cssText = 'width:100%;box-sizing:border-box;font:18px ui-monospace,monospace;padding:8px;border:2px solid #a89878;border-radius:6px;background:#fff;color:#2a221c';
+      box.append(l, i); return i;
+    });
+    const bar = document.createElement('div'); bar.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:12px';
+    const note = document.createElement('div'); note.style.cssText = 'margin-top:8px;min-height:20px';
+    box.append(bar, note);
+    const close = v => { wrap.remove(); domModal = false; res(v); };
+    const mk = (label, main) => { const b = document.createElement('button'); b.textContent = label; b.style.cssText = MODAL_BTN + (main ? ';background:#d84838;color:#fff' : ''); bar.appendChild(b); return b; };
+    const cancel = mk('ABBRECHEN'); cancel.type = 'button'; cancel.onclick = () => close(false);
+    const go = mk(ok, true); go.type = 'submit';
+    box.onsubmit = async e => {
+      e.preventDefault(); if (go.disabled) return;
+      const v = Object.fromEntries(inputs.map(i => [i.name, i.value]));
+      go.disabled = true; note.style.color = '#5a5048'; note.textContent = 'Bitte warten …';
+      let err = null; try { err = await onSubmit(v); } catch (x) { err = x.message; }
+      go.disabled = false;
+      if (err) { note.style.color = '#c03028'; note.textContent = err; } else close(true);
+    };
+    document.body.appendChild(wrap); inputs[0].focus();
+  });
+}
+async function accountLogin(register) {
+  const done = await formModal({
+    title: register ? 'Neues Konto' : 'Anmelden',
+    hint: register ? 'Mit einem Konto sind deine Spielstände auf Handy und PC gleich. Das Passwort braucht mindestens 8 Zeichen.' : 'Melde dich mit deinem Wesenwelt-Konto an.',
+    fields: [{ name: 'email', label: 'E-Mail', type: 'email', auto: 'email' }, { name: 'password', label: 'Passwort', type: 'password', auto: register ? 'new-password' : 'current-password' }],
+    ok: register ? 'ERSTELLEN' : 'ANMELDEN',
+    onSubmit: async v => {
+      const d = await api(register ? '/api/register' : '/api/login', 'POST', { email: v.email, password: v.password });
+      account = { token: d.token, ...d.user }; storeAccount(); if (account.dev) devOn = true;
+      return null;
+    },
+  });
+  if (!done) return false;
+  setGuest(false);
+  let msg = register ? 'Dein Konto ist bereit! Deine Spielstände werden ab jetzt in der Cloud gesichert.' : 'Du bist angemeldet. Deine Spielstände sind jetzt auf allen Geräten gleich.';
+  try { await syncSaves(); } catch (e) { msg += ' (Abgleich später: ' + e.message + ')'; }
+  await say(msg);
+  return true;
+}
+async function accountLogout() {
+  try { await api('/api/logout', 'POST'); } catch (e) {}
+  account = null; storeAccount();
+  try { devOn = localStorage.getItem(DEV_KEY) === DEV_HASH; } catch (e) { devOn = false; }
+}
+async function accountMenu() {
+  if (!accountsReady()) return say('Konten sind noch nicht eingerichtet. Du spielst auf diesem Gerät.');
+  if (!account) {
+    const c = await ask('Du spielst als Gast. Konto benutzen?', ['ANMELDEN', 'NEUES KONTO', 'ZURÜCK']);
+    if (c < 2) await accountLogin(c === 1);
+    return;
+  }
+  const c = await ask(`Angemeldet: ${account.email}`, ['ABGLEICHEN', 'ABMELDEN', 'KONTO LÖSCHEN', 'ZURÜCK'], 3);
+  if (c === 0) {
+    // Während des Spiels: erst schauen, ob ein anderes Gerät neuer ist, sonst den aktuellen Stand hochladen
+    const before = mode === 'world' ? (loadSlot(currentSlot) || {}).savedAt || 0 : 0;
+    try { await syncSaves(); } catch (e) { await say(e.message); return; }
+    const now = mode === 'world' ? loadSlot(currentSlot) : null;
+    if (now && (now.savedAt || 0) > before && await ask('Ein anderes Gerät hat einen neueren Stand. Laden?', ['LADEN', 'NEIN'], 0) === 0) {
+      await fadeTo(4); applySave(now); await fadeTo(0); await say('Der neuere Spielstand ist geladen.'); return;
+    }
+    if (mode === 'world') saveGame();
+    await say('Deine Spielstände sind abgeglichen.');
+  }
+  if (c === 1) { await accountLogout(); await say('Du bist abgemeldet. Deine Spielstände bleiben auf diesem Gerät.'); }
+  if (c === 2) {
+    if (await ask('Konto und Cloud-Spielstände löschen?', ['LÖSCHEN', 'ABBRECHEN'], 1) !== 0) return;
+    const gone = await formModal({ title: 'Konto löschen', hint: 'Zur Sicherheit bitte dein Passwort eingeben.', fields: [{ name: 'password', label: 'Passwort', type: 'password', auto: 'current-password' }], ok: 'LÖSCHEN',
+      onSubmit: async v => { await api('/api/me', 'DELETE', { password: v.password }); return null; } });
+    if (gone) { account = null; storeAccount(); await say('Dein Konto wurde gelöscht. Auf diesem Gerät bleibt alles erhalten.'); }
+  }
+}
+async function accountIntro() {
+  // Beim ersten Start fragen, ob man ein Konto nutzen oder als Gast spielen will
+  if (!accountsReady() || account || isGuest()) return;
+  const c = await ask('Willkommen! Wie möchtest du spielen?', ['ANMELDEN', 'NEUES KONTO', 'ALS GAST']);
+  if (c < 2 && await accountLogin(c === 1)) return;
+  if (c === 2) { setGuest(true); await say('Du spielst als Gast. Ein Konto kannst du jederzeit mit SELECT anlegen.'); }
 }
 
 for (const C of [Title, ProfileScreen, EditorScreen, NameScreen, TrainerCard, OptionsScreen, DexScreen, TeamScreen, SummaryScreen, StarterScreen, BadgeScreen, MapScreen, ListScreen]) C.prototype.full = true;
@@ -4027,11 +4178,11 @@ function versionLabel() {
 const PROFILE_COUNT = 3;
 const slotKey = i => `wesenwelt.urzeit.slot${i + 1}`;
 let currentSlot = 0;
-function snapshot() { return { dexv: DEX_VERSION, money: state.money, box: state.box, lastCenter: state.lastCenter, slot: currentSlot, profile: state.profile, time: state.time, map: cur ? cur.id : 'home:0', x: player.x, y: player.y, dir: player.dir, badges: state.badges, flags: state.flags, items: state.items, steps: state.steps, team: state.team, seen: state.seen, caught: state.caught }; }
+function snapshot() { return { dexv: DEX_VERSION, savedAt: Date.now(), gid: state.gid, money: state.money, box: state.box, lastCenter: state.lastCenter, slot: currentSlot, profile: state.profile, time: state.time, map: cur ? cur.id : 'home:0', x: player.x, y: player.y, dir: player.dir, badges: state.badges, flags: state.flags, items: state.items, steps: state.steps, team: state.team, seen: state.seen, caught: state.caught }; }
 function loadSlot(i) { try { const s = localStorage.getItem(slotKey(i)); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function writeSlot(i, d) { try { localStorage.setItem(slotKey(i), JSON.stringify(d)); return true; } catch (e) { return false; } }
-function deleteSlot(i) { try { localStorage.removeItem(slotKey(i)); } catch (e) {} }
-function saveGame() { return writeSlot(currentSlot, snapshot()); }
+function deleteSlot(i) { try { localStorage.removeItem(slotKey(i)); } catch (e) {} if (account) api(`/api/saves/${i}`, 'DELETE').catch(() => {}); }
+function saveGame() { const ok = writeSlot(currentSlot, snapshot()); cloudPush(currentSlot); return ok; }
 function loadRaw() { try { const s = localStorage.getItem(CONFIG.saveKey); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function migrateOldSave() {
   // Spielstand aus der Zeit vor den Profilen landet in Profil 1
@@ -4043,7 +4194,7 @@ function migrateOldSave() {
 function applySave(s) {
   state.profile = s.profile || { name: 'Spieler', look: { ...DEFAULT_LOOK } };
   state.profile.look = { ...DEFAULT_LOOK, ...state.profile.look };
-  state.time = s.time || 0;
+  state.time = s.time || 0; state.gid = s.gid || newGid();
   state.badges = (s.badges || []).slice(0, 16).concat(Array(16).fill(false)).slice(0, 16);
   state.flags = s.flags || {}; state.items = s.items || {}; state.steps = s.steps || 0;
   if ((s.dexv || 1) < 2) {
@@ -4073,7 +4224,7 @@ function placeName(d) {
    START
    --------------------------------------------------------------------- */
 async function newGame(profile) {
-  Object.assign(state, { profile, time: 0, money: 3000, box: [], lastCenter: null, badges: Array(16).fill(false), flags: {}, items: {}, steps: 0, team: [], seen: {}, caught: {} });
+  Object.assign(state, { gid: newGid(), profile, time: 0, money: 3000, box: [], lastCenter: null, badges: Array(16).fill(false), flags: {}, items: {}, steps: 0, team: [], seen: {}, caught: {} });
   lastArea = 0;
   setMap('home:0', 4, 4, 'down');
   mode = 'world';
@@ -4088,8 +4239,11 @@ async function newGame(profile) {
 async function profileFlow() {
   const ps = new ProfileScreen(); layers.push(ps);
   try {
+    await accountIntro();
+    if (account) { try { await syncSaves(); } catch (e) {} }
     for (;;) {
       const slot = await ps.pick();
+      if (slot === -2) { await accountMenu(); ps.refresh(); continue; }
       if (slot < 0) return null;
       const data = loadSlot(slot);
       if (!data) {
@@ -4103,7 +4257,7 @@ async function profileFlow() {
       const prof = { name: 'Spieler', ...data.profile, look: { ...DEFAULT_LOOK, ...(data.profile || {}).look } };
       const c = await ask(`Profil von ${prof.name}`, ['SPIELEN', 'AUSSEHEN', 'CODE ZEIGEN', 'LÖSCHEN', 'ZURÜCK']);
       if (c === 0) return { slot, data };
-      if (c === 1) { const p = await new EditorScreen(prof, 'AUSSEHEN ÄNDERN').run(); if (p) { data.profile = p; writeSlot(slot, data); } }
+      if (c === 1) { const p = await new EditorScreen(prof, 'AUSSEHEN ÄNDERN').run(); if (p) { data.profile = p; data.savedAt = Date.now(); writeSlot(slot, data); cloudPush(slot); } }
       if (c === 2) await exportCode(data);
       if (c === 3) {
         const s = await ask(`${prof.name} wirklich löschen? Der Spielstand geht verloren.`, ['JA', 'NEIN'], 1);

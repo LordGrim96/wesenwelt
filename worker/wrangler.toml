@@ -1,0 +1,11 @@
+# Server für Konten und Cloud-Spielstände. Wird von .github/workflows/worker.yml veröffentlicht.
+name = "wesenwelt-api"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "wesenwelt"
+# Wird beim Veröffentlichen automatisch durch die echte Datenbank-ID ersetzt
+database_id = "__D1_ID__"

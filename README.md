@@ -36,6 +36,13 @@ Auf dem Handy die Seite öffnen und „App installieren“ (Android) bzw. „Zum
 
 Die Wesen, Orte und Grafiken sind eigene Entwürfe und stammen nicht aus offiziellen Spielen.
 
+## Konten (Cloudflare)
+
+Der Ordner `worker/` ist ein kleiner Server (Cloudflare Workers + D1) für Konten und Cloud-Spielstände.
+Er wird bei jeder Änderung automatisch veröffentlicht (`.github/workflows/worker.yml`), sobald im GitHub-Projekt
+die Geheimnisse `CLOUDFLARE_API_TOKEN` und `CLOUDFLARE_ACCOUNT_ID` hinterlegt sind. Die Server-Adresse steht im Spiel unter `CONFIG.api`.
+Ohne Konto spielt man als Gast, dann bleiben die Spielstände auf dem Gerät.
+
 ## Lizenz
 
 [CC BY-NC-ND 4.0](https://creativecommons.org/licenses/by-nc-nd/4.0/deed.de) (siehe `LICENSE`): kostenlos spielen und unverändert teilen, mit Namensnennung und ohne Geld damit zu verdienen. Veränderte Versionen sind nicht erlaubt – Änderungen am Spiel macht nur der Urheber.
