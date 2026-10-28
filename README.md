@@ -35,3 +35,7 @@ Auf dem Handy die Seite öffnen und „App installieren“ (Android) bzw. „Zum
 - `v1-gameboy.html` – die erste Version im Game-Boy-Stil
 
 Die Wesen, Orte und Grafiken sind eigene Entwürfe und stammen nicht aus offiziellen Spielen.
+
+## Rechte
+
+Alle Rechte vorbehalten (siehe `LICENSE`). Spielen ist kostenlos erlaubt; Änderungen am Spiel macht nur der Urheber.
