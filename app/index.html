@@ -99,7 +99,7 @@ const CONFIG = {
   // Adresse des Konto-Servers (worker/). Leer = nur Gast-Spielstände auf dem Gerät
   api: 'https://wesenwelt-api.edengrim67.workers.dev',
 };
-const GAME_VERSION = '202610281451'; // wird von build_app.py durch die Build-Zeit ersetzt
+const GAME_VERSION = '202610281505'; // wird von build_app.py durch die Build-Zeit ersetzt
 
 // Logische Bildgröße passt sich dem Bildschirm an (mindestens 256x192); SC = interne Auflösung für scharfe Schrift
 let VW = 256, VH = 192, OX = 0, OY = 0, RW = 256, RH = 192;
@@ -196,8 +196,9 @@ const T = {
   CFLOOR: 55, CCOUNTER: 56, CWALL: 57, FOS0: 58, FOS1: 59, FOS2: 60, FOS3: 61, FOS4: 62, FOS5: 63, CSOFA: 64, CPLANT: 65, CPC: 66,
   FLOOR_STONE: 67, FLOOR_STRAW: 68, FLOOR_FUR: 69, FLOOR_DIRT: 70, IWALL_STONE: 71, IWALL_HUT: 72, IWALL_TENT: 73, IWALL_CAVE: 74,
   BED: 75, HEARTH: 76, POTS: 77, RUG: 78, FOSDISP: 79, BARREL: 80, GF0: 81, GD0: 97,
+  GH0: 113, GE0: 129, CROOF: 145, CWALLX: 146, CDOOR: 147, CSIGN: 148, GROOF: 149, GWALL: 150, GDOOR: 151,
 };
-const TREE_Q = 124, NT = 128;
+const TREE_Q = 188, NT = 192;
 const SOLID = new Set([T.TREE, T.WATER, T.ROOF, T.WALL, T.WINDOW, T.SIGN, T.FENCE, T.IWALL, T.COUNTER,
   T.SHELF, T.TABLE, T.PLANT, T.ROOF_GYM, T.ROOF_CENTER, T.ROOF_SHOP, T.ROCK, T.PC, T.STATUE, T.VOID,
   T.WALL_CENTER, T.WALL_SHOP, T.WALL_GYM, T.FERN, T.BONES, T.TORCH,
@@ -604,6 +605,70 @@ const OBJ = new Set([T.COUNTER, T.MAT, T.TABLE, T.PLANT, T.CCOUNTER, T.CSOFA, T.
 for (const t of [T.CCOUNTER, T.CWALL, T.FOS0, T.FOS1, T.FOS2, T.FOS3, T.FOS4, T.FOS5, T.CSOFA, T.CPLANT, T.CPC, T.IWALL_STONE, T.IWALL_HUT, T.IWALL_TENT, T.IWALL_CAVE, T.BED, T.HEARTH, T.POTS, T.FOSDISP, T.BARREL, ...GYM_TYPES.map((t, k) => T.GD0 + k)]) SOLID.add(t);
 for (const t of [T.CFLOOR, T.FLOOR_STONE, T.FLOOR_STRAW, T.FLOOR_FUR, T.FLOOR_DIRT, ...GYM_TYPES.map((t, k) => T.GF0 + k)]) SHADOW_RECV.add(t);
 for (const t of [T.CWALL, T.IWALL_STONE, T.IWALL_HUT, T.IWALL_TENT, T.IWALL_CAVE, T.FOS3, T.FOS4, T.FOS5]) TOP_CASTERS.add(t);
+
+/* --- Arena-Fallen (begehbar, aber gefährlich), Typ-Wappen und Fassaden für Center und Arena --- */
+const spiral = (P, cx, cy, f, col, n = 22) => { for (let a = 0; a < n; a++) { const an = a * 0.55 + f * 1.2, r = a * 0.32; P.p(Math.round(cx + Math.cos(an) * r), Math.round(cy + Math.sin(an) * r), col); } };
+const HAZARD_ART = {
+  PFLANZE: (P, f) => { GYM_FLOOR_ART.PFLANZE(P, f); for (let i = 0; i < 4; i++) { const x = 2 + i * 4, y = 2 + (i % 2) * 6; for (let k = 0; k < 7; k++) { P.p(x + Math.round(Math.sin(k * 0.9 + i) * 1.5), y + k, '#163a14'); } P.p(x + 1, y + 2, '#e83838'); P.p(x - 1, y + 4, '#e83838'); P.p(x + 1, y + 6, '#e83838'); } },
+  GESTEIN: (P, f) => { GYM_FLOOR_ART.GESTEIN(P); for (let k = 0; k < 9; k++) { P.p(3 + k, 4 + Math.round(Math.sin(k) * 2), '#2a2620'); P.p(8 - (k >> 1), 9 + k / 2, '#2a2620'); } for (const [x, y] of [[4, 11], [11, 5], [12, 12]]) { P.r(x, y, 2, 2, '#5a5248'); P.p(x, y, '#c8c0b0'); } P.r(6 + (f % 2), 1 + f, 2, 2, '#7a7266'); },
+  WASSER: (P, f) => { P.r(0, 0, 16, 16, '#1e4a8a'); dot(P, 8, 8, 7, '#2a62b0'); dot(P, 8, 8, 4, '#18407a'); spiral(P, 8, 8, f, '#a8e0ff'); spiral(P, 8, 8, f + 2.6, '#5aa0e8'); },
+  ELEKTRO: (P, f) => { P.r(0, 0, 16, 16, '#2a2e34'); P.r(1, 1, 14, 14, '#e8c020'); P.r(2, 2, 12, 12, '#3a3e44'); const z = [[3, 4], [5, 6], [4, 8], [7, 10], [6, 12]]; z.forEach(([x, y], k) => { P.p(x + f * 2, y, '#fff6a0'); P.p(x + f * 2 + 1, y, k % 2 ? '#f8e040' : '#fff6a0'); }); if (f % 2) { P.p(12, 3, '#ffffff'); P.p(3, 12, '#ffffff'); } },
+  GEIST: (P, f) => { P.r(0, 0, 16, 16, '#3c3048'); dot(P, 8, 8, 7, '#7a58b0'); dot(P, 8, 8, 6, '#0c0814'); const y = 9 - (f % 2); pat(P, ['.w.w.', '.w.w.w', 'wwwww.', '.www..', '.www..'], { w: '#d8c8ff' }, 5, y - 3); },
+  FEUER: (P, f) => { P.r(0, 0, 16, 16, '#c83810'); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const v = Math.sin((x + f * 2) * 0.7 + Math.sin(y * 0.8)) + Math.sin(y * 0.9 - f); if (v > 1.1) P.p(x, y, '#f8b030'); else if (v > 0.5) P.p(x, y, '#f07020'); else if (v < -1.3) P.p(x, y, '#6a1808'); } P.p((f * 5) % 16, (f * 3) % 16, '#fff0a0'); },
+  FLUG: (P, f) => { GYM_FLOOR_ART.FLUG(P); P.r(2, 2, 12, 12, '#7a8494'); for (let y = 3; y < 14; y += 2) P.r(3, y, 10, 1, '#4a5260'); for (const x of [4, 8, 11]) { const y = 12 - ((f * 3 + x) % 10); P.p(x, y, '#ffffff'); P.p(x - 1, y + 1, '#ffffff'); P.p(x + 1, y + 1, '#ffffff'); } },
+  STAHL: (P, f) => { GYM_FLOOR_ART.STAHL(P); const h = f % 2 ? 4 : 2; for (let gy = 0; gy < 3; gy++) for (let gx = 0; gx < 3; gx++) { const x = 3 + gx * 5, y = 5 + gy * 4; P.r(x - 1, y, 3, 1, '#4a525e'); for (let k = 0; k < h; k++) P.p(x, y - k, k === h - 1 ? '#ffffff' : '#c8d0dc'); } },
+  NORMAL: P => { GYM_FLOOR_ART.NORMAL(P); P.r(2, 2, 12, 12, '#6a5a44'); P.r(3, 3, 10, 10, '#140e08'); P.r(3, 3, 10, 2, '#2a2018'); },
+  EIS: (P, f) => { GYM_FLOOR_ART.EIS(P); for (let k = 0; k < 12; k++) { P.p(2 + k, 8 + Math.round(Math.sin(k * 1.3) * 2), '#1e4a8a'); P.p(7 + Math.round(Math.sin(k) * 2), 2 + k, '#1e4a8a'); } dot(P, 8, 8, 2.2, '#1e4a8a'); if (f === 1) P.p(8, 8, '#a8e0ff'); },
+  GIFT: (P, f) => { P.r(0, 0, 16, 16, '#4a8a28'); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (hash(x, y, 120) < 0.12) P.p(x, y, '#3a6a20'); for (const [x, y, ph] of [[4, 5, 0], [11, 9, 1], [7, 12, 2], [12, 3, 3]]) { const r = ((f + ph) % 4) * 0.6; if (r) dot(P, x, y, r, '#a8f070'); P.p(x, y, '#d8ff98'); } },
+  KAMPF: (P, f) => { GYM_FLOOR_ART.KAMPF(P); for (let gy = 0; gy < 2; gy++) for (let gx = 0; gx < 3; gx++) { const x = 3 + gx * 5, y = 4 + gy * 7; P.r(x, y, 2, 5, '#c8a050'); P.p(x, y - 1, '#f0d890'); P.p(x + 1, y - 1, '#7a5a20'); P.r(x - 1, y + 5, 4, 1, '#5a3a18'); } },
+  PSYCHO: (P, f) => { GYM_FLOOR_ART.PSYCHO(P); dot(P, 8, 8, 7, '#c040b0'); dot(P, 8, 8, 6, '#f0a8f0'); dot(P, 8, 8, 4, '#c040b0'); for (let k = 0; k < 6; k++) { const an = k / 6 * Math.PI * 2 + f * 0.5; P.p(Math.round(8 + Math.cos(an) * 5), Math.round(8 + Math.sin(an) * 5), '#ffffff'); } dot(P, 8, 8, 1.5, '#ffffff'); },
+  'KÄFER': P => { GYM_FLOOR_ART['KÄFER'](P); for (let k = 0; k < 8; k++) { const an = k / 8 * Math.PI * 2; for (let r = 0; r < 8; r++) P.p(Math.round(8 + Math.cos(an) * r), Math.round(8 + Math.sin(an) * r), '#f0f0f0'); } for (const r of [3, 6]) for (let k = 0; k < 24; k++) { const an = k / 24 * Math.PI * 2; P.p(Math.round(8 + Math.cos(an) * r), Math.round(8 + Math.sin(an) * r), '#d8d8d8'); } },
+  BODEN: (P, f) => { P.r(0, 0, 16, 16, '#b88a48'); dot(P, 8, 8, 7, '#a07438'); spiral(P, 8, 8, -f, '#d8b06a', 26); dot(P, 8, 8, 1.5, '#6a4a20'); },
+  DRACHE: (P, f) => { GYM_FLOOR_ART.DRACHE(P); P.r(3, 9, 10, 6, '#1e1830'); P.r(4, 10, 8, 4, '#0c0814'); const fl = [['..o..o..', '.oyo.oo.', 'oyyyoyyo'], ['.o..o...', '.oo.oyo.', 'oyyoyyyo'], ['...o..o.', '.oyo.oo.', 'oyyyyyyo'], ['.o...o..', 'oyo.oyo.', 'oyyyoyyo']][f]; pat(P, fl, { o: '#8048f0', y: '#d8a8ff' }, 4, 7); },
+};
+const GLYPHS = {
+  PFLANZE: ['...xx...', '..xxxx..', '.xxxxxx.', '.xx.xxx.', '.xxx.xx.', '..xxxx..', '...xx...', '...x....'],
+  GESTEIN: ['........', '..xxx...', '.xxxxx..', 'xxxxxxx.', 'xxxxxxxx', '.xxxxxx.', '........', '........'],
+  WASSER: ['...x....', '...x....', '..xxx...', '.xxxxx..', '.xxxxx..', '.xxxxx..', '..xxx...', '........'],
+  ELEKTRO: ['....xx..', '...xx...', '..xx....', '.xxxxx..', '...xx...', '..xx....', '.xx.....', '........'],
+  GEIST: ['..xxxx..', '.xxxxxx.', '.x.xx.x.', '.xxxxxx.', '.xxxxxx.', '.xxxxxx.', '.x.x.x..', '........'],
+  FEUER: ['...x....', '..xx..x.', '..xxx.x.', '.xxxxxx.', '.xxxxxx.', '.xxxxxx.', '..xxxx..', '........'],
+  FLUG: ['x.......', 'xx......', 'xxx..x..', '.xxxxxx.', '..xxxxxx', '...xxxx.', '....xx..', '........'],
+  STAHL: ['..x..x..', '.xxxxxx.', '.xx..xx.', 'xx....xx', '.xx..xx.', '.xxxxxx.', '..x..x..', '........'],
+  NORMAL: ['...xx...', '...xx...', 'xxxxxxxx', '.xxxxxx.', '..xxxx..', '.xx..xx.', '.x....x.', '........'],
+  EIS: ['...x....', '.x.x.x..', '..xxx...', 'xxxxxxx.', '..xxx...', '.x.x.x..', '...x....', '........'],
+  GIFT: ['..xxxx..', '.xxxxxx.', '.x.xx.x.', '.xxxxxx.', '..xxxx..', '..x.x...', '.x.x.x..', '........'],
+  KAMPF: ['.xxxxx..', 'xxxxxxx.', 'xxxxxxx.', 'xxxxxxx.', '.xxxxxx.', '..xxxx..', '..xxxx..', '........'],
+  PSYCHO: ['........', '..xxxx..', '.x....x.', 'x..xx..x', 'x..xx..x', '.x....x.', '..xxxx..', '........'],
+  'KÄFER': ['x......x', '.x.xx.x.', '..xxxx..', '.xx..xx.', '.xxxxxx.', '.xx..xx.', '..xxxx..', '........'],
+  BODEN: ['........', '...x....', '..xxx...', '.xxxxx.x', 'xxxxxxxx', 'xxxxxxxx', '........', '........'],
+  DRACHE: ['x......x', 'xx....xx', '.xx..xx.', '..xxxx..', '.xxxxxx.', '.x.xx.x.', '..xxxx..', '........'],
+};
+function gymWall(P) {
+  P.r(0, 0, 16, 16, '#4a4450');
+  for (let y = 0; y < 16; y += 4) { P.r(0, y + 3, 16, 1, '#2e2a34'); for (let x = (y % 8 ? 4 : 0); x < 16; x += 8) P.r(x, y, 1, 3, '#2e2a34'); P.r(0, y, 16, 1, '#5e5866'); }
+  P.r(0, 0, 16, 1, '#c8a040'); P.r(0, 15, 16, 1, '#1e1a22');
+}
+function centerFacade(P) { P.r(0, 0, 16, 16, '#f4f6f8'); P.r(0, 0, 16, 1, '#ffffff'); P.r(0, 11, 16, 2, '#f06a8a'); P.r(0, 11, 16, 1, '#f8a0b8'); P.r(0, 13, 16, 3, '#c8d0d8'); P.r(0, 15, 16, 1, '#6a7480'); }
+const ART3 = {
+  [T.GROOF]: P => { P.r(0, 0, 16, 16, '#3a2630'); for (let y = 0; y < 16; y += 4) { P.r(0, y, 16, 1, '#5a3a46'); P.r(0, y + 3, 16, 1, '#24161c'); for (let x = (y % 8 ? 2 : 6); x < 16; x += 8) P.r(x, y + 1, 1, 2, '#2a1a22'); } P.r(0, 15, 16, 1, '#c8a040'); },
+  [T.GWALL]: P => gymWall(P),
+  [T.GDOOR]: (P, f) => { gymWall(P); P.r(2, 2, 12, 14, '#1e1a22'); P.r(3, 3, 10, 13, '#5a3a24'); P.r(7, 3, 2, 13, '#1e1a22'); for (const y of [5, 10]) P.r(3, y, 10, 1, '#8a8a92'); P.p(6, 9, '#f0c850'); P.p(9, 9, '#f0c850'); P.r(2, 2, 12, 1, '#c8a040'); },
+  [T.CROOF]: (P, f) => { P.r(0, 0, 16, 16, '#eef0f4'); for (let y = 0; y < 16; y += 4) { P.r(0, y + 3, 16, 1, '#c8ced8'); P.r(0, y, 16, 1, '#ffffff'); } P.r(3, 4, 10, 7, '#5a8aa8'); P.r(4, 5, 8, 5, '#9ad8f0'); P.r(4 + ((f * 3) % 8), 5, 1, 5, '#e8fbff'); P.r(0, 14, 16, 2, '#f06a8a'); },
+  [T.CWALLX]: P => { centerFacade(P); P.r(2, 2, 12, 8, '#4a6a82'); P.r(3, 3, 10, 6, '#8ad0ec'); for (let i = 0; i < 4; i++) P.p(4 + i, 7 - i, '#e8fbff'); P.r(8, 3, 1, 6, '#4a6a82'); },
+  [T.CDOOR]: (P, f) => { centerFacade(P); P.r(2, 1, 12, 15, '#5a6672'); P.r(3, 2, 10, 14, '#9ad8f0'); P.r(7, 2, 2, 14, '#5a6672'); for (let i = 0; i < 5; i++) { P.p(4 + i, 10 - i, '#e8fbff'); P.p(10 + (i >> 1), 12 - i, '#e8fbff'); } P.r(2, 1, 12, 1, '#f06a8a'); },
+  [T.CSIGN]: (P, f) => { centerFacade(P); dot(P, 8, 6, 6.2, ['#f8a0b8', '#ffc0d0', '#ffe0e8', '#ffc0d0'][f]); dot(P, 8, 6, 5, '#e04868'); P.r(7, 2, 2, 8, '#ffffff'); P.r(4, 5, 8, 2, '#ffffff'); },
+};
+GYM_TYPES.forEach((t, k) => {
+  ART3[T.GH0 + k] = HAZARD_ART[t];
+  ART3[T.GE0 + k] = (P, f) => { gymWall(P); dot(P, 8, 7.5, 7, '#c8a040'); dot(P, 8, 7.5, 6, shade(TYPES[t], -0.35)); dot(P, 8, 7.5, 5, TYPES[t]); pat(P, GLYPHS[t], { x: '#ffffff' }, 4, 4); if (f === 0) P.p(5, 4, '#ffffff'); };
+});
+Object.assign(TILE_ART, ART3);
+const gymHazard = type => T.GH0 + GYM_TYPES.indexOf(type), gymEmblem = type => T.GE0 + GYM_TYPES.indexOf(type);
+const HAZARDS = new Set(GYM_TYPES.map((t, k) => T.GH0 + k));
+for (const t of [T.GROOF, T.CROOF]) { ROOFS.add(t); SOLID.add(t); }
+for (const t of [T.GWALL, T.GDOOR, T.CWALLX, T.CDOOR, T.CSIGN, ...GYM_TYPES.map((t, k) => T.GE0 + k)]) { WALLS.add(t); if (t !== T.GDOOR && t !== T.CDOOR) SOLID.add(t); }
+for (const t of [T.CWALLX, T.CDOOR, T.CSIGN]) GLOWS.add(t);
 
 /* --- Überlagerungen: Graskanten, Uferschaum, Dachkanten, Schatten, Bodendetails --- */
 const OV = { fT: 0, wT: 4, rL: 8, rR: 9, rT: 10, rB: 11, sT: 12, sL: 13, d1: 14, eL: 17, eR: 18 };
@@ -1515,6 +1580,8 @@ const STYLES = {
   stone: { wall: T.WALL_STONE, win: T.WINDOW_STONE, door: T.DOOR_STONE, roof: T.ROOF_SLATE },
   hut: { wall: T.WALL, win: T.WINDOW, door: T.DOOR, roof: T.ROOF_THATCH },
   tent: { wall: T.WALL, win: T.WINDOW, door: T.DOOR, roof: T.ROOF_HIDE },
+  center: { wall: T.CWALLX, win: T.CWALLX, door: T.CDOOR, roof: T.CROOF },
+  gym: { wall: T.GWALL, win: T.GWALL, door: T.GDOOR, roof: T.GROOF },
 };
 function building(m, x, y, w, h, roof, doorX, emblem, style = 'wood') {
   const S = STYLES[style] || STYLES.wood, R = S.roof || roof;
@@ -1531,6 +1598,37 @@ function building(m, x, y, w, h, roof, doorX, emblem, style = 'wood') {
 let TOWN_RECTS = [];
 let ROUTES = [];
 
+// Routen mit Umweg: Routenindex -> wie weit der Bogen nach oben (-) oder unten (+) führt
+const DETOURS = { 3: -22, 6: 23, 12: 23, 15: -23 };
+const HAMLETS = [];
+const HAMLET_NAMES = ['Farnrast', 'Aschenrast', 'Kreiderast', 'Dünenrast'];
+function buildHamlet(m, route) {
+  // Zwischendorf mitten auf dem Bogen: Forscherstation, Rasthütte, Lagerfeuer
+  const pts = route.pts, flat = idx => pts.slice(idx - 10, idx + 11).every(q => q.dy === 0 && q.y === pts[idx].y);
+  let idx = pts.length >> 1;
+  for (let d = 0; d < pts.length / 2 && !flat(idx); d++) idx = (pts.length >> 1) + (d % 2 ? d : -d);
+  if (!flat(idx)) return;
+  const p = pts[idx], k = HAMLETS.length, name = HAMLET_NAMES[k % HAMLET_NAMES.length];
+  const areaId = AREA_NAMES.length; AREA_NAMES.push('RASTPLATZ ' + name.toUpperCase());
+  for (let y = p.y - 7; y <= p.y + 5; y++) for (let x = p.x - 9; x <= p.x + 9; x++) {
+    const t = tget(m, x, y);
+    if (t !== T.PATH && t !== T.BRIDGE && t !== T.WATER) tset(m, x, y, T.GRASS);
+    aset(m, x, y, areaId);
+  }
+  placeBuilding(m, k, 'station', p.x - 7, p.y - 6, 5, 4, T.ROOF_SLATE, 2, T.WINDOW_STONE, 'stone');
+  placeBuilding(m, k, 'rest', p.x + 2, p.y - 6, 4, 4, T.ROOF_THATCH, 1, null, 'hut');
+  for (const x of [p.x - 5, p.x + 3]) for (const y of [p.y - 2, p.y - 1]) tset(m, x, y, T.PATH);
+  tset(m, p.x - 1, p.y - 2, T.SIGN); m.objs.set(K(p.x - 1, p.y - 2), { text: `RASTPLATZ ${name.toUpperCase()}\nLinks die Forscherstation, rechts die Rasthütte.` });
+  for (let y = p.y + 2; y <= p.y + 4; y++) for (let x = p.x - 1; x <= p.x + 1; x++) tset(m, x, y, T.PATH);
+  tset(m, p.x, p.y + 3, T.CAMPFIRE); m.objs.set(K(p.x, p.y + 3), { text: 'Ein Lagerfeuer für Reisende. Hier erzählt man sich, welche Wesen in der Gegend gesichtet wurden.' });
+  for (const [x, y] of [[p.x - 3, p.y + 3], [p.x + 3, p.y + 3]]) tset(m, x, y, T.ROCK);
+  for (const [x, y] of [[p.x - 7, p.y + 3], [p.x - 6, p.y + 4], [p.x + 6, p.y + 3], [p.x + 7, p.y + 4]]) tset(m, x, y, T.FLOWER);
+  for (const x of [p.x - 9, p.x + 9]) tset(m, x, p.y - 2, T.TORCH);
+  // Wer jetzt auf einem Haus oder Felsen stünde (Trainer, Gegenstände), muss weichen
+  m.npcs = m.npcs.filter(n => n.gate !== undefined || !SOLID.has(tget(m, n.x, n.y)));
+  m.npcs.push(new Actor({ x: p.x + 5, y: p.y + 3, dir: 'left', variant: 4, wander: true, id: `hamlet:${k}`, talk: `Willkommen am Rastplatz ${name}! In der Forscherstation erfährst du alles über die Wesen hier draußen.` }));
+  HAMLETS.push({ name, x: p.x, y: p.y, route: route.n });
+}
 function genWorld() {
   const rng = mulberry32(CONFIG.seed);
   const ri = (a, b) => a + Math.floor(rng() * (b - a + 1));
@@ -1569,10 +1667,12 @@ function genWorld() {
       let x = x0, y = y0;
       for (;;) { pts.push({ x, y, dx, dy }); if (x === x1 && y === y1) break; x += dx; y += dy; }
     };
-    if (mode === 'H') { const mx = Math.round((a.x + b.x) / 2); seg(a.x, a.y, mx, a.y); seg(mx, a.y, mx, b.y); seg(mx, b.y, b.x, b.y); }
+    // Manche Routen machen einen weiten Bogen durch die Wildnis (mit Rastplatz in der Mitte)
+    if (DETOURS[i]) { const sx = Math.sign(b.x - a.x), x1 = a.x + sx * 15, x2 = b.x - sx * 15, wy = a.y + DETOURS[i]; seg(a.x, a.y, x1, a.y); seg(x1, a.y, x1, wy); seg(x1, wy, x2, wy); seg(x2, wy, x2, b.y); seg(x2, b.y, b.x, b.y); }
+    else if (mode === 'H') { const mx = Math.round((a.x + b.x) / 2); seg(a.x, a.y, mx, a.y); seg(mx, a.y, mx, b.y); seg(mx, b.y, b.x, b.y); }
     else { const my = Math.round((a.y + b.y) / 2); seg(a.x, a.y, a.x, my); seg(a.x, my, b.x, my); seg(b.x, my, b.x, b.y); }
     const areaId = AREA_NAMES.length; AREA_NAMES.push('ROUTE ' + (i + 1));
-    const route = { i, n: i + 1, from: i, to: i + 1, pts: pts.filter(p => !inRect(TOWN_RECTS[i], p.x, p.y) && !inRect(TOWN_RECTS[i + 1], p.x, p.y)), areaId };
+    const route = { i, n: i + 1, from: i, to: i + 1, detour: !!DETOURS[i], pts: pts.filter(p => !inRect(TOWN_RECTS[i], p.x, p.y) && !inRect(TOWN_RECTS[i + 1], p.x, p.y)), areaId };
     ROUTES.push(route);
     for (const p of route.pts) {
       for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
@@ -1600,11 +1700,12 @@ function genWorld() {
     const src = TOWN_RECTS[route.from];
     const perp = p => (p.dy === 0 ? [0, 1] : [1, 0]);
     const nearCorner = idx => { for (let q = Math.max(0, idx - 6); q < Math.min(pts.length, idx + 6); q++) if (pts[q].dx !== pts[idx].dx || pts[q].dy !== pts[idx].dy) return true; return false; };
-    let gateIdx = pts.findIndex(p => rectDist(src, p.x, p.y) === 5);
+    // Bei Umwegen steht die Sperre mitten im ersten Bogenstück, damit man nicht an der Ecke vorbeilaufen kann
+    let gateIdx = route.detour ? pts.findIndex(p => p.dx === 0 && Math.abs(p.y - src.cy) >= 10) : pts.findIndex(p => rectDist(src, p.x, p.y) === 5);
     if (gateIdx < 0) gateIdx = Math.min(4, pts.length - 1);
 
     // See neben der Route (im Vulkangebiet wird daraus ein Lavasee)
-    if (route.i % 2 === 0 && pts.length > 24) {
+    if (route.i % 2 === 0 && pts.length > 24 && !route.detour) {
       const mid = Math.floor(pts.length / 2); let p = pts[mid];
       for (let q = mid; q < pts.length - 8; q++) if (!nearCorner(q)) { p = pts[q]; break; }
       const [px, py] = perp(p); const side = rng() < 0.5 ? -1 : 1;
@@ -1674,6 +1775,8 @@ function genWorld() {
         if (tget(m, x, y) !== T.WATER) addItem(m, x, y, ITEM_POOL[ri(0, ITEM_POOL.length - 1)], `route${route.n}`);
       }
     }
+
+    if (route.detour) buildHamlet(m, route);
 
     // Sperre am Routenanfang: Route 1 braucht ein Wesen, alle anderen den Orden der Startstadt
     {
@@ -1783,6 +1886,9 @@ function buildTown(m, i, r) {
 // Bauweise der Wohnhäuser je Stadt (Index wie TOWNS)
 const HOUSE_STYLE = ['cave', 'hut', 'stone', 'hut', 'wood', 'hut', 'stone', 'wood', 'stone', 'wood', 'tent', 'hut', 'cave', 'wood', 'hut', 'tent', 'cave', 'stone'];
 function placeBuilding(m, i, kind, x, y, w, h, roof, doorX, emblem, style) {
+  // Center: Glasfassade mit Leuchtschild · Arena: dunkle Halle mit Typ-Wappen über dem Tor
+  if (kind === 'center') { style = 'center'; emblem = T.CSIGN; }
+  if (kind === 'gym' || kind === 'league') { style = 'gym'; emblem = gymEmblem(kind === 'league' ? 'DRACHE' : TOWNS[i].type); }
   const door = building(m, x, y, w, h, roof, doorX, emblem, style), id = `${kind}:${i}`;
   DOORS[id] = door;
   m.warps.set(K(door.x, door.y), { to: id, x: 4, y: ROOM_H[kind] - 2, dir: 'up' });
@@ -2232,7 +2338,7 @@ function buildVolcanoTown(m, i, X, Y) {
 /* ---------------------------------------------------------------------
    INNENRÄUME
    --------------------------------------------------------------------- */
-const ROOM_H = { center: 8, shop: 8, house: 8, house2: 8, home: 8, lab: 10, gym: 14, league: 12 };
+const ROOM_H = { station: 8, rest: 8, center: 8, shop: 8, house: 8, house2: 8, home: 8, lab: 10, gym: 14, league: 12 };
 function room(id, w, h, fl) {
   const m = newMap(id, w, h, fl);
   m.outside = T.VOID; m.floor = fl;
@@ -2240,11 +2346,11 @@ function room(id, w, h, fl) {
   tset(m, 4, h - 1, T.MAT);
   return m;
 }
-// Arena-Grundrisse (Zeilen 2-13, Tür bei x=4 ganz unten). # = Typ-Deko, S = Schild, 1-3 = Trainer
+// Arena-Grundrisse (Zeilen 2-13, Tür bei x=4 ganz unten). # = Typ-Deko, x = Falle, S = Schild, 1-3 = Trainer
 const GYM_PLANS = [
-  { rows: ['#...L....#', '#........#', '######.###', '#..1.....#', '#........#', '###.######', '#.....2..#', '#........#', '#####.####', '#.......3#', '#S......S#', '#.........'], dirs: ['right', 'left', 'left'] },
-  { rows: ['#...L....#', '#........#', '###.######', '#.....1..#', '#........#', '######.###', '#..2.....#', '#........#', '####.#####', '#3.......#', '#S......S#', '#.........'], dirs: ['left', 'right', 'right'] },
-  { rows: ['#...L....#', '#.#....#.#', '#.#.##.#.#', '#...##...#', '##.1...#.#', '#..#.###.#', '#.##...2.#', '#....#...#', '#.##.#.#.#', '#3.......#', '#S......S#', '#.........'], dirs: ['right', 'left', 'right'] },
+  { rows: ["#...L....#", "#xx....xx#", "######.###", "#..1...xx#", "#xx......#", "###.######", "#.x..2..x#", "#......x.#", "#......x.#", "#......x.#", "#S......S#", "#........."], dirs: ["right", "left", "left"] },
+  { rows: ["#...L....#", "#xx....xx#", "###.######", "#xx...1..#", "#......xx#", "######.###", "#..2...x.#", "#xxxxx.x.#", "#......x.#", "#3.xx...x#", "#S...x..S#", "#........."], dirs: ["left", "right", "right"] },
+  { rows: ["#...L....#", "#......x.#", "#.#.##.#.#", "#...##...#", "#......x.#", "#..#.###.#", "#.##...2.#", "#....#.x.#", "#x##x#.#.#", "#3.......#", "#S...xx.S#", "#........."], dirs: ["right", "left", "right"] },
 ];
 const GYM_TIPS = { PFLANZE: 'Feuer, Eis und Flug helfen dir hier.', GESTEIN: 'Wasser, Pflanze und Kampf sind stark gegen Gestein.', WASSER: 'Pflanze und Elektro sind deine Freunde.', ELEKTRO: 'Boden-Wesen spüren keinen Strom!', GEIST: 'Geist-Attacken wirken gut gegen Geister.', FEUER: 'Wasser, Gestein und Boden löschen jedes Feuer.', FLUG: 'Elektro, Eis und Gestein holen sie vom Himmel.', STAHL: 'Feuer, Kampf und Boden verbiegen Stahl.', NORMAL: 'Kampf-Wesen haben hier die besten Chancen.', EIS: 'Feuer, Kampf, Gestein und Stahl schmelzen das Eis.', GIFT: 'Boden und Psycho sind stark gegen Gift.', KAMPF: 'Psycho, Flug und Fee halten Kämpfer auf.', PSYCHO: 'Käfer und Geist verwirren die Psycho-Wesen.', 'KÄFER': 'Feuer, Flug und Gestein sind gut gegen Käfer.', BODEN: 'Wasser, Pflanze und Eis sind stark gegen Boden.', DRACHE: 'Eis, Drache und Fee bezwingen Drachen.' };
 function getMap(id) { if (!MAPS[id]) MAPS[id] = makeInterior(id); return MAPS[id]; }
@@ -2253,6 +2359,22 @@ function makeInterior(id) {
   const H = ROOM_H[kind]; let m;
   const npc = o => m.npcs.push(new Actor(o));
   switch (kind) {
+    case 'station':
+      // Forscherstation: hier erfährt man alles über die Wesen der Gegend
+      m = room(id, 10, H, T.LAB_FLOOR);
+      for (let x = 0; x < 10; x++) { tset(m, x, 0, T.LAB_WALL); tset(m, x, 1, T.LAB_WALL); }
+      for (const x of [1, 2]) tset(m, x, 1, T.LAB_MACHINE); for (const x of [6, 7, 8]) tset(m, x, 1, T.SHELF);
+      tset(m, 0, 3, T.LAB_TANK); tset(m, 9, 3, T.PC); tset(m, 0, 5, T.FOSDISP); tset(m, 9, 6, T.PLANT); tset(m, 3, 4, T.TABLE); tset(m, 4, 4, T.TABLE);
+      m.objs.set(K(0, 5), { text: 'Ein Fossil aus der Gegend. Daneben liegen Notizen über Fundorte.' });
+      m.objs.set(K(9, 3), { fn: () => stationTalk(i) });
+      npc({ x: 5, y: 3, dir: 'down', variant: 3, talk: () => stationTalk(i) });
+      break;
+    case 'rest':
+      m = room(id, 10, H, T.FLOOR_STRAW);
+      for (let x = 0; x < 10; x++) { tset(m, x, 0, T.IWALL_HUT); tset(m, x, 1, T.IWALL_HUT); }
+      for (const [tt, x, y] of [[T.BED, 1, 2], [T.BED, 2, 2], [T.HEARTH, 7, 2], [T.TABLE, 4, 4], [T.POTS, 9, 5], [T.RUG, 6, 5]]) tset(m, x, y, tt);
+      npc({ x: 5, y: 3, dir: 'down', variant: 2, talk: async () => { await say('HÜTTENWIRTIN: Lange Reise, was? Ruh dich am Feuer aus.'); await healTeam(true); } });
+      break;
     case 'center':
       // Modernes Wesen-Center: hinter der Pflegerin steht die Fossil-Heilmaschine
       m = room(id, 10, H, T.CFLOOR);
@@ -2333,7 +2455,8 @@ function makeInterior(id) {
       // Jede Arena ist nach ihrem Typ eingerichtet: eigener Boden, eigene Deko, eigener Weg
       m = room(id, 10, H, gymFloor(t.type));
       const deco = gymDecor(t.type), plan = GYM_PLANS[(i + 1) % GYM_PLANS.length], dirs = plan.dirs, trainers = [];
-      plan.rows.forEach((row, r) => { for (let x = 0; x < 10; x++) { const c = row[x], y = r + 2; if (c === '#' || c === 'S') tset(m, x, y, deco); if (c === 'S') m.objs.set(K(x, y), { text: `ARENA ${t.name.toUpperCase()}\nLeitung: ${t.leader} · Typ: ${t.type}` }); if ('123'.includes(c)) trainers.push([+c - 1, x, y]); } });
+      m.gymType = t.type;
+      plan.rows.forEach((row, r) => { for (let x = 0; x < 10; x++) { const c = row[x], y = r + 2; if (c === 'x') tset(m, x, y, gymHazard(t.type)); if (c === '#' || c === 'S') tset(m, x, y, deco); if (c === 'S') m.objs.set(K(x, y), { text: `ARENA ${t.name.toUpperCase()}\nLeitung: ${t.leader} · Typ: ${t.type}` }); if ('123'.includes(c)) trainers.push([+c - 1, x, y]); } });
       npc({ x: 4, y: 2, dir: 'down', variant: 5, id: 'leader', talk: () => leaderTalk(i) });
       for (const [k, x, y] of trainers) {
         if (k === 2 && i <= 8) continue; // ab der 9. Arena wartet ein dritter Trainer
@@ -2344,7 +2467,7 @@ function makeInterior(id) {
       break;
     }
     case 'league':
-      m = room(id, 10, H, gymFloor('DRACHE'));
+      m = room(id, 10, H, gymFloor('DRACHE')); m.gymType = 'FEUER';
       for (const y of [3, 5, 7, 9]) { tset(m, 2, y, gymDecor('FEUER')); tset(m, 7, y, gymDecor('FEUER')); }
       npc({ x: 4, y: 2, dir: 'down', variant: 5, id: 'champion', talk: championTalk });
       break;
@@ -3187,6 +3310,7 @@ function devDests() {
     ...TOWNS.map((t, i) => ({ name: t.name, tag: i ? (t.league ? 'LIGA' : `ORDEN ${i}`) : 'START', map: 'world', x: TOWN_RECTS[i].cx, y: TOWN_RECTS[i].cy })),
     ...TOWNS.slice(1, 17).map((t, k) => inside('gym', k + 1, `Arena ${t.name}`)),
     inside('league', 17, 'Champion-Liga'),
+    ...HAMLETS.map((h, k) => ({ name: `Rastplatz ${h.name}`, tag: `ROUTE ${h.route}`, map: 'world', x: h.x, y: h.y })),
     ...ROUTES.map(r => { const p = r.pts[r.pts.length >> 1]; return { name: `Route ${r.n}`, tag: `${TOWNS[r.from].name.slice(0, 5)}-${TOWNS[r.to].name.slice(0, 5)}`, map: 'world', x: p.x, y: p.y }; }),
   ];
 }
@@ -4408,6 +4532,28 @@ async function healTeam(home) {
   await say(home ? 'Du und deine Wesen ruhen euch aus. Alle sind wieder fit!' : 'Deine Wesen sind wieder vollständig geheilt. Bis bald!');
   saveGame();
 }
+async function stationTalk(k) {
+  const h = HAMLETS[k]; if (!h) return;
+  const tab = encounterTable(h.x, h.y), ids = [...new Set(tab.map(e => e.sp))], lv = Math.max(...tab.map(e => e.lvl));
+  await say(`FORSCHERIN: Willkommen in der Forscherstation ${h.name}! Ich beobachte die Wesen auf Route ${h.route}.`);
+  for (;;) {
+    const c = await ask('Was möchtest du wissen?', ['STECKBRIEFE', 'IN DEN URDEX', 'ZURÜCK']);
+    if (c === 0) {
+      let sel = 0;
+      for (;;) {
+        sel = await openScreen(new ListScreen('WESEN DER GEGEND', ids.map(id => [SPECIES[id - 1].name, SPECIES[id - 1].types.map(t => t.slice(0, 3)).join('/')]), sel, `Um Level ${lv} · A: Steckbrief`));
+        if (sel < 0) break;
+        const sp = SPECIES[ids[sel] - 1], r = REAL[sp.name];
+        const weak = Object.keys(CHART).filter(a => typeEff(a, sp.types) > 1).slice(0, 4).join(', ');
+        await say(`${sp.name.toUpperCase()}, das ${sp.cat}-Wesen (${sp.types.join('/')}). ${sp.dex}`);
+        await say(`Schwach gegen: ${weak || 'kaum etwas'}.${r ? ` Echtes Vorbild: ${r[0]}.` : ''}`);
+      }
+    } else if (c === 1) {
+      ids.forEach(id => { state.seen[id] = 1; });
+      await say('Ich habe dir alle Wesen dieser Gegend in deinen URDEX eingetragen. Viel Glück beim Fangen!');
+    } else return;
+  }
+}
 async function openShop() { await openScreen(new ShopScreen()); await say('Danke für deinen Besuch!'); }
 async function chooseStarter() {
   if (state.team.length) return say('Die übrigen Kapseln gehören anderen jungen Trainern.');
@@ -4517,8 +4663,22 @@ function onArrive() {
       run(() => wildEncounter(player.x, player.y)); return true;
     }
   }
+  if (HAZARDS.has(tget(cur, player.x, player.y))) { run(hazardHit); return true; }
   if (checkTrainerSight()) return true;
   return false;
+}
+const HAZARD_TEXT = {
+  PFLANZE: 'Autsch! Die Dornenranken zerkratzen dich.', GESTEIN: 'Der Boden bricht ein! Steine poltern herab.', WASSER: 'Ein Strudel reißt dich mit!', ELEKTRO: 'BZZZT! Ein Stromschlag!',
+  GEIST: 'Eine Geisterhand packt dich und zieht dich zurück!', FEUER: 'Heiß! Das ist Lava!', FLUG: 'Ein Windstoß wirbelt dich durch die Halle!', STAHL: 'Stahlspitzen schießen aus dem Boden!',
+  NORMAL: 'Eine Falltür! Du fällst nach unten.', EIS: 'Das Eis bricht! Brrr, eiskalt!', GIFT: 'Giftschlamm! Schnell raus hier!', KAMPF: 'Die Bambusfalle schnappt zu!',
+  PSYCHO: 'Die Rune leuchtet auf und teleportiert dich!', 'KÄFER': 'Du klebst im Spinnennetz fest!', BODEN: 'Treibsand! Du versinkst!', DRACHE: 'Drachenfeuer schießt aus dem Boden!',
+};
+async function hazardHit() {
+  // Falle in der Arena: kurzer Schreck, dann zurück an den Eingang
+  const type = cur.gymType || 'NORMAL';
+  shake = 22; hitFx = { t: 24, col: TYPES[type] }; await waitTicks(22);
+  await say(HAZARD_TEXT[GYM_TYPES[tget(cur, player.x, player.y) - T.GH0]] || HAZARD_TEXT[type]);
+  await fadeTo(4); player.x = 4; player.y = cur.h - 2; player.dir = 'up'; await fadeTo(0);
 }
 function worldUpdate() {
   for (const n of cur.npcs) {
@@ -4535,7 +4695,7 @@ function worldUpdate() {
     const [dx, dy] = DIRS[dir]; const x = n.x + dx, y = n.y + dy;
     n.dir = dir;
     if (Math.abs(x - n.home.x) > 2 || Math.abs(y - n.home.y) > 2) continue;
-    if (blocked(cur, x, y, n) || cur.warps.has(K(x, y)) || tget(cur, x, y) === T.DOOR || tget(cur, x, y) === T.CAVE_DOOR || tget(cur, x, y) === T.DOOR_STONE || tget(cur, x, y) === T.MAT) continue;
+    if (blocked(cur, x, y, n) || cur.warps.has(K(x, y)) || tget(cur, x, y) === T.DOOR || tget(cur, x, y) === T.CAVE_DOOR || tget(cur, x, y) === T.DOOR_STONE || tget(cur, x, y) === T.CDOOR || tget(cur, x, y) === T.GDOOR || tget(cur, x, y) === T.MAT) continue;
     n.start(dir);
   }
   if (popup.t > 0) popup.t--;
@@ -4711,20 +4871,91 @@ function drawTile(tx, ty, sx, sy, f) {
     if (TOP_CASTERS.has(n[0])) O(OV.sT);
   }
 }
+let shake = 0, hitFx = null;
+// Farbige Lichtkreise (z. B. Lava, Strom, Neon) werden einmal erzeugt und wiederverwendet
+const GLOW_CACHE = {};
+function glowOf(col) {
+  if (GLOW_CACHE[col]) return GLOW_CACHE[col];
+  const c = document.createElement('canvas'); c.width = c.height = 48; const g = c.getContext('2d'), [r, gg, b] = hexRgb(col);
+  const gr = g.createRadialGradient(24, 24, 2, 24, 24, 24); gr.addColorStop(0, `rgba(${r},${gg},${b},.8)`); gr.addColorStop(0.45, `rgba(${r},${gg},${b},.28)`); gr.addColorStop(1, `rgba(${r},${gg},${b},0)`);
+  g.fillStyle = gr; g.fillRect(0, 0, 48, 48); return (GLOW_CACHE[col] = c);
+}
+// Stimmung je Arena: Abdunkeln, farbiges Licht an Fallen, Spieler und Leitung, schwebende Teilchen
+const GYM_FX = {
+  FEUER: { tint: '#8a6058', light: '#ff7a30', p: '#f8a030', vy: -0.5, vx: 0.1 }, DRACHE: { tint: '#5a4a6e', light: '#a070ff', p: '#c098ff', vy: -0.4, vx: 0.1 },
+  ELEKTRO: { tint: '#5e6070', light: '#f8e040', p: '#fff6a0', vy: 0, vx: 0, flick: 1 }, EIS: { tint: '#8aa4c0', light: '#a8e8ff', p: '#ffffff', vy: 0.35, vx: 0.15 },
+  GIFT: { tint: '#6a5470', light: '#90e050', p: '#b8f080', vy: -0.3, vx: 0 }, WASSER: { tint: '#6a88a8', light: '#60b0ff', p: '#d0f0ff', vy: -0.35, vx: 0 },
+  PFLANZE: { tint: '#6a8060', light: '#c0f080', p: '#88c860', vy: 0.25, vx: 0.2 }, 'KÄFER': { tint: '#6a7058', light: '#e0d060', p: '#c8e070', vy: 0.2, vx: -0.2 },
+  GEIST: { tint: '#4a3e5e', light: '#b090ff', p: '#d0c0ff', vy: -0.15, vx: 0.1 }, PSYCHO: { tint: '#6a5070', light: '#ff80e0', p: '#ffc0f0', vy: -0.15, vx: -0.1 },
+  FLUG: { tint: '#8a9ab0', light: '#ffffff', p: '#ffffff', vy: 0, vx: 1.2 }, STAHL: { tint: '#6a7080', light: '#c8e0ff', p: '#ffffff', vy: 0.1, vx: 0, flick: 1 },
+  GESTEIN: { tint: '#786c62', light: '#ffc080', p: '#d8c8a8', vy: 0.15, vx: 0.05 }, BODEN: { tint: '#8a7058', light: '#ffc070', p: '#e8c890', vy: 0.1, vx: 0.3 },
+  KAMPF: { tint: '#806a58', light: '#ff9060', p: '#e8d0a0', vy: -0.1, vx: 0.05 }, NORMAL: { tint: '#7a7480', light: '#ffe0b0', p: '#f0e8d8', vy: -0.1, vx: 0.05 },
+};
+function drawGymFx(camX, camY) {
+  const fx = GYM_FX[cur.gymType] || GYM_FX.NORMAL, x0 = Math.floor(camX / TS), y0 = Math.floor(camY / TS);
+  ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = fx.tint; ctx.fillRect(0, 0, VW, VH);
+  ctx.globalCompositeOperation = 'lighter';
+  const pulse = 0.55 + 0.2 * Math.sin(tick / 9), G = glowOf(fx.light);
+  for (let ty = y0; ty <= y0 + Math.ceil(VH / TS); ty++) for (let tx = x0; tx <= x0 + Math.ceil(VW / TS); tx++) {
+    if (!HAZARDS.has(tget(cur, tx, ty))) continue;
+    ctx.globalAlpha = pulse * (fx.flick && hash(tx, ty, tick >> 2) < 0.3 ? 1.4 : 0.8); ctx.drawImage(G, tx * TS - camX - 8, ty * TS - camY - 8, 32, 32);
+  }
+  const lead = cur.npcs.find(n => n.id === 'leader' || n.id === 'champion');
+  ctx.globalAlpha = 0.55; ctx.drawImage(glowOf('#fff0d0'), Math.round(player.px) - camX - 32, Math.round(player.py) - camY - 36, 80, 80);
+  if (lead) { ctx.globalAlpha = 0.6 + 0.15 * Math.sin(tick / 12); ctx.drawImage(G, lead.x * TS - camX - 40, lead.y * TS - camY - 44, 96, 96); }
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  ctx.save(); ctx.beginPath(); ctx.rect(-camX, -camY, cur.w * TS, cur.h * TS); ctx.clip(); // Teilchen nur im Raum
+  for (let k = 0; k < 36; k++) {
+    let x = (hash(k, 1, 51) * (VW + 40) + tick * fx.vx * (0.6 + hash(k, 2, 51))) % (VW + 40), y = (hash(k, 3, 51) * (VH + 40) + tick * fx.vy * (0.6 + hash(k, 4, 51))) % (VH + 40);
+    if (x < 0) x += VW + 40; if (y < 0) y += VH + 40;
+    if (fx.flick && ((tick >> 2) + k) % 7) continue;
+    ctx.globalAlpha = 0.5 + 0.5 * hash(k, tick >> 4, 52); ctx.fillStyle = fx.p;
+    if (fx.vx > 1) ctx.fillRect(Math.round(x) - 20, Math.round(y) - 20, 6, 1); else ctx.fillRect(Math.round(x) - 20, Math.round(y) - 20, 1 + (k % 3 === 0), 1 + (k % 3 === 0));
+  }
+  ctx.restore(); ctx.globalAlpha = 1;
+}
+function holoSprite(id) {
+  const key = 'holo' + id; if (SPR[key]) return SPR[key];
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.drawImage(wesenSprite(id), 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#9ae8ff'; g.fillRect(0, 0, 64, 64);
+  return (SPR[key] = c);
+}
+// Center: Neonband, das über die Wand läuft, Holo-Schirme mit Wesen und ein pulsierendes Leuchten am Fossil
+function drawCenterFx(fx, fy) {
+  const ox = fx - 3 * TS, run = (tick * 2) % (10 * TS + 40) - 20;
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = 0.5; ctx.drawImage(glowOf('#ff70a0'), ox + run - 16, fy + 26, 32, 16);
+  ctx.globalAlpha = 0.18 + 0.08 * Math.sin(tick / 15); ctx.drawImage(glowOf('#80e0ff'), fx - 24, fy - 24, 96, 80);
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  const sp = 1 + Math.floor(tick / 150) % SPECIES.length;
+  for (const hx of [ox + TS + 1, ox + 7 * TS + 1]) {
+    ctx.fillStyle = 'rgba(40,120,170,.55)'; ctx.fillRect(hx, fy + 3, 14, 14);
+    ctx.fillStyle = 'rgba(160,230,255,.9)'; ctx.fillRect(hx, fy + 3, 14, 1); ctx.fillRect(hx, fy + 16, 14, 1);
+    ctx.globalAlpha = 0.55 + 0.3 * Math.sin(tick / 6); ctx.drawImage(holoSprite(sp), hx - 1, fy + 1, 16, 16); ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(200,245,255,.35)'; ctx.fillRect(hx, fy + 4 + (tick >> 1) % 12, 14, 1);
+  }
+}
 function drawHealFx(fx, fy, t, n) {
   // Kapseln nacheinander auf das Leuchtband, dann leuchtet das Fossil und es funkelt
   for (let i = 0; i < n; i++) if (t > 20 + i * 14) { const x = fx + 6 + i * 7, y = fy + 26; ctx.fillStyle = '#6a3a10'; ctx.fillRect(x, y, 5, 5); ctx.fillStyle = '#f0a020'; ctx.fillRect(x + 1, y + 1, 3, 3); ctx.fillStyle = '#fff0b0'; ctx.fillRect(x + 1, y + 1, 1, 1); }
   const go = t - (24 + n * 14);
   if (go <= 0) return;
-  ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.25 + 0.2 * Math.sin(go / 3);
-  ctx.fillStyle = '#ffe8a0'; ctx.fillRect(fx + 3, fy + 3, 42, 22); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  ctx.globalCompositeOperation = 'lighter';
+  // Lichtstrahlen von den Kapseln ins Fossil, das Skelett glüht immer stärker
+  for (let i = 0; i < n; i++) { ctx.globalAlpha = 0.35 + 0.25 * Math.sin(go / 2 + i); ctx.fillStyle = '#a8f0ff'; ctx.fillRect(fx + 8 + i * 7, fy + 6, 1, 20); }
+  ctx.globalAlpha = Math.min(0.75, 0.2 + go / 120) * (0.8 + 0.2 * Math.sin(go / 3));
+  ctx.fillStyle = '#ffe8a0'; ctx.fillRect(fx + 3, fy + 3, 42, 22);
+  ctx.globalAlpha = 0.5; ctx.drawImage(glowOf('#ff90c0'), fx - 24, fy - 30, 96, 96);
+  if (go > 60) { ctx.globalAlpha = Math.max(0, (70 - go) / 10) * 0.8; ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, VW, VH); }
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   for (let k = 0; k < 6; k++) {
     const p = (go + k * 11) % 40, x = fx + 6 + Math.floor(hash(k, Math.floor((go + k * 11) / 40), 9) * 36), y = fy + 22 - p / 2, r = p < 20 ? p >> 3 : (40 - p) >> 3;
     ctx.fillStyle = '#ffffff'; ctx.fillRect(x, y - r, 1, r * 2 + 1); ctx.fillRect(x - r, y, r * 2 + 1, 1);
   }
 }
 function drawWorld() {
-  const camX = Math.round(player.px) + 8 - (VW >> 1), camY = Math.round(player.py) + 6 - (VH >> 1);
+  let camX = Math.round(player.px) + 8 - (VW >> 1), camY = Math.round(player.py) + 6 - (VH >> 1);
+  if (shake > 0) { camX += (tick * 7) % 5 - 2; camY += (tick * 3) % 5 - 2; }
   const x0 = Math.floor(camX / TS), y0 = Math.floor(camY / TS);
   const f = (tick >> 4) & 3;
   const ph = dayPhase(), fancy = cur.outdoor && OPTS.gfx !== 2;
@@ -4745,7 +4976,10 @@ function drawWorld() {
     ctx.drawImage(img, sx, top + bob);
     if (a.alert > 0) { a.alert--; rr(sx + 3, top - 14, 10, 13, 3, '#283038'); rr(sx + 4, top - 13, 8, 11, 2, '#ffffff'); ctx.fillStyle = UI.red; ctx.fillRect(sx + 7, top - 11, 2, 5); ctx.fillRect(sx + 7, top - 5, 2, 2); }
   }
+  if (cur.gymType) drawGymFx(camX, camY);
+  if (cur.fossil) drawCenterFx(cur.fossil.x * TS - camX, cur.fossil.y * TS - camY);
   if (cur.heal && cur.fossil) drawHealFx(cur.fossil.x * TS - camX, cur.fossil.y * TS - camY, tick - cur.heal.start, cur.heal.n);
+  if (hitFx && hitFx.t > 0) { ctx.globalAlpha = hitFx.t / 24 * 0.55; ctx.fillStyle = hitFx.col; ctx.fillRect(0, 0, VW, VH); ctx.globalAlpha = 1; hitFx.t--; }
   const gx = Math.round(player.px / TS), gy = Math.round(player.py / TS);
   if (tget(cur, gx, gy) === T.TALL) ctx.drawImage(atlas[bget(cur, gx, gy)][f], (rustle.has(K(gx, gy)) ? T.TALL_RUSTLE : T.TALL) * TS, 8, TS, 8, gx * TS - camX, gy * TS - camY + 8, TS, 8);
   if (fancy) drawFlock(camX, camY, false);
@@ -4802,6 +5036,7 @@ function render() {
   if (updateT) { const s = 'Neue Version! Spiel wird aktualisiert...'; box(VW / 2 - 112, VH / 2 - 15, 224, 30); text(s, VW / 2 - measure(s) / 2, VH / 2 - 9); }
 }
 function step() {
+  if (shake > 0) shake--;
   tick++;
   for (let i = tickers.length - 1; i >= 0; i--) if (--tickers[i].n <= 0) { const t = tickers[i]; tickers.splice(i, 1); t.r(); }
   if (fade !== fadeTarget) {
@@ -4884,6 +5119,7 @@ function applySave(s) {
 const fmtTime = sec => `${Math.floor(sec / 3600)}:${String(Math.floor(sec / 60) % 60).padStart(2, '0')}`;
 function placeName(d) {
   if (!d || !d.map) return '';
+  if (/^(station|rest):/.test(d.map)) { const h = HAMLETS[+d.map.split(':')[1]]; return h ? 'RASTPLATZ ' + h.name.toUpperCase() : ''; }
   if (d.map === 'world') return AREA_NAMES[aget(MAPS.world, d.x, d.y)] || 'UNTERWEGS';
   const t = TOWNS[+d.map.split(':')[1]]; return t ? t.name.toUpperCase() : '';
 }
