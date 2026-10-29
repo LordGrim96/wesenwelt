@@ -41,7 +41,9 @@ Die Wesen, Orte und Grafiken sind eigene Entwürfe und stammen nicht aus offizie
 Der Ordner `worker/` ist ein kleiner Server (Cloudflare Workers + D1) für Konten und Cloud-Spielstände.
 Er wird bei jeder Änderung automatisch veröffentlicht (`.github/workflows/worker.yml`), sobald im GitHub-Projekt
 die Geheimnisse `CLOUDFLARE_API_TOKEN` und `CLOUDFLARE_ACCOUNT_ID` hinterlegt sind. Die Server-Adresse steht im Spiel unter `CONFIG.api`.
-Ohne Konto spielt man als Gast, dann bleiben die Spielstände auf dem Gerät.
+Gespielt wird nur mit Konto: Die veröffentlichte App enthält den Spielcode verschlüsselt (`tools/encrypt.mjs`, `tools/gate.html`).
+Den Schlüssel gibt der Server nur angemeldeten, nicht gesperrten Spielern; danach bleibt er auf dem Gerät, damit man auch offline spielen kann.
+Admins öffnen die GOAT-Übersicht auf dem Titelbild mit SELECT.
 
 ## Lizenz
 

@@ -8,6 +8,8 @@ import json
 import os
 import pathlib
 import re
+import subprocess
+import tempfile
 import time
 
 ROOT = pathlib.Path(__file__).parent
@@ -57,7 +59,7 @@ sw_register = """
 // Meldet der Offline-Speicher eine andere Version, lädt das Spiel in einem sicheren Moment neu.
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', e => {
-    if (e.data && e.data.type === 'version' && e.data.v !== GAME_VERSION) dispatchEvent(new Event('wesenwelt-update'));
+    if (e.data && e.data.type === 'version' && typeof GAME_VERSION !== 'undefined' && e.data.v !== GAME_VERSION) dispatchEvent(new Event('wesenwelt-update'));
   });
   addEventListener('load', async () => {
     try {
@@ -73,6 +75,20 @@ if ('serviceWorker' in navigator) {
 </body>
 </html>
 """
+
+# Verschlüsselung: Mit WW_KEY wird der Spielcode verschlüsselt eingebettet und erst nach der Anmeldung entschlüsselt
+KEY = os.environ.get("WW_KEY", "")
+if KEY:
+    s0 = src.index("<script>\n'use strict'"); s1 = src.index("</script>", s0)
+    code = src[s0 + len("<script>"):s1]
+    with tempfile.TemporaryDirectory() as tmp:
+        fin, fout = pathlib.Path(tmp) / "game.js", pathlib.Path(tmp) / "game.enc"
+        fin.write_text(code, encoding="utf-8")
+        subprocess.run(["node", str(ROOT / "tools" / "encrypt.mjs"), str(fin), str(fout)], check=True)
+        blob = fout.read_text()
+    gate = (ROOT / "tools" / "gate.html").read_text(encoding="utf-8").replace("__API__", API)
+    src = src[:s0] + gate + '\n<script type="application/octet-stream" id="ww-data">' + blob + "</script>" + src[s1 + len("</script>"):]
+    print("Spielcode verschlüsselt")
 
 # Der Body-Inhalt beginnt nach dem Stylesheet-Link-Block des Spiels
 body_start = src.index('<div class="game"')

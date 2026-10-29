@@ -66,13 +66,13 @@ async function newSession(db, userId) {
 async function currentUser(req, db) {
   const m = /^Bearer ([0-9a-f]{64})$/.exec(req.headers.get('authorization') || '');
   if (!m) return null;
-  return db.prepare('SELECT u.id, u.name, u.dev, u.admin, u.pw_hash, u.pw_salt FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ?')
+  return db.prepare('SELECT u.id, u.name, u.dev, u.admin, u.pw_hash, u.pw_salt FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ? AND s.expires_at > ? AND u.blocked = 0')
     .bind(await sha256(m[1]), Date.now()).first();
 }
 async function playerSlots(db) {
   const r = await db.prepare("SELECT v FROM settings WHERE k = 'max_players'").first();
-  const n = await db.prepare('SELECT COUNT(*) AS n FROM users WHERE admin = 0').first();
-  return { max_players: r ? +r.v : -1, players: n.n };
+  const n = await db.prepare('SELECT COUNT(*) AS n, SUM(blocked) AS b FROM users WHERE admin = 0').first();
+  return { max_players: r ? +r.v : -1, players: n.n, blocked: n.b || 0 };
 }
 const publicUser = u => ({ name: u.name, dev: !!(u.dev || u.admin), admin: !!u.admin });
 const checkPassword = async (u, pw) => sameText(await pbkdf2(String(pw || ''), u.pw_salt), u.pw_hash);
@@ -105,6 +105,7 @@ async function handle(req, env) {
     // Auch ohne Konto wird gerechnet, damit die Antwortzeit nichts verrät
     const hash = await pbkdf2(String(b.password || ''), u ? u.pw_salt : '00'.repeat(16));
     if (!u || !sameText(hash, u.pw_hash)) return fail(401, 'Name oder Passwort stimmt nicht.');
+    if (u.blocked) return fail(403, 'Dein Zugang ist gesperrt. Frag den Entwickler.');
     return json({ token: await newSession(db, u.id), user: publicUser(u) });
   }
 
@@ -113,6 +114,13 @@ async function handle(req, env) {
   if (!user) return fail(401, 'Bitte neu anmelden.');
 
   if (path === '/api/me' && method === 'GET') return json({ user: publicUser(user) });
+
+  // Schlüssel für das verschlüsselte Spiel: nur für angemeldete, nicht gesperrte Spieler
+  if (path === '/api/gamekey' && method === 'GET') {
+    const r = await db.prepare("SELECT v FROM settings WHERE k = 'game_key'").first();
+    if (!r) return fail(503, 'Das Spiel ist noch nicht eingerichtet.');
+    return json({ key: r.v, user: publicUser(user) });
+  }
 
   if (path === '/api/logout' && method === 'POST') {
     const token = (req.headers.get('authorization') || '').slice(7);
@@ -166,10 +174,10 @@ async function handle(req, env) {
       return json(await playerSlots(db));
     }
     if (path === '/api/admin/users' && method === 'GET') {
-      const r = await db.prepare('SELECT u.id, u.name, u.dev, u.admin, u.created_at, (SELECT COUNT(*) FROM saves s WHERE s.user_id = u.id) AS saves, (SELECT MAX(saved_at) FROM saves s WHERE s.user_id = u.id) AS last_save FROM users u ORDER BY u.created_at DESC LIMIT 500').all();
-      return json({ users: r.results.map(u => ({ ...u, dev: !!u.dev, admin: !!u.admin })) });
+      const r = await db.prepare('SELECT u.id, u.name, u.dev, u.admin, u.blocked, u.created_at, (SELECT COUNT(*) FROM saves s WHERE s.user_id = u.id) AS saves, (SELECT MAX(saved_at) FROM saves s WHERE s.user_id = u.id) AS last_save FROM users u ORDER BY u.created_at DESC LIMIT 500').all();
+      return json({ users: r.results.map(u => ({ ...u, dev: !!u.dev, admin: !!u.admin, blocked: !!u.blocked })) });
     }
-    const am = /^\/api\/admin\/users\/(\d+)(?:\/(reset|dev))?$/.exec(path);
+    const am = /^\/api\/admin\/users\/(\d+)(?:\/(reset|dev|block))?$/.exec(path);
     const target = am && await db.prepare('SELECT id, name, admin FROM users WHERE id = ?').bind(+am[1]).first();
     if (!target) return fail(404, 'Diesen Spieler gibt es nicht.');
     if (target.id === user.id) return fail(403, 'Dein eigenes Konto änderst du unter KONTO → PASSWORT ÄNDERN.');
@@ -181,6 +189,15 @@ async function handle(req, env) {
         db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(target.id),
       ]);
       return json({ name: target.name, password: pw });
+    }
+    if (am[2] === 'block' && method === 'POST') {
+      const b = await readJson(req);
+      // Sperren meldet den Spieler sofort auf allen Geräten ab
+      await db.batch([
+        db.prepare('UPDATE users SET blocked = ? WHERE id = ?').bind(b.blocked ? 1 : 0, target.id),
+        ...(b.blocked ? [db.prepare('DELETE FROM sessions WHERE user_id = ?').bind(target.id)] : []),
+      ]);
+      return json({ ok: true });
     }
     if (am[2] === 'dev' && method === 'POST') {
       const b = await readJson(req);

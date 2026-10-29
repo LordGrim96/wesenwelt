@@ -22,6 +22,27 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      # Spielschlüssel vom Konto-Server holen: damit wird das Spiel verschlüsselt (nur angemeldete Spieler bekommen ihn)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Spielschlüssel holen
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: worker
+        shell: bash
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then echo "::notice::Ohne Cloudflare wird das Spiel unverschlüsselt gebaut."; exit 0; fi
+          npm ci --no-audit --no-fund
+          ID="$(npx wrangler d1 list --json | node -e "const l=JSON.parse(require('fs').readFileSync(0,'utf8'));const d=l.find(x=>x.name==='wesenwelt');process.stdout.write(d?d.uuid:'')")"
+          test -n "$ID"; sed -i "s/__D1_ID__/$ID/" wrangler.toml
+          npx wrangler d1 execute wesenwelt --remote --command "INSERT OR IGNORE INTO settings (k, v) VALUES ('game_key', lower(hex(randomblob(32))))" > /dev/null
+          KEY="$(npx wrangler d1 execute wesenwelt --remote --json --command "SELECT v FROM settings WHERE k = 'game_key'" | node -e "const r=JSON.parse(require('fs').readFileSync(0,'utf8'));process.stdout.write(r[0].results[0].v)")"
+          test ${#KEY} -eq 64
+          echo "::add-mask::$KEY"
+          echo "WW_KEY=$KEY" >> "$GITHUB_ENV"
+          git checkout wrangler.toml
       - run: python3 build_app.py
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

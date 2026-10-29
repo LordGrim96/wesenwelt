@@ -99,7 +99,7 @@ const CONFIG = {
   // Adresse des Konto-Servers (worker/). Leer = nur Gast-Spielstände auf dem Gerät
   api: 'https://wesenwelt-api.edengrim67.workers.dev',
 };
-const GAME_VERSION = '202610281727'; // wird von build_app.py durch die Build-Zeit ersetzt
+const GAME_VERSION = '202610291538'; // wird von build_app.py durch die Build-Zeit ersetzt
 
 // Logische Bildgröße passt sich dem Bildschirm an (mindestens 256x192); SC = interne Auflösung für scharfe Schrift
 let VW = 256, VH = 192, OX = 0, OY = 0, RW = 256, RH = 192;
@@ -2957,7 +2957,7 @@ class NameScreen {
       rr(x, 154, w, 18, 4, sel ? UI.red : '#8aa0b8'); rr(x + 1, 155, w - 2, 16, 3, sel ? '#fff0e8' : '#eef2f8');
       text(label, x + w / 2 - Math.floor(measure(label) / 2), 154, UI.text, null);
     });
-    text(this.opts.mask ? 'Nur für den Entwickler des Spiels' : 'Tippen geht auch mit der Tastatur', 12, 174, '#7888a0', null);
+    text(this.opts.mask ? 'Nur für den GOAT des Spiels' : 'Tippen geht auch mit der Tastatur', 12, 174, '#7888a0', null);
   }
 }
 
@@ -2985,7 +2985,7 @@ class TrainerCard {
 }
 
 class OptionsScreen {
-  constructor() { this.sel = 0; this.rows = [['gfx', 'GRAFIK', GFX_NAMES], ['time', 'TAGESZEIT', ['AUTOMATISCH', 'MORGEN', 'TAG', 'ABEND', 'NACHT']], ['text', 'TEXTTEMPO', TEXT_NAMES], ['konto', 'KONTO'], ['offline', 'OFFLINE-MODUS', ['AUS', 'AN']], ['code', 'SPIELSTAND-CODE'], ['dev', 'ENTWICKLER'], ['back', 'ZURÜCK']]; }
+  constructor() { this.sel = 0; this.rows = [['gfx', 'GRAFIK', GFX_NAMES], ['time', 'TAGESZEIT', ['AUTOMATISCH', 'MORGEN', 'TAG', 'ABEND', 'NACHT']], ['text', 'TEXTTEMPO', TEXT_NAMES], ['konto', 'KONTO'], ['offline', 'OFFLINE-MODUS', ['AUS', 'AN']], ['code', 'SPIELSTAND-CODE'], ['dev', 'GOAT-MODUS'], ['back', 'ZURÜCK']]; }
   update() {
     const n = this.rows.length, [key, , vals] = this.rows[this.sel];
     if (pressed.up) this.sel = (this.sel + n - 1) % n;
@@ -3016,13 +3016,13 @@ class OptionsScreen {
     });
     box(2, 146, 252, 44);
     const key = this.rows[this.sel][0];
-    const info = { gfx: ['Alle Effekte: Wolken, Flugsaurier, Vignette.', 'Fast alle Effekte, schont den Akku.', 'Ohne Wetter und Effekte, für ältere Handys.'][OPTS.gfx], time: OPTS.time ? 'Feste Tageszeit für die ganze Welt.' : 'Tageszeit nach deiner echten Uhrzeit.', text: 'So schnell erscheinen die Texte.', code: 'Spielstand auf Handy oder PC mitnehmen.', konto: account ? `Angemeldet als ${accName()}` : 'Anmelden: Spielstände auf allen Geräten.', offline: OPTS.offline ? 'Spielstände nur auf dem Gerät.' : 'An: ohne Internet, Abgleich später.', dev: devOn ? 'A: Entwicklermodus ausschalten.' : 'A: Passwort eingeben.', back: 'Einstellungen werden automatisch gespeichert.' }[key];
+    const info = { gfx: ['Alle Effekte: Wolken, Flugsaurier, Vignette.', 'Fast alle Effekte, schont den Akku.', 'Ohne Wetter und Effekte, für ältere Handys.'][OPTS.gfx], time: OPTS.time ? 'Feste Tageszeit für die ganze Welt.' : 'Tageszeit nach deiner echten Uhrzeit.', text: 'So schnell erscheinen die Texte.', code: 'Spielstand auf Handy oder PC mitnehmen.', konto: account ? `Angemeldet als ${accName()}` : 'Anmelden: Spielstände auf allen Geräten.', offline: OPTS.offline ? 'Spielstände nur auf dem Gerät.' : 'An: ohne Internet, Abgleich später.', dev: devOn ? 'A: GOAT-Modus ausschalten.' : 'A: Passwort eingeben.', back: 'Einstellungen werden automatisch gespeichert.' }[key];
     text(info, 12, 150); text('Links/Rechts: ändern   B: zurück', 12, 166, '#7888a0', null);
   }
 }
 
 class Menu {
-  constructor() { this.items = ['URDEX', 'TEAM', 'TASCHE', 'PROFIL', 'ORDEN', 'KARTE', 'OPTIONEN', 'SICHERN', ...(devOn ? ['ENTWICKLER'] : []), 'ZURÜCK']; this.sel = 0; }
+  constructor() { this.items = ['URDEX', 'TEAM', 'TASCHE', 'PROFIL', 'ORDEN', 'KARTE', 'OPTIONEN', 'SICHERN', ...(devOn ? ['GOAT'] : []), 'ZURÜCK']; this.sel = 0; }
   update() {
     if (pressed.up) this.sel = (this.sel + this.items.length - 1) % this.items.length;
     if (pressed.down) this.sel = (this.sel + 1) % this.items.length;
@@ -3038,7 +3038,7 @@ class Menu {
         if (it === 'OPTIONEN') await openScreen(new OptionsScreen());
         if (it === 'ORDEN') await openScreen(new BadgeScreen());
         if (it === 'KARTE') await openScreen(new MapScreen());
-        if (it === 'ENTWICKLER') await devMenu();
+        if (it === 'GOAT') await devMenu();
         if (it === 'SICHERN') {
           const c = await ask('Spielstand sichern?', ['JA', 'NEIN']);
           if (c === 0) await say(saveGame() ? 'Spielstand gesichert!' : 'Speichern ist in diesem Browser nicht möglich.');
@@ -3316,7 +3316,10 @@ class MapScreen {
 /* --- Titel --- */
 class Title {
   constructor(done) { this.done = done; }
-  update() { if (pressed.A || pressed.START) { pop(this); this.done(); } }
+  update() {
+    if (pressed.SELECT && account && account.admin && accountsReady()) { pop(this); this.done('goat'); return; }
+    if (pressed.A || pressed.START) { pop(this); this.done(); }
+  }
   draw() {
     const sky = ['#f8b060', '#f09050', '#e07048', '#c05040', '#8a3a3a', '#5a2c34', '#3a2228', '#3a2228'];
     sky.forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(-OX, i ? i * 18 : -OY, RW, i ? 18 : 18 + OY); });
@@ -3339,6 +3342,7 @@ class Title {
     if (pc) ['Pfeile: laufen · Leertaste: OK', 'Umschalt: zurück/rennen · Enter: Menü'].forEach((h, k) => text(h, 128 - measure(h) / 2, 165 + k * 12, '#8a7460', null));
     const vl = versionLabel(); if (vl) text(vl, VW - 6 - measure(vl), document.body.classList.contains('touch') ? 175 : 140, '#8a7460', null);
     const cr = '© LordGrim96 · CC BY-NC-ND'; text(cr, VW - 6 - measure(cr), -2, '#7a3220', null);
+    if (account && account.admin && accountsReady()) { const g = 'GOAT · SELECT', w = measure(g) + 12; rr(VW - w - 6, 132, w, 15, 4, '#2a1a10'); rr(VW - w - 5, 133, w - 2, 13, 3, '#f0c040'); text(g, VW - w, 130, '#2a1a10', null); }
     if ((tick >> 5) & 1) { const st = pc ? 'LEERTASTE DRÜCKEN' : 'START DRÜCKEN'; text(st, 128 - measure(st) / 2, pc ? 150 : 158, '#f8e8b0', '#3a1a10'); }
   }
 }
@@ -3410,13 +3414,13 @@ function sha256(str) {
   return H.map(v => (v >>> 0).toString(16).padStart(8, '0')).join('');
 }
 async function devToggle() {
-  if (devOn) { if (await ask('Entwicklermodus ausschalten?', ['JA', 'NEIN'], 1) === 0) { devLock(); await say('Entwicklermodus ist aus.'); } return; }
+  if (devOn) { if (await ask('GOAT-Modus ausschalten?', ['JA', 'NEIN'], 1) === 0) { devLock(); await say('GOAT-Modus ist aus.'); } return; }
   const pw = await new NameScreen('', null, 0, { title: 'PASSWORT', mask: true }).run();
   if (pw === null) return;
   if (sha256('wesenwelt:' + pw) !== DEV_HASH) { await say('Falsches Passwort.'); return; }
   devOn = true; try { localStorage.setItem(DEV_KEY, DEV_HASH); } catch (e) {}
   if (account) { try { const d = await api('/api/dev', 'POST', { password: pw }); account.dev = d.user.dev; storeAccount(); } catch (e) {} }
-  await say('Entwicklermodus aktiv! Im START-Menü gibt es jetzt den Punkt ENTWICKLER, und auf der KARTE reist du mit A sofort an jeden Ort.');
+  await say('GOAT-Modus aktiv! Im START-Menü gibt es jetzt den Punkt GOAT, und auf der KARTE reist du mit A sofort an jeden Ort.');
 }
 function devLock() { devOn = false; noclip = false; devCoords = false; try { localStorage.removeItem(DEV_KEY); } catch (e) {} }
 function unstick() {
@@ -3451,7 +3455,7 @@ const DEV_INFO = {
   'TEAM +5 LEVEL': 'Alle Team-Wesen steigen 5 Level auf.', 'TEAM HEILEN': 'KP, AP und Status voll.',
   'ITEMS & TALER': 'Von jedem Item 10 Stück und 10000 Taler.', 'URDEX FÜLLEN': 'Alle Wesen als gesehen und gefangen.',
   'DATENBANK': 'Alle Wesen mit Bild und Text ansehen.', 'TAGESZEIT': 'Tageszeit wechseln (auch Alt+T).',
-  'SPIELSTAND-CODE': 'Spielstand als Code für ein anderes Gerät.', 'SPIELER': 'Konten verwalten: Passwort, Rechte, löschen.', 'ZUGÄNGE': 'So viele Spieler dürfen ein Konto haben.', 'SPERREN': 'Entwicklermodus auf diesem Gerät ausschalten.',
+  'SPIELSTAND-CODE': 'Spielstand als Code für ein anderes Gerät.', 'SPIELER': 'Konten verwalten: Passwort, Rechte, löschen.', 'ZUGÄNGE': 'So viele Spieler dürfen ein Konto haben.', 'SPERREN': 'GOAT-Modus auf diesem Gerät ausschalten.',
 };
 async function devMenu() {
   let sel = 0, slots = null;
@@ -3461,7 +3465,7 @@ async function devMenu() {
     const rows = [['SCHNELLREISE'], ['DURCH WÄNDE', noclip ? 'AN' : 'AUS'], ['KOORDINATEN', devCoords ? 'AN' : 'AUS'], ['WILDE WESEN', CONFIG.encounters ? 'AN' : 'AUS'],
       ['ORDEN', `${state.badges.filter(Boolean).length}/16`], ['WESEN HOLEN'], ['TEAM +5 LEVEL'], ['TEAM HEILEN'], ['ITEMS & TALER', String(state.money)], ['URDEX FÜLLEN'],
       ['DATENBANK'], ['TAGESZEIT', TIMES[timeMode].toUpperCase()], ['SPIELSTAND-CODE'], ...(account && account.admin ? [['ZUGÄNGE', slots ? `${slots.players}/${slots.max_players < 0 ? 'OFFEN' : slots.max_players}` : '?'], ['SPIELER', 'ADMIN']] : []), ['SPERREN']];
-    sel = await openScreen(new ListScreen('ENTWICKLER', rows, sel, i => DEV_INFO[rows[i][0]]));
+    sel = await openScreen(new ListScreen('GOAT-MODUS', rows, sel, i => DEV_INFO[rows[i][0]]));
     if (sel < 0) return;
     const it = rows[sel][0];
     if (it === 'SCHNELLREISE') {
@@ -3493,21 +3497,8 @@ async function devMenu() {
     if (it === 'TAGESZEIT') { timeMode = OPTS.time = (timeMode + 1) % TIMES.length; saveOpts(); }
     if (it === 'SPIELSTAND-CODE') await exportCode();
     if (it === 'SPIELER') { await adminPlayers(); await loadSlotsInfo(); }
-    if (it === 'ZUGÄNGE') {
-      if (!slots) { await say('Keine Verbindung zum Server.'); continue; }
-      const N = [0, 1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 50, 100, -1];
-      const label = n => n < 0 ? 'UNBEGRENZT' : n === 0 ? 'NUR ICH' : `${n} SPIELER`;
-      const cur = Math.max(0, N.indexOf(slots.max_players));
-      const i = await openScreen(new ListScreen('ZUGÄNGE', N.map(n => [label(n), n === slots.max_players ? 'AKTUELL' : '']), cur, `Spieler mit Konto: ${slots.players}`));
-      if (i < 0) continue;
-      try {
-        slots = await api('/api/admin/settings', 'POST', { max_players: N[i] });
-        const free = slots.max_players < 0 ? 'Jeder kann ein Konto anlegen.' : (f => f === 1 ? 'Ein Platz ist noch frei.' : `${f} Plätze sind noch frei.`)(Math.max(0, slots.max_players - slots.players));
-        await say(`Gespeichert: ${label(N[i])}. ${free}`);
-        if (slots.max_players >= 0 && slots.players > slots.max_players) await say('Es gibt schon mehr Konten. Die bleiben bestehen, du kannst sie unter SPIELER löschen.');
-      } catch (e) { await say(e.message); }
-    }
-    if (it === 'SPERREN') { if (await ask('Entwicklermodus ausschalten?', ['JA', 'NEIN'], 1) === 0) { devLock(); closeMenus(); return; } }
+    if (it === 'ZUGÄNGE') slots = await setAccessLimit(slots) || slots;
+    if (it === 'SPERREN') { if (await ask('GOAT-Modus ausschalten?', ['JA', 'NEIN'], 1) === 0) { devLock(); closeMenus(); return; } }
   }
 }
 
@@ -3701,7 +3692,7 @@ async function accountLogin(register) {
   });
   if (!done) return false;
   offlineSession = false;
-  let msg = account.admin ? `Willkommen, Admin ${accName()}! Spielerverwaltung findest du im Menü unter ENTWICKLER.` : register ? 'Dein Konto ist bereit! Deine Spielstände werden ab jetzt in der Cloud gesichert.' : 'Du bist angemeldet. Deine Spielstände sind jetzt auf allen Geräten gleich.';
+  let msg = account.admin ? `Willkommen, Admin ${accName()}! Die GOAT-Übersicht öffnest du auf dem Titelbild mit SELECT.` : register ? 'Dein Konto ist bereit! Deine Spielstände werden ab jetzt in der Cloud gesichert.' : 'Du bist angemeldet. Deine Spielstände sind jetzt auf allen Geräten gleich.';
   try { await syncSaves(); } catch (e) { msg += ' (Abgleich später: ' + e.message + ')'; }
   await say(msg);
   return true;
@@ -3717,7 +3708,7 @@ async function accountLogout() {
 }
 function forgetAccount() {
   account = null; storeAccount(); clearLocalSlots();
-  try { localStorage.removeItem(OWNER_KEY); devOn = localStorage.getItem(DEV_KEY) === DEV_HASH; } catch (e) { devOn = false; }
+  try { localStorage.removeItem(OWNER_KEY); localStorage.removeItem('wesenwelt.gamekey'); devOn = localStorage.getItem(DEV_KEY) === DEV_HASH; } catch (e) { devOn = false; }
 }
 async function accountMenu() {
   if (!accountsReady()) return say('Konten sind noch nicht eingerichtet. Du spielst auf diesem Gerät.');
@@ -3754,25 +3745,60 @@ async function accountMenu() {
     if (gone) { forgetAccount(); await say('Dein Konto wurde gelöscht.'); if (mode === 'world') location.reload(); }
   }
 }
-// Spielerverwaltung für Admins: Passwort zurücksetzen (es gibt keine E-Mail), Entwicklerrechte, löschen
+// Zugänge: wie viele Spieler (ohne Admins) ein Konto haben dürfen
+async function setAccessLimit(slots) {
+  if (!slots) { await say('Keine Verbindung zum Server.'); return null; }
+  const N = [0, 1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 50, 100, -1];
+  const label = n => n < 0 ? 'UNBEGRENZT' : n === 0 ? 'NUR ICH' : `${n} SPIELER`;
+  const i = await openScreen(new ListScreen('ZUGÄNGE', N.map(n => [label(n), n === slots.max_players ? 'AKTUELL' : '']), Math.max(0, N.indexOf(slots.max_players)), `Spieler mit Konto: ${slots.players}`));
+  if (i < 0) return slots;
+  try {
+    slots = await api('/api/admin/settings', 'POST', { max_players: N[i] });
+    const free = slots.max_players < 0 ? 'Jeder kann ein Konto anlegen.' : (f => f === 1 ? 'Ein Platz ist noch frei.' : `${f} Plätze sind noch frei.`)(Math.max(0, slots.max_players - slots.players));
+    await say(`Gespeichert: ${label(N[i])}. ${free}`);
+    if (slots.max_players >= 0 && slots.players > slots.max_players) await say('Es gibt schon mehr Konten. Die bleiben bestehen, du kannst sie in der Spielerliste sperren oder löschen.');
+  } catch (e) { await say(e.message); }
+  return slots;
+}
+// GOAT-Übersicht (nur Admins, schon vom Titelbild aus): Server, Zugänge, Spielerliste, Einstellungen
+const GOAT_INFO = { SERVER: 'Ist der Konto-Server gerade erreichbar?', KONTO: 'Mit diesem Admin-Konto bist du angemeldet.', 'ZUGÄNGE': 'A: festlegen, wie viele Spieler ein Konto haben dürfen.', GESPERRT: 'So viele Spieler sind gerade gesperrt.', SPIELERLISTE: 'A: sperren, entsperren, Passwort, GOAT-Rechte, löschen.', 'OFFLINE-MODUS': 'A: umschalten (kein Internet nötig).', GRAFIK: 'A: Grafikstufe wechseln.', TAGESZEIT: 'A: Tageszeit wechseln.', VERSION: 'Diese Spielversion ist installiert.' };
+async function goatPanel() {
+  let sel = 0;
+  for (;;) {
+    const online = await serverReachable(); let slots = null;
+    if (online) try { slots = await api('/api/admin/settings'); } catch (e) {}
+    const rows = [['SERVER', online ? 'ONLINE' : 'OFFLINE'], ['KONTO', accName()], ['ZUGÄNGE', slots ? `${slots.players}/${slots.max_players < 0 ? 'OFFEN' : slots.max_players}` : '?'], ['GESPERRT', slots ? String(slots.blocked) : '?'], ['SPIELERLISTE'],
+      ['OFFLINE-MODUS', OPTS.offline ? 'AN' : 'AUS'], ['GRAFIK', GFX_NAMES[OPTS.gfx]], ['TAGESZEIT', TIMES[timeMode].toUpperCase()], ['VERSION', GAME_VERSION], ['ZURÜCK']];
+    sel = await openScreen(new ListScreen('GOAT-ÜBERSICHT', rows, sel, i => GOAT_INFO[rows[i][0]] || ''));
+    if (sel < 0 || rows[sel][0] === 'ZURÜCK') return;
+    const it = rows[sel][0];
+    if (it === 'SPIELERLISTE') { if (online) await adminPlayers(); else await say('Die Spielerliste braucht eine Verbindung zum Server.'); }
+    if (it === 'ZUGÄNGE') await setAccessLimit(slots);
+    if (it === 'OFFLINE-MODUS') { OPTS.offline = OPTS.offline ? 0 : 1; saveOpts(); }
+    if (it === 'GRAFIK') { OPTS.gfx = (OPTS.gfx + 1) % GFX_NAMES.length; saveOpts(); }
+    if (it === 'TAGESZEIT') { timeMode = OPTS.time = (timeMode + 1) % TIMES.length; saveOpts(); }
+  }
+}
+// Spielerverwaltung für Admins: sperren, Passwort zurücksetzen (es gibt keine E-Mail), GOAT-Rechte, löschen
 async function adminPlayers() {
   let sel = 0;
   for (;;) {
     let users; try { users = (await api('/api/admin/users')).users; } catch (e) { await say(e.message); return; }
     const day = t => { const d = new Date(t); return `${d.getDate()}.${d.getMonth() + 1}.${String(d.getFullYear()).slice(2)}`; };
-    const tag = u => u.admin ? 'ADMIN' : u.dev ? 'ENTW.' : u.last_save ? day(u.last_save) : 'neu';
+    const tag = u => u.admin ? 'ADMIN' : u.blocked ? 'GESPERRT' : u.dev ? 'GOAT' : u.last_save ? day(u.last_save) : 'neu';
     sel = await openScreen(new ListScreen('SPIELER', users.map(u => [u.name, tag(u)]), sel, i => `Seit ${day(users[i].created_at)} · ${users[i].saves} Spielstände`));
     if (sel < 0) return;
     const u = users[sel];
     if (u.admin) { await say('Admins kann man hier nicht ändern. Dein Passwort änderst du unter OPTIONEN → KONTO.'); continue; }
-    const c = await ask(`Spieler ${u.name}`, ['NEUES PASSWORT', u.dev ? 'ENTW. WEGNEHMEN' : 'ENTW. GEBEN', 'LÖSCHEN', 'ZURÜCK'], 3);
+    const c = await ask(`Spieler ${u.name}${u.blocked ? ' (gesperrt)' : ''}`, ['NEUES PASSWORT', u.dev ? 'GOAT WEGNEHMEN' : 'GOAT GEBEN', 'LÖSCHEN', u.blocked ? 'ENTSPERREN' : 'SPERREN', 'ZURÜCK'], 4);
     try {
       if (c === 0 && await ask(`${u.name} ein neues Passwort geben?`, ['JA', 'NEIN'], 1) === 0) {
         const d = await api(`/api/admin/users/${u.id}/reset`, 'POST');
         await say(`Neues Passwort für ${d.name}: ${d.password}`);
         await say('Schreib es dir auf und gib es dem Spieler. Er kann es danach unter OPTIONEN → KONTO ändern.');
       }
-      if (c === 1) { await api(`/api/admin/users/${u.id}/dev`, 'POST', { dev: !u.dev }); await say(u.dev ? `${u.name} hat keine Entwicklerrechte mehr.` : `${u.name} hat jetzt Entwicklerrechte.`); }
+      if (c === 1) { await api(`/api/admin/users/${u.id}/dev`, 'POST', { dev: !u.dev }); await say(u.dev ? `${u.name} hat keine GOAT-Rechte mehr.` : `${u.name} hat jetzt GOAT-Rechte.`); }
+      if (c === 3) { await api(`/api/admin/users/${u.id}/block`, 'POST', { blocked: !u.blocked }); await say(u.blocked ? `${u.name} darf wieder spielen.` : `${u.name} ist gesperrt und wurde auf allen Geräten abgemeldet.`); }
       if (c === 2 && await ask(`${u.name} mit allen Spielständen löschen?`, ['LÖSCHEN', 'ABBRECHEN'], 1) === 0) { await api(`/api/admin/users/${u.id}`, 'DELETE'); await say(`${u.name} wurde gelöscht.`); sel = 0; }
     } catch (e) { await say(e.message); }
   }
@@ -3782,9 +3808,9 @@ async function requireLogin() {
   while (accountsReady() && !account && !offlineSession) {
     if (!(await serverReachable())) {
       // Ohne Internet: offline auf diesem Gerät spielen, beim nächsten Anmelden wird alles hochgeladen
-      const c = await ask('Kein Internet. Du kannst offline auf diesem Gerät spielen.', ['OFFLINE SPIELEN', 'NOCHMAL VERSUCHEN', 'ZURÜCK'], 0);
-      if (c === 2) return false;
-      if (c === 0) { offlineSession = true; pendingSync = true; await say('Offline-Modus: Deine Spielstände bleiben auf diesem Gerät. Melde dich später unter OPTIONEN → KONTO an, dann wird alles gesichert.'); }
+      // Offline spielen geht erst, wenn man sich auf diesem Gerät einmal angemeldet hat
+      const c = await ask('Kein Internet. Melde dich einmal online an, danach geht es auch offline.', ['NOCHMAL', 'ZURÜCK'], 0);
+      if (c === 1) return false;
       continue;
     }
     const c = await ask('Bitte melde dich an, um zu spielen.', ['ANMELDEN', 'NEUES KONTO', 'ZURÜCK'], 0);
@@ -5354,7 +5380,8 @@ async function boot() {
   try { resume = sessionStorage.getItem('wesenwelt.resume'); sessionStorage.removeItem('wesenwelt.resume'); } catch (e) {}
   if (resume !== null && loadSlot(+resume)) { currentSlot = +resume; applySave(loadSlot(currentSlot)); mode = 'world'; popup = { text: 'UPDATE INSTALLIERT', t: 160 }; return; }
   for (;;) {
-    await new Promise(res => layers.push(new Title(res)));
+    const t0 = await new Promise(res => layers.push(new Title(res)));
+    if (t0 === 'goat') { await goatPanel(); continue; }
     const r = await profileFlow();
     if (!r) continue;
     currentSlot = r.slot;
@@ -5409,7 +5436,7 @@ boot();
 // Meldet der Offline-Speicher eine andere Version, lädt das Spiel in einem sicheren Moment neu.
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', e => {
-    if (e.data && e.data.type === 'version' && e.data.v !== GAME_VERSION) dispatchEvent(new Event('wesenwelt-update'));
+    if (e.data && e.data.type === 'version' && typeof GAME_VERSION !== 'undefined' && e.data.v !== GAME_VERSION) dispatchEvent(new Event('wesenwelt-update'));
   });
   addEventListener('load', async () => {
     try {

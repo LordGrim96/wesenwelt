@@ -1,0 +1,77 @@
+<div id="gate" style="position:fixed;inset:0;z-index:900;background:#1a1014;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;font:20px VT323,monospace;color:#f8e8b0">
+  <form id="gateForm" novalidate style="width:min(360px,100%);background:#2a1a1e;border:4px solid #f8a030;border-radius:12px;padding:18px;box-sizing:border-box">
+    <div style="font:24px 'Press Start 2P',monospace;text-align:center;letter-spacing:1px">WESENWELT</div>
+    <div style="text-align:center;color:#f8a030;margin:8px 0 14px">URZEIT-EDITION</div>
+    <div id="gateMain">
+      <label style="display:block;margin:6px 0 2px">Benutzername</label>
+      <input name="name" autocomplete="username" autocapitalize="off" spellcheck="false" maxlength="254" style="width:100%;box-sizing:border-box;font:18px ui-monospace,monospace;padding:8px;border:2px solid #f8a030;border-radius:6px;background:#fff8ec;color:#2a1a10">
+      <label style="display:block;margin:10px 0 2px">Passwort</label>
+      <input name="password" type="password" autocomplete="current-password" style="width:100%;box-sizing:border-box;font:18px ui-monospace,monospace;padding:8px;border:2px solid #f8a030;border-radius:6px;background:#fff8ec;color:#2a1a10">
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button type="submit" id="gateLogin" style="flex:1;font:20px VT323,monospace;padding:9px;border-radius:6px;border:2px solid #f8e8b0;background:#d84838;color:#fff">ANMELDEN</button>
+        <button type="button" id="gateRegister" style="flex:1;font:20px VT323,monospace;padding:9px;border-radius:6px;border:2px solid #f8e8b0;background:#3a2a2e;color:#f8e8b0">NEUES KONTO</button>
+      </div>
+    </div>
+    <div id="gateMsg" style="margin-top:12px;min-height:22px;color:#f8c080"></div>
+    <div style="margin-top:6px;font-size:16px;color:#8a7460;text-align:center">Spielen nur mit Konto · © LordGrim96</div>
+  </form>
+</div>
+<script>
+// Anmelde-Tor: Das Spiel liegt verschlüsselt in der Seite. Den Schlüssel gibt der Server nur angemeldeten, nicht gesperrten Spielern.
+// Nach einer Anmeldung bleibt der Schlüssel auf dem Gerät, damit man auch offline spielen kann.
+(async () => {
+  const API = '__API__', ACC = 'wesenwelt.account', KEY = 'wesenwelt.gamekey', OWNER = 'wesenwelt.owner';
+  const $ = id => document.getElementById(id), form = $('gateForm'), msg = t => { $('gateMsg').textContent = t || ''; };
+  const get = k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } };
+  const put = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+  const hex = h => Uint8Array.from(h.match(/../g), b => parseInt(b, 16));
+  async function call(path, opts = {}, ms = 8000) {
+    const c = new AbortController(), t = setTimeout(() => c.abort(), ms);
+    try {
+      const r = await fetch(API + path, { ...opts, signal: c.signal, headers: { 'content-type': 'application/json', ...(opts.headers || {}) } });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw Object.assign(new Error(d.error || 'Fehler beim Server.'), { status: r.status });
+      return d;
+    } catch (e) { if (e.status) throw e; throw new Error('Keine Verbindung zum Server.'); } finally { clearTimeout(t); }
+  }
+  async function start(key) {
+    try {
+      const raw = Uint8Array.from(atob($('ww-data').textContent.trim()), c => c.charCodeAt(0));
+      const k = await crypto.subtle.importKey('raw', hex(key), 'AES-GCM', false, ['decrypt']);
+      const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: raw.slice(0, 12) }, k, raw.slice(12));
+      const code = await new Response(new Blob([plain]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+      $('gate').remove();
+      const s = document.createElement('script'); s.textContent = code; document.body.appendChild(s);
+    } catch (e) { put(KEY, null); msg('Das Spiel konnte nicht geöffnet werden. Bitte neu anmelden.'); }
+  }
+  async function unlock(token, user) {
+    const d = await call('/api/gamekey', { headers: { authorization: 'Bearer ' + token } });
+    const name = (d.user || user).name;
+    // Gerät gehört jetzt diesem Konto: Spielstände eines anderen Kontos werden entfernt (sie liegen in dessen Cloud)
+    const owner = get(OWNER);
+    if (owner && String(owner).toLowerCase() !== String(name).toLowerCase()) for (let i = 1; i <= 3; i++) put('wesenwelt.urzeit.slot' + i, null);
+    put(OWNER, name); put(ACC, { token, ...(d.user || user) }); put(KEY, d.key);
+    return start(d.key);
+  }
+  async function login(register) {
+    const v = { name: form.name.value.trim(), password: form.password.value };
+    if (!v.name || !v.password) return msg('Bitte Name und Passwort eingeben.');
+    msg('Bitte warten …');
+    try { const d = await call(register ? '/api/register' : '/api/login', { method: 'POST', body: JSON.stringify(v) }); await unlock(d.token, d.user); }
+    catch (e) { msg(e.message); }
+  }
+  form.onsubmit = e => { e.preventDefault(); login(false); };
+  $('gateRegister').onclick = () => login(true);
+  const acc = get(ACC), cached = get(KEY);
+  if (acc && acc.token) {
+    msg('Anmelden …');
+    try { return await unlock(acc.token, acc); }
+    catch (e) {
+      if (e.status) { put(ACC, null); put(KEY, null); msg(e.status === 401 ? 'Bitte melde dich neu an.' : e.message); }
+      else if (cached) { msg('Offline – du spielst ohne Internet.'); return start(cached); }
+      else msg('Keine Verbindung. Bitte einmal online anmelden.');
+    }
+  } else msg('');
+  form.name.focus();
+})();
+</script>
