@@ -4243,16 +4243,22 @@ class Battle {
     }
     return null;
   }
+  // Erfahrung: Jeder Kämpfer bekommt die volle Menge, der Rest des Teams die Hälfte (Teamlernen).
+  // Wer unter dem Level des Gegners liegt, lernt schneller, wer darüber liegt, langsamer.
+  // So holen neue Teammitglieder schnell auf, ohne dass man endlos trainieren muss.
   async giveExp() {
-    const f = this.F, gain = Math.max(1, Math.floor(baseExp(f.sp) * f.lvl / 7 * (this.wild ? 1 : 1.5)));
-    const alive = [...this.part].filter(i => state.team[i] && state.team[i].hp > 0);
-    if (!alive.length) return;
-    const each = Math.max(1, Math.floor(gain / alive.length));
-    for (const i of alive) {
-      const w = state.team[i];
-      await this.msg(`${wName(w).toUpperCase()} erhält ${each} Erfahrungspunkte!`);
-      await this.addExp(w, each, i === this.pi);
+    const f = this.F, base = baseExp(f.sp) * f.lvl / 5 * (this.wild ? 1 : 1.5);
+    const gain = w => Math.max(1, Math.floor(base * ((2 * f.lvl + 10) / (f.lvl + w.lvl + 10)) ** 2.5));
+    const fit = w => w.hp > 0 && w.lvl < 100 && w !== f;
+    const fought = state.team.filter((w, i) => this.part.has(i) && fit(w)), rest = state.team.filter((w, i) => !this.part.has(i) && fit(w));
+    for (const w of fought) {
+      const n = gain(w);
+      await this.msg(`${wName(w).toUpperCase()} erhält ${n} Erfahrungspunkte!`);
+      await this.addExp(w, n, w === this.P);
     }
+    if (!rest.length) return;
+    await this.msg('Der Rest deines Teams hat zugeschaut und lernt mit!');
+    for (const w of rest) await this.addExp(w, Math.max(1, Math.floor(gain(w) / 2)), false);
   }
   async addExp(w, amount, active) {
     let left = amount;
@@ -4321,6 +4327,7 @@ class Battle {
       const N = wName(f).toUpperCase();
       await this.msg(`Eingeschlossen! ${N} gehört jetzt zu dir!`);
       state.seen[f.sp] = state.caught[f.sp] = 1;
+      await this.giveExp();
       if (await ask(`Möchtest du ${N} einen Spitznamen geben?`, ['JA', 'NEIN'], 1) === 0) { const nn = await new NameScreen('', state.profile.look, f.sp).run(); if (nn) f.nick = nn; }
       if (state.team.length < 6) state.team.push(f);
       else { state.box.push(f); await this.msg(`${wName(f).toUpperCase()} wurde ins Lager am Stein-PC geschickt.`); }
