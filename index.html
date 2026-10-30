@@ -749,6 +749,9 @@ const VARIANTS = [
   { h: '#5a7a3a', H: '#3a5a28', r: '#6a8a4a', R: '#4a6a30', y: '#6a8a4a', Y: '#4a6a30', p: '#4a3a28' },
   { h: '#303038', H: '#181820', r: '#e0b030', R: '#a07818', y: '#e0b030', Y: '#a07818', p: '#303038', P: '#181820' },
   { h: '#f8a8b8', H: '#d88098', r: '#f8f8f8', R: '#e0c0c8', y: '#f8f8f8', Y: '#e0c0c8', p: '#f0a0b0', P: '#c87888' },
+  // 7: Meteor-Bande (lila Kutten mit Glut-Abzeichen), 8: Kommandantin Krater
+  { h: '#3a2a4a', H: '#221830', r: '#4a2a6a', R: '#2e1a44', y: '#f86828', Y: '#b04818', p: '#2a2038', P: '#181020' },
+  { h: '#c83820', H: '#8a2010', r: '#2a2038', R: '#181020', y: '#f86828', Y: '#b04818', p: '#2a2038', P: '#181020' },
 ];
 const mirror = rows => rows.map(r => r.split('').reverse().join(''));
 const sym = half => half.map(r => r + r.split('').reverse().join(''));
@@ -848,6 +851,7 @@ function playerSprite(look, dir, frame) {
 const CHAR = {};
 function getChar(kind, variant, dir, frame) {
   if (kind === 'player') return playerSprite(state.profile.look, dir, frame);
+  if (kind === 'rival') return playerSprite((state.rival && state.rival.look) || { ...DEFAULT_LOOK, style: 1, hair: 3 }, dir, frame);
   const key = kind + variant;
   if (!CHAR[key]) {
     if (kind === 'item') { const c = charCanvas(ITEM_ART, 0, false); CHAR[key] = { down: [c, c, c] }; }
@@ -1930,6 +1934,7 @@ function genWorld() {
     }
   }
   for (const [x, y] of sand) tset(m, x, y, T.SAND);
+  placeStoryNpcs(m);
   return m;
 }
 
@@ -3047,6 +3052,9 @@ class Menu {
     const w = this.items.length > 9 ? 100 : 84, h = this.items.length * 16 + 12, x = VW - w - 2;
     box(x, 2, w, h);
     this.items.forEach((o, k) => { text(o, x + 22, 6 + k * 16); if (k === this.sel) arrowRight(x + 10, 10 + k * 16); });
+    // Aktuelles Ziel der Geschichte
+    const gw = VW - w - 8, lines = wrapW('ZIEL: ' + currentGoal(), gw - 16).slice(0, 4), gh = lines.length * 14 + 10;
+    box(2, VH - gh - 2, gw, gh); lines.forEach((l, k) => text(l, 10, VH - gh + 1 + k * 14));
   }
 }
 
@@ -4405,7 +4413,7 @@ class Battle {
     this.drawBg();
     const fx = 196 + (1 - e) * -280, px = 64 + (1 - e) * 280;
     this.platform(fx, 86, 52, 11); this.platform(px, 132, 64, 13);
-    if (this.tr && v.trF > 0) { ctx.globalAlpha = v.trF; ctx.drawImage(getChar('hero', this.tr.variant ?? 1, 'down', 0), fx - 21 + (1 - v.trF) * 70, 24, 128 / 3, 64); ctx.globalAlpha = 1; }
+    if (this.tr && v.trF > 0) { ctx.globalAlpha = v.trF; ctx.drawImage((this.tr.rival ? getChar('rival', 0, 'down', 0) : getChar('hero', this.tr.variant ?? 1, 'down', 0)), fx - 21 + (1 - v.trF) * 70, 24, 128 / 3, 64); ctx.globalAlpha = 1; }
     if (v.trP > 0) { ctx.globalAlpha = Math.min(1, v.trP * 1.5); ctx.drawImage(playerSprite(state.profile.look, 'up', 0), px - 21 - (1 - v.trP) * 70, 70, 128 / 3, 64); ctx.globalAlpha = 1; }
     if (!(v.blink === 'f' && (tick >> 2) & 1)) this.drawMon(this.F, fx + v.fX, 86 + v.fY, v.fK, v.fA, false, v.fFlash);
     if (!(v.blink === 'p' && (tick >> 2) & 1)) this.drawMon(this.P, px + v.pX, 132 + v.pY, v.pK, v.pA, true, 0);
@@ -4529,7 +4537,7 @@ async function startBattle(o) {
   const b = new Battle(o);
   const r = await b.run();
   for (const w of state.team) if (b.leveled.has(w) && w.hp > 0) while (canEvolve(w)) await evolve(w);
-  if (r === 'lose') await blackout();
+  if (r === 'lose') { if (o.noBlackout) state.team.forEach(healWesen); else await blackout(); }
   saveGame();
   return r;
 }
@@ -4805,6 +4813,91 @@ async function stationTalk(k) {
   }
 }
 async function openShop() { await openScreen(new ShopScreen()); await say('Danke für deinen Besuch!'); }
+/* =====================================================================
+   STORY – Kapitel 1: Der Aufbruch
+   Der Rivale holt sich im Labor den Starter mit Typvorteil, die Meteor-Bande
+   belagert die Arena von Zykadenhain, und auf Route 2 wartet der Rivale erneut.
+   ===================================================================== */
+const rivalName = () => ((state.rival && state.rival.name) || 'Rex').toUpperCase();
+// Der Rivale nimmt immer den Starter, der gegen deinen stark ist (Pflanze > Boden > Gift > Pflanze)
+const RIVAL_PICK = { Paraspross: 'Dilospritz', Ankylino: 'Paraspross', Dilospritz: 'Ankylino' };
+const rivalStarter = () => state.flags.rivalSp || SPID.Dilospritz;
+const STEP = { u: 'up', d: 'down', l: 'left', r: 'right' };
+async function walk(a, steps) { for (const c of steps) { a.start(STEP[c]); while (a.moving) { a.update(1); await waitTicks(1); } } }
+async function labRivalScene() {
+  if (state.flags['st:lab']) return;
+  const R = rivalName(), mine = SPECIES[state.team[0].sp - 1].name;
+  state.flags.rivalSp = SPID[RIVAL_PICK[mine]] || SPID.Dilospritz;
+  const sp = SPECIES[state.flags.rivalSp - 1].name.toUpperCase();
+  const rv = new Actor({ x: 4, y: ROOM_H.lab - 1, dir: 'up', sprite: 'rival', id: 'rival:lab' }); cur.npcs.push(rv);
+  await say(`${R}: Halt, wartet! Prof. Dennis, ich will auch ein Wesen!`);
+  await walk(rv, 'uu');
+  await say(`PROF. DENNIS: ${R}! Spät, aber du bist da. Such dir eins der beiden anderen aus.`);
+  await say(`${R}: Dann nehme ich ${sp}! Das ist stark gegen dein ${mine.toUpperCase()}. Ha!`);
+  rv.dir = player.x > rv.x ? 'right' : player.x < rv.x ? 'left' : 'up';
+  await say(`${R}: Los, ${PN()}! Wir testen gleich unsere neuen Wesen!`);
+  const tr = { id: 'rival:1', name: R, rival: true, team: [{ sp: state.flags.rivalSp, lvl: 5 }], money: 120, lose: 'Was?! Das war doch nur Glück!' };
+  const r = await startBattle({ trainer: tr, noBlackout: true });
+  state.team.forEach(healWesen);
+  await say(r === 'win' ? `${R}: Na gut, diesmal hast du gewonnen. Aber nur diesmal!` : `${R}: Siehst du? Ich bin eben der Bessere!`);
+  await say('PROF. DENNIS: Ein toller erster Kampf! Ich habe eure Wesen gleich wieder fit gemacht.');
+  await say(`${R}: Ich hol mir jetzt alle 16 Orden. Bis dann, ${PN()}!`);
+  await walk(rv, 'dd'); cur.npcs = cur.npcs.filter(n => n !== rv);
+  state.flags['st:lab'] = 1; saveGame();
+  await say(`PROF. DENNIS: Ach, die Jugend. ${PN()}, die erste Arena ist in ZYKADENHAIN. Viel Glück!`);
+}
+function storyTrainer(id, name, team, variant) {
+  return { id, name, variant, money: 400, team: team.map(([n, lvl]) => ({ sp: speciesAtLevel(SPID[n], lvl), lvl })), lose: 'Mist! Das gibt Ärger mit der Kommandantin!' };
+}
+function placeStoryNpcs(m) {
+  // Zykadenhain: Die Meteor-Bande versperrt die Arena, bis man sie besiegt
+  const d = DOORS['gym:1'];
+  if (d) {
+    const gone = () => !!state.flags['st:grunt1'] || state.badges[0];
+    const g1 = new Actor({ x: d.x, y: d.y + 1, dir: 'down', variant: 7, id: 'grunt:z:1', hidden: gone });
+    const g2 = new Actor({ x: d.x + 1, y: d.y + 1, dir: 'down', variant: 7, id: 'grunt:z:2', hidden: gone });
+    if (SOLID.has(tget(m, g2.x, g2.y))) g2.x = d.x - 1;
+    g1.talk = g2.talk = () => gruntScene();
+    m.npcs.push(g1, g2);
+  }
+  // Route 2: Der Rivale wartet ein Stück hinter dem Ranger, sobald man den Farn-Orden hat
+  const r2 = ROUTES.find(r => r.from === 1), src = TOWN_RECTS[1];
+  if (r2 && r2.pts.length > 20) {
+    const gi = Math.max(0, r2.pts.findIndex(p => Math.max(src.x0 - p.x, p.x - src.x1, src.y0 - p.y, p.y - src.y1) === 5)), p = r2.pts[gi + 10];
+    const travel = p.dx > 0 ? 'right' : p.dx < 0 ? 'left' : p.dy > 0 ? 'down' : 'up';
+    const tr = {
+      id: 'rival:2', rival: true, money: 900, lose: 'Schon wieder?! Du wirst echt stark.', after: 'Wir sehen uns in Fossilfurt!',
+      get name() { return rivalName(); },
+      get intro() { return `Da bist du ja, ${PN()}! Ich hab den Farn-Orden auch schon. Zeig mal, was du gelernt hast!`; },
+      get team() { return [{ sp: SPID.Pteri, lvl: 11 }, { sp: speciesAtLevel(rivalStarter(), 13), lvl: 13 }]; },
+    };
+    const a = new Actor({ x: p.x, y: p.y, dir: OPP[travel], sprite: 'rival', id: 'rival:2', trainer: tr, hidden: () => !state.badges[0] || !!state.flags['beat:rival:2'] });
+    a.talk = () => trainerEncounter(a, false);
+    m.npcs.push(a);
+  }
+}
+async function gruntScene() {
+  if (state.flags['st:grunt1']) return;
+  if (!state.team.some(w => w.hp > 0)) return say('MANN IN LILA: Komm wieder, wenn deine Wesen fit sind. Hahaha!');
+  await say('MANN IN LILA: Halt! Hier kommt keiner rein. Wir von der METEOR-BANDE durchsuchen die Arena!');
+  await say('FRAU IN LILA: Unter Zykadenhain soll ein METEOR-SPLITTER liegen. Kommandantin Krater will ihn haben!');
+  await say('MANN IN LILA: Du willst uns stören? Dann zeig, was du drauf hast!');
+  if (await startBattle({ trainer: storyTrainer('grunt:z:1', 'Bandit', [['Kompso', 6], ['Pteri', 7]], 7) }) !== 'win') return;
+  await say('FRAU IN LILA: Pff. Dann eben ich!');
+  if (await startBattle({ trainer: storyTrainer('grunt:z:2', 'Banditin', [['Halmi', 7], ['Kopfnuss', 8]], 7) }) !== 'win') return;
+  await say('MANN IN LILA: Rückzug! Das melden wir Kommandantin Krater!');
+  await fadeTo(4); state.flags['st:grunt1'] = 1; saveGame(); await fadeTo(0);
+  await say('Die METEOR-BANDE ist abgehauen. Die Arena von Zykadenhain ist wieder offen!');
+}
+// Was als Nächstes zu tun ist (steht im START-Menü)
+function currentGoal() {
+  if (!state.team.length) return 'Geh ins Labor von Prof. Dennis und hol dir dein erstes Wesen.';
+  if (!state.flags['st:grunt1'] && !state.badges[0]) return 'Reise nach Zykadenhain. Dort belagern Leute in Lila die Arena!';
+  const i = state.badges.findIndex(b => !b);
+  if (i === 1 && !state.flags['beat:rival:2']) return `${rivalName()} wartet auf Route 2 Richtung Fossilfurt.`;
+  if (i >= 0) return `Reise nach ${TOWNS[i + 1].name} und hol dir den ${TOWNS[i + 1].badge}.`;
+  return 'Auf zum Meteorgipfel: Fordere den Champion heraus!';
+}
 async function catchGuide() {
   await say('PROF. DENNIS: So fängst du wilde Wesen:');
   await say('1. Im hohen Farn auf den Routen tauchen wilde Wesen auf.');
@@ -4833,6 +4926,7 @@ async function chooseStarter() {
     state.items.Trank = (state.items.Trank || 0) + 3;
     await say(`PROF. DENNIS: Nimm diese 10 BERNSTEINKAPSELN und 3 TRÄNKE mit. Damit kannst du wilde Wesen fangen!`);
     await catchGuide();
+    await labRivalScene();
     await say(`Du und ${wName(w).toUpperCase()} seid jetzt ein Team! Mein Assistent auf Route 1 lässt euch durch.`);
     saveGame();
     return;
