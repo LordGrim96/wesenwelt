@@ -995,14 +995,16 @@ const REAL_GROUPS = [
 const REAL = {}; for (const [names, ...info] of REAL_GROUPS) for (const n of names) REAL[n] = info;
 const SPID = Object.fromEntries(SPECIES.map(s => [s.name, s.id]));
 const STARTERS = [SPID.Paraspross, SPID.Ankylino, SPID.Dilospritz];
+// Starter (heutige und frühere) kann man nicht fangen: Es gibt sie nur vom Professor
+const NO_CATCH = new Set(['Paraspross', 'Parablatt', 'Paraferro', 'Ankylino', 'Ankylodon', 'Juwelkylos', 'Dilospritz', 'Dilotox', 'Dilofaust', 'Karnokid', 'Karnotaurus', 'Sturmtaurus', 'Funkhorn', 'Donnerhorn', 'Blitzeratops'].map(n => SPID[n]));
 const DEX_VERSION = 3; // 2: Starter-Arten vorn im Urdex · 3: neue Boden/Gift-Starter, frühere Starter ans Ende
 const wName = w => w.nick || SPECIES[w.sp - 1].name;
 // Wilde Wesen je Gebiet (für das kommende Kampfsystem)
 const BIOME_POOL = [
-  ['Kompso', 'Pteri', 'Libellux', 'Halmi', 'Archi', 'Plattling', 'Hornix', 'Trilobix', 'Funkhorn'],
+  ['Kompso', 'Pteri', 'Libellux', 'Halmi', 'Archi', 'Plattling', 'Hornix', 'Trilobix'],
   ['Segelglut', 'Kopfnuss', 'Panzerling', 'Meteorlein', 'Draki'],
   ['Mammilo', 'Säbelino', 'Ferrodon', 'Pteri'],
-  ['Dünenläufer', 'Panzerling', 'Kompso', 'Zappraptor', 'Karnokid'],
+  ['Dünenläufer', 'Panzerling', 'Kompso', 'Zappraptor'],
   ['Teerling', 'Koelo', 'Sumpfkrok', 'Knochling', 'Tröti'],
 ];
 
@@ -4261,6 +4263,7 @@ class Battle {
   }
   async throwCapsule() {
     const v = this.view, f = this.F;
+    if (NO_CATCH.has(f.sp)) { await this.msg('Dieses Wesen gehört zu den Startern. Es lässt sich nicht fangen!'); return; }
     v.capsule = { x: 40, y: 120, rot: 0, star: 0 };
     const said = this.msg(`${PN()} wirft eine BERNSTEINKAPSEL!`);
     await this.tween(28, k => { v.capsule.x = 40 + 156 * k; v.capsule.y = 116 - 58 * k - Math.sin(k * Math.PI) * 60; });
@@ -4685,7 +4688,7 @@ function encounterTable(x, y) {
   const b = bget(MAPS.world, x, y), area = aget(MAPS.world, x, y);
   const route = ROUTES.find(r => r.areaId === area);
   const lvl = 1 + (route ? route.n : 1) * 3;
-  return BIOME_POOL[b].map(n => ({ sp: SPID[n], lvl }));
+  return BIOME_POOL[b].map(n => ({ sp: SPID[n], lvl })).filter(e => !NO_CATCH.has(e.sp));
 }
 async function wildEncounter(x, y) {
   const t = encounterTable(x, y), e = t[Math.floor(Math.random() * t.length)];
