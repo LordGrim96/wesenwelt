@@ -867,17 +867,17 @@ function getChar(kind, variant, dir, frame) {
 const STAT_NAMES = ['KP', 'ANGRIFF', 'VERTEID.', 'SP.-ANG.', 'SP.-VER.', 'INIT.'];
 const SPECIES = [];
 function S(name, types, base, evo, cat, dex, art) { SPECIES.push({ id: SPECIES.length + 1, name, types, base, evo, cat, dex, art }); }
-// Die drei Starter: Boden (Ankylosaurus), Gift (Dilophosaurus), Pflanze (Parasaurolophus).
+// Die drei Starter (vorn im Urdex): Pflanze (Parasaurolophus), Boden (Ankylosaurus), Gift (Dilophosaurus).
 // Dreieck: Pflanze > Boden > Gift > Pflanze. In der 3. Stufe kommt ein Zweittyp dazu (Fee, Kampf, Stahl), der das Dreieck erhält.
+S('Paraspross', ['PFLANZE'], [50, 45, 55, 55, 60, 40], 16, 'Blütenkamm', 'Freundlich und neugierig. Die sanften Töne aus seinem Kamm lassen Pflanzen wachsen.', { k: 'bi', h: 'duck', s: .58, c: ['#e890b0', '#fae4ec', '#58a848'], crest: 'hadro', leaves: 1 });
+S('Parablatt', ['PFLANZE'], [65, 60, 70, 75, 75, 55], 36, 'Blütenkamm', 'Sein Lied beruhigt wilde Wesen. Auf seinem Rücken blühen Farne und Blumen.', { k: 'bi', h: 'duck', s: .8, c: ['#e07ca0', '#fae4ec', '#48a040'], crest: 'hadro', leaves: 1 });
+S('Paraferro', ['PFLANZE', 'STAHL'], [85, 80, 110, 95, 100, 55], 0, 'Stahlkamm', 'Sein Kamm ist hart wie Stahl. Bläst es hinein, schallt eine Fanfare durch den ganzen Urwald.', { k: 'bi', h: 'duck', s: 1, c: ['#4a9848', '#e8f0d8', '#9aa8bc'], crest: 'hadro', leaves: 2 });
 S('Ankylino', ['BODEN'], [55, 55, 70, 40, 50, 35], 16, 'Panzerkeule', 'Gräbt sich bei Gefahr in den Boden ein, bis nur noch sein Panzer herausschaut.', { k: 'quad', h: 'ankylo', s: .66, c: ['#c89a5a', '#f0dcb0', '#8a5a30'], armor: 1, club: 1 });
 S('Ankylodon', ['BODEN'], [70, 75, 95, 50, 65, 45], 36, 'Panzerkeule', 'Ein Schlag mit seiner Schwanzkeule lässt den Boden beben. Felsen zerspringen wie Glas.', { k: 'quad', h: 'ankylo', s: .84, c: ['#b8884a', '#f0dcb0', '#7a4a24'], armor: 1, club: 1, spikesSide: 1 });
 S('Juwelkylos', ['BODEN', 'FEE'], [95, 90, 120, 75, 95, 50], 0, 'Juwelpanzer', 'Auf seinem Panzer wachsen funkelnde Kristalle. Wer eines davon findet, hat ein Jahr lang Glück.', { k: 'quad', h: 'ankylo', s: .93, c: ['#a8784a', '#f0dcb0', '#e870c0'], armor: 1, club: 1, gems: 1 });
 S('Dilospritz', ['GIFT'], [45, 60, 40, 55, 40, 65], 16, 'Doppelkamm', 'Spuckt zum Spaß kleine Giftblasen. An seinem Doppelkamm sieht man, wie es sich fühlt.', { k: 'bi', h: 'small', s: .55, c: ['#78b850', '#f0f0b8', '#a848c0'], crest: 'dilo' });
 S('Dilotox', ['GIFT'], [60, 80, 55, 65, 55, 85], 36, 'Doppelkamm', 'Spreizt seinen Halskragen, bevor es zielgenau Gift spuckt. Es trifft auf zehn Schritte.', { k: 'bi', h: 'raptor', s: .8, c: ['#62a442', '#f0f0b8', '#9a38b8'], crest: 'dilo', frill: 1, pose: 'horiz' });
 S('Dilofaust', ['GIFT', 'KAMPF'], [80, 115, 70, 80, 70, 110], 0, 'Giftkämpfer', 'Kämpft mit Krallen, Tritten und Giftspucke. Es trainiert jeden Morgen, um noch stärker zu werden.', { k: 'bi', h: 'raptor', s: 1.02, c: ['#4a8a38', '#f0f0b8', '#8a28a8'], crest: 'dilo', frill: 1, spines: 1 });
-S('Paraspross', ['PFLANZE'], [50, 45, 55, 55, 60, 40], 16, 'Blütenkamm', 'Freundlich und neugierig. Die sanften Töne aus seinem Kamm lassen Pflanzen wachsen.', { k: 'bi', h: 'duck', s: .58, c: ['#e890b0', '#fae4ec', '#58a848'], crest: 'hadro', leaves: 1 });
-S('Parablatt', ['PFLANZE'], [65, 60, 70, 75, 75, 55], 36, 'Blütenkamm', 'Sein Lied beruhigt wilde Wesen. Auf seinem Rücken blühen Farne und Blumen.', { k: 'bi', h: 'duck', s: .8, c: ['#e07ca0', '#fae4ec', '#48a040'], crest: 'hadro', leaves: 1 });
-S('Paraferro', ['PFLANZE', 'STAHL'], [85, 80, 110, 95, 100, 55], 0, 'Stahlkamm', 'Sein Kamm ist hart wie Stahl. Bläst es hinein, schallt eine Fanfare durch den ganzen Urwald.', { k: 'bi', h: 'duck', s: 1, c: ['#4a9848', '#e8f0d8', '#9aa8bc'], crest: 'hadro', leaves: 2 });
 S('Farnodon', ['PFLANZE'], [45, 49, 49, 65, 65, 45], 16, 'Farnhals', 'Knabbert am liebsten junge Farnspitzen. Auf seinem Rücken wachsen kleine Blätter.', { k: 'quad', h: 'sauro', neck: .55, s: .55, c: ['#68b848', '#e8e8a0', '#2f8a3a'], leaves: 1 });
 S('Zykadon', ['PFLANZE'], [60, 62, 63, 80, 80, 60], 36, 'Farnhals', 'Sein Hals ist so lang, dass es Früchte aus den höchsten Baumkronen pflückt.', { k: 'quad', h: 'sauro', neck: .8, s: .75, c: ['#58a840', '#e8e8a0', '#2f8a3a'], leaves: 1 });
 S('Gigafarnus', ['PFLANZE', 'BODEN'], [80, 82, 83, 100, 100, 80], 0, 'Urriese', 'Zieht es über die Ebene, bebt der Boden meilenweit. Auf seinem Rücken wächst ein ganzer Wald.', { k: 'quad', h: 'sauro', neck: 1, s: 1, c: ['#4a9038', '#e0dca0', '#2f7a2a'], leaves: 2 });
@@ -997,7 +997,7 @@ const SPID = Object.fromEntries(SPECIES.map(s => [s.name, s.id]));
 const STARTERS = [SPID.Paraspross, SPID.Ankylino, SPID.Dilospritz];
 // Starter (heutige und frühere) kann man nicht fangen: Es gibt sie nur vom Professor
 const NO_CATCH = new Set(['Paraspross', 'Parablatt', 'Paraferro', 'Ankylino', 'Ankylodon', 'Juwelkylos', 'Dilospritz', 'Dilotox', 'Dilofaust', 'Karnokid', 'Karnotaurus', 'Sturmtaurus', 'Funkhorn', 'Donnerhorn', 'Blitzeratops'].map(n => SPID[n]));
-const DEX_VERSION = 3; // 2: Starter-Arten vorn im Urdex · 3: neue Boden/Gift-Starter, frühere Starter ans Ende
+const DEX_VERSION = 4; // 2: Starter-Arten vorn im Urdex · 3: neue Boden/Gift-Starter, frühere Starter ans Ende · 4: Pflanze-Starter zuerst
 const wName = w => w.nick || SPECIES[w.sp - 1].name;
 // Wilde Wesen je Gebiet (für das kommende Kampfsystem)
 const BIOME_POOL = [
@@ -1550,7 +1550,7 @@ const TOWNS = [
   { name: 'Meteorgipfel', league: true, biome: 1, line: 'Hier wartet der Champion. Bist du bereit?' },
 ];
 // Weltgröße: Die Städte liegen weit auseinander, dazwischen kurvige Routen mit Abzweigungen zum Erkunden
-const WORLD_SCALE = 3, WORLD_VERSION = 2;
+const WORLD_SCALE = 3, WORLD_VERSION = 3;
 const SLOTS = [[20, 112], [68, 112], [116, 112], [116, 66], [68, 66], [20, 66], [20, 20], [68, 20], [116, 20],
   [176, 20], [224, 20], [272, 20], [272, 66], [224, 66], [176, 66], [176, 112], [224, 112], [272, 112]].map(([x, y]) => [x * WORLD_SCALE, y * WORLD_SCALE]);
 const TW = 22, TH = 18, TCX = 11, TCY = 9;
@@ -1618,7 +1618,8 @@ const SPUR_TEXT = {
 };
 function decorateRoute(m, route, core, inAnyTown) {
   const rng = mulberry32(4242 + route.n * 31), pts = route.pts;
-  const npcAt0 = new Set(m.npcs.map(n => K(n.x, n.y)));
+  // Rund um Trainer und Gegenstände bleibt alles frei, damit man sie erreicht
+  const npcAt0 = new Set(m.npcs.flatMap(n => [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => K(n.x + dx, n.y + dy))));
   const mine = (x, y) => !inAnyTown(x, y) && !core.has(K(x, y)) && !npcAt0.has(K(x, y)) && (aget(m, x, y) === route.areaId || tget(m, x, y) === T.TREE) && tget(m, x, y) !== T.WATER;
   const put = (x, y, t) => { if (mine(x, y)) { tset(m, x, y, t); if (!SOLID.has(t) || t === T.WATER) aset(m, x, y, route.areaId); return true; } return false; };
   const biomeAt = (x, y) => bget(m, x, y);
@@ -1683,11 +1684,11 @@ function carveSpurs(m, route, rng, inAnyTown) {
     if (!p || pts.slice(Math.max(0, idx - 8), idx + 9).some(q => q.dx !== p.dx || q.dy !== p.dy)) continue;
     if (route.spurs.some(s => Math.abs(s.idx - idx) < 20)) continue;
     const side = rng() < 0.5 ? -1 : 1, len = 14 + Math.floor(rng() * 10), [px, py] = p.dy === 0 ? [0, side] : [side, 0];
-    const ex = p.x + px * (len + 5), ey = p.y + py * (len + 5);
+    const ex = p.x + px * (len + 4), ey = p.y + py * (len + 4);
     let ok = true;
-    for (let o = 6; o <= len + 10 && ok; o++) for (let w = -6; w <= 6; w++) { const x = p.x + px * o + py * w, y = p.y + py * o + px * w; if (x < 2 || y < 2 || x >= m.w - 2 || y >= m.h - 2 || inAnyTown(x, y) || tget(m, x, y) !== T.TREE) { ok = false; break; } }
+    for (let o = 5; o <= len + 9 && ok; o++) for (let w = -6; w <= 6; w++) { const x = p.x + px * o + py * w, y = p.y + py * o + px * w; if (x < 2 || y < 2 || x >= m.w - 2 || y >= m.h - 2 || inAnyTown(x, y) || tget(m, x, y) !== T.TREE) { ok = false; break; } }
     if (!ok) continue;
-    for (let o = 5; o <= len + 5; o++) for (let w = -1; w <= 2; w++) { const x = p.x + px * o + Math.abs(py) * w, y = p.y + py * o + Math.abs(px) * w; tset(m, x, y, w === 0 || w === 1 ? (o % 5 < 3 ? T.PATH : T.GRASS) : T.GRASS); aset(m, x, y, route.areaId); }
+    for (let o = 4; o <= len + 4; o++) for (let w = -1; w <= 1; w++) { const x = p.x + px * o + Math.abs(py) * w, y = p.y + py * o + Math.abs(px) * w; tset(m, x, y, w === 0 ? (o % 5 < 3 ? T.PATH : T.GRASS) : T.GRASS); aset(m, x, y, route.areaId); }
     for (let y = ey - 4; y <= ey + 4; y++) for (let x = ex - 4; x <= ex + 4; x++) if ((x - ex) ** 2 + (y - ey) ** 2 <= 18) { tset(m, x, y, T.GRASS); aset(m, x, y, route.areaId); }
     route.spurs.push({ idx, x: ex, y: ey, side, dir: [px, py], len, px0: p.x, py0: p.y });
   }
@@ -1745,7 +1746,7 @@ function genWorld() {
   const inAnyTown = (x, y) => TOWN_RECTS.some(r => inRect(r, x, y));
   const rectDist = (r, x, y) => Math.max(r.x0 - x, x - r.x1, r.y0 - y, y - r.y1);
 
-  const R = 4;
+  const R = 3; // halbe Breite der Schneise neben dem Weg
   const core = new Set();
   for (let i = 0; i < TOWNS.length - 1; i++) {
     const a = centers[i], b = centers[i + 1];
@@ -1784,7 +1785,7 @@ function genWorld() {
       }
     }
     for (const p of route.pts) {
-      const cells = p.dy === 0 ? [[p.x, p.y], [p.x, p.y + 1]] : [[p.x, p.y], [p.x + 1, p.y]];
+      const cells = [[p.x, p.y]]; // einspuriger Pfad
       for (const [x, y] of cells) {
         if (inAnyTown(x, y)) continue;
         tset(m, x, y, tget(m, x, y) === T.WATER ? T.BRIDGE : T.PATH);
@@ -1819,7 +1820,7 @@ function genWorld() {
         for (let y = cy - ry; y <= cy + ry; y++) for (let x = cx - rx; x <= cx + rx; x++) {
           if (((x - cx) / (rx + 0.5)) ** 2 + ((y - cy) / (ry + 0.5)) ** 2 <= 1) { tset(m, x, y, T.WATER); aset(m, x, y, route.areaId); }
         }
-        for (let along = -4; along <= 4; along++) for (let off = 5; off <= 6; off++) {
+        for (let along = -4; along <= 4; along++) for (let off = 4; off <= 6; off++) {
           const x = p.x + (horiz ? along : side * off), y = p.y + (horiz ? side * off : along);
           if (tget(m, x, y) === T.TREE) { tset(m, x, y, T.GRASS); aset(m, x, y, route.areaId); }
         }
@@ -1916,7 +1917,7 @@ function genWorld() {
   // Jeder Abzweig bleibt begehbar, auch wenn Flüsse oder Seen ihn kreuzen (dann mit Steg)
   for (const r of ROUTES) for (const sp of r.spurs) {
     const [px, py] = sp.dir;
-    for (let o = 5; o <= sp.len + 5; o++) for (let w = 0; w <= 1; w++) {
+    for (let o = 4; o <= sp.len + 4; o++) for (let w = 0; w <= 0; w++) {
       const x = sp.px0 + px * o + Math.abs(py) * w, y = sp.py0 + py * o + Math.abs(px) * w, t = tget(m, x, y);
       if (SOLID.has(t) && !m.objs.has(K(x, y))) tset(m, x, y, t === T.WATER ? T.BRIDGE : T.PATH);
     }
@@ -2522,6 +2523,7 @@ function makeInterior(id) {
       if (kind === 'home') {
         npc({ x: 6, y: 4, dir: 'left', variant: 2, id: 'mom', talk: async () => {
           await say(`MAMA: ${PN()}, pass gut auf dich auf! Die Urzeit da draußen ist wild.`);
+          if (state.team.length && !state.flags.momCaps) { state.flags.momCaps = 1; state.items.Bernsteinkapsel = (state.items.Bernsteinkapsel || 0) + 5; await say('MAMA: Hier, nimm diese 5 BERNSTEINKAPSELN mit. Damit fängst du neue Freunde!'); }
           await healTeam(true);
         } });
       } else {
@@ -2557,7 +2559,11 @@ function makeInterior(id) {
       for (const x of [4, 5, 6]) m.objs.set(K(x, 4), { fn: () => chooseStarter() });
       npc({ x: 5, y: 3, dir: 'down', variant: 3, id: 'prof', talk: async () => {
         if (!state.team.length) { await say(`PROF. BERNSTEIN: Da bist du ja, ${PN()}! In diesen drei Bernsteinkapseln warten junge Dinos auf einen Partner.`); await say('Das sanfte PARASPROSS vom Typ PFLANZE, das gepanzerte ANKYLINO vom Typ BODEN und das flinke DILOSPRITZ vom Typ GIFT. Wen wählst du?'); await chooseStarter(); }
-        else { await say(`PROF. BERNSTEIN: Wie geht es ${wName(state.team[0]).toUpperCase()}? Triff viele Wesen und fülle deinen URDEX!`); await say('Am PC und im Fossil-Archiv erfährst du, auf welchen echten Urzeittieren die Wesen beruhen.'); }
+        else {
+          await say(`PROF. BERNSTEIN: Wie geht es ${wName(state.team[0]).toUpperCase()}? Triff viele Wesen und fülle deinen URDEX!`);
+          if (await ask('Soll ich dir das Fangen noch einmal erklären?', ['JA', 'NEIN'], 1) === 0) await catchGuide();
+          else await say('Am PC und im Fossil-Archiv erfährst du, auf welchen echten Urzeittieren die Wesen beruhen.');
+        }
       } });
       npc({ x: 2, y: 7, dir: 'right', variant: 3, wander: true, talk: 'ASSISTENT: Der Professor erforscht, wie die Wesen die Urzeit überlebt haben.' });
       break;
@@ -2632,13 +2638,17 @@ function calcStats(w) {
   return sp.base.map((b, i) => i === 0 ? Math.floor((2 * b + w.iv[i]) * w.lvl / 100) + w.lvl + 10 : Math.floor((2 * b + w.iv[i]) * w.lvl / 100) + 5);
 }
 const expFor = l => l ** 3; // Erfahrung für ein Level (Lv. 100 = 1.000.000 EP)
+// Geschlecht: Geister, Meteoriten, Bernstein, Trilobiten und Ammoniten haben keins
+const GENDERLESS = new Set(['ghost', 'meteor', 'amber', 'trilo', 'ammo']);
+const genderFor = sp => GENDERLESS.has(SPECIES[sp - 1].art.k) ? 'n' : Math.random() < 0.5 ? 'm' : 'f';
 function makeWesen(sp, lvl) {
-  const w = { sp, lvl, iv: Array.from({ length: 6 }, () => Math.floor(Math.random() * 32)), exp: expFor(lvl), status: null, moves: movesAt(sp, lvl).map(n => ({ n, pp: MOVES[n].pp })) };
+  const w = { sp, lvl, g: genderFor(sp), iv: Array.from({ length: 6 }, () => Math.floor(Math.random() * 32)), exp: expFor(lvl), status: null, moves: movesAt(sp, lvl).map(n => ({ n, pp: MOVES[n].pp })) };
   w.hp = calcStats(w)[0];
   return w;
 }
 // Ältere Spielstände: fehlende Attacken, Erfahrung und Zustand ergänzen
 function ensureWesen(w) {
+  if (!w.g) w.g = genderFor(w.sp);
   if (!w.moves || !w.moves.length) w.moves = movesAt(w.sp, w.lvl).map(n => ({ n, pp: MOVES[n].pp }));
   w.moves = w.moves.filter(m => MOVES[m.n]);
   if (!(w.exp >= expFor(w.lvl))) w.exp = expFor(w.lvl);
@@ -2724,6 +2734,13 @@ function header(title, right) {
   ctx.fillStyle = UI.header; ctx.fillRect(-OX, 0, RW, 18); ctx.fillStyle = shade(UI.header, -0.4); ctx.fillRect(-OX, 18, RW, 2);
   text(title, 8, 0, '#ffffff', '#1c2c48');
   if (right) text(right, VW - 8 - measure(right), 0, '#ffffff', '#1c2c48');
+}
+// ♂/♀ als kleine Pixel-Zeichen
+const GENDER_ART = { m: ['....xxx', '.....xx', '.xxx.x.', 'x...x..', 'x...x..', 'x...x..', '.xxx...'], f: ['.xxx.', 'x...x', 'x...x', 'x...x', '.xxx.', '..x..', '.xxx.', '..x..'] };
+function genderIcon(g, x, y) {
+  const art = GENDER_ART[g]; if (!art) return;
+  const col = g === 'm' ? '#3878e8' : '#e84868';
+  art.forEach((row, r) => { for (let c = 0; c < row.length; c++) if (row[c] === 'x') { ctx.fillStyle = shade(col, -0.45); ctx.fillRect(x + c + 1, y + r + 1, 1, 1); ctx.fillStyle = col; ctx.fillRect(x + c, y + r, 1, 1); } });
 }
 function drawWesen(id, x, y, scale = 1, silhouette = false) {
   const c = wesenSprite(id);
@@ -3120,7 +3137,7 @@ class TeamScreen {
       rr(x + 1, y + 1, 120, 40, 5, sw ? '#f8d040' : sel ? '#f8a070' : ko ? '#a87870' : '#58a0d8');
       rr(x + 3, y + 3, 116, 36, 4, sel ? '#ffd8c0' : ko ? '#e8d0cc' : '#c8e4f8');
       drawWesen(w.sp, x + 2, y + 4 + ((tick >> 3) & 1 && sel && !ko ? -1 : 0), 0.5);
-      text(wName(w), x + 36, y + 1, UI.text, UI.shadow, 16, Math.min(measure(wName(w)), 82));
+      text(wName(w), x + 36, y + 1, UI.text, UI.shadow, 16, Math.min(measure(wName(w)), 72)); genderIcon(w.g, x + 38 + Math.min(measure(wName(w)), 72), y + 6);
       text(`Lv.${w.lvl}`, x + 36, y + 16);
       if (ko) { rr(x + 36, y + 31, 24, 8, 2, '#c03028'); text('K.O.', x + 48 - measure('K.O.') / 2, y + 27, '#ffffff', null); }
       else if (w.status) { const si = STATUS_INFO[w.status]; rr(x + 36, y + 31, 24, 8, 2, si.col); text(si.tag, x + 48 - measure(si.tag) / 2, y + 27, '#ffffff', null); }
@@ -3144,7 +3161,7 @@ class SummaryScreen {
     box(4, 24, 112, 116, UI.panel);
     ctx.fillStyle = '#c8d8e8'; ctx.beginPath(); ctx.ellipse(60, 118, 40, 8, 0, 0, 7); ctx.fill();
     drawWesen(w.sp, 28, 58);
-    text(wName(w).toUpperCase(), 12, 26, UI.text, UI.shadow, 16, 100); text(`Lv.${w.lvl}`, 12, 40);
+    text(wName(w).toUpperCase(), 12, 26, UI.text, UI.shadow, 16, 88); genderIcon(w.g, 14 + Math.min(measure(wName(w).toUpperCase()), 88), 31); text(`Lv.${w.lvl}`, 12, 40);
     if (w.nick) text(sp.name, 12, 54, '#7888a0', null, 16, 100);
     sp.types.forEach((t, i) => typeChip(t, 120 + i * 52, 26));
     box(118, 42, 136, 100);
@@ -4039,6 +4056,7 @@ class Battle {
     if (this.wild) {
       state.seen[this.F.sp] = 1; v.fK = 1;
       await this.msg(`Ein wildes ${wName(this.F).toUpperCase()} erscheint!`);
+      if (!state.flags.tipCatch) { state.flags.tipCatch = 1; await this.msg('Tipp: Schwäche das Wesen und wirf dann über TASCHE eine BERNSTEINKAPSEL!'); }
     } else {
       await this.msg(`${this.tr.name.toUpperCase()} möchte kämpfen!`);
       await this.tween(18, k => { v.trF = 1 - k; });
@@ -4264,29 +4282,46 @@ class Battle {
   async throwCapsule() {
     const v = this.view, f = this.F;
     if (NO_CATCH.has(f.sp)) { await this.msg('Dieses Wesen gehört zu den Startern. Es lässt sich nicht fangen!'); return; }
-    v.capsule = { x: 40, y: 120, rot: 0, star: 0 };
+    // Bernstein-Fang: Die Kapsel platzt, flüssiger Bernstein steigt am Wesen hoch und härtet aus.
+    // Das Wesen stemmt sich dagegen (Risse), dann wird es entweder zum Bernstein-Juwel oder der Bernstein zerspringt.
+    v.capsule = { x: 40, y: 120, rot: 0, trail: [] };
     const said = this.msg(`${PN()} wirft eine BERNSTEINKAPSEL!`);
-    await this.tween(28, k => { v.capsule.x = 40 + 156 * k; v.capsule.y = 116 - 58 * k - Math.sin(k * Math.PI) * 60; });
-    await this.tween(14, k => { v.fK = 1 - k; v.fFlash = 1; }); v.fFlash = 0;
-    await this.tween(12, k => { v.capsule.y = 58 + 24 * k; });
+    await this.tween(26, k => { const c = v.capsule; c.x = 40 + 156 * k; c.y = 116 - 58 * k - Math.sin(k * Math.PI) * 60; c.rot = k * 14; c.trail.push([c.x, c.y]); if (c.trail.length > 8) c.trail.shift(); });
+    v.capsule = null; this.burst('f', '#f0a020', false, -1); v.shake = 8;
+    const A = v.amber = { fill: 0, glow: 0, cracks: [], rays: 0, gem: 0, t0: tick };
+    await this.tween(34, k => { A.fill = k * k * (3 - 2 * k); });
     await said;
     const max = calcStats(f)[0], bonus = f.status === 'SLP' ? 2 : f.status ? 1.5 : 1;
     const p = Math.min(1, ((3 * max - 2 * f.hp) * catchRate(f.sp) * bonus / (3 * max)) / 255);
-    const caught = Math.random() < p, shakes = caught ? 3 : p > 0.6 ? 2 : p > 0.3 ? 1 : 0;
-    for (let i = 0; i < shakes; i++) { await this.wait(18); await this.tween(18, k => { v.capsule.rot = Math.sin(k * Math.PI * 2) * 0.4; }); }
+    const caught = Math.random() < p, struggles = caught ? 3 : p > 0.6 ? 2 : p > 0.3 ? 1 : 0;
+    const crack = () => { const a = Math.random() * Math.PI * 2, pts = [[Math.cos(a) * 24, Math.sin(a) * 26 - 28]]; for (let i = 0; i < 4; i++) { const [x, y] = pts[pts.length - 1]; pts.push([x * 0.7 + (Math.random() - 0.5) * 10, (y + 28) * 0.7 - 28 + (Math.random() - 0.5) * 10]); } return pts; };
+    for (let i = 0; i < struggles; i++) {
+      await this.wait(12);
+      await this.tween(18, k => { v.fX = Math.sin(k * Math.PI * 5) * 2.5; A.glow = Math.sin(k * Math.PI); });
+      v.fX = 0; A.cracks.push(crack()); v.shake = 5;
+    }
     if (caught) {
-      v.capsule.star = 1; this.burst('f', '#f8e070', true, -1); await this.wait(24);
+      await this.tween(26, k => { A.rays = k; A.glow = k; A.cracks.length = Math.floor(A.cracks.length * (1 - k)); });
+      this.burst('f', '#fff0a0', true, -1);
+      await this.tween(24, k => { A.gem = k; v.fK = 1 - k; });
+      v.fK = 0; v.amber = null;
+      v.gem = { x: 196, y: 56 };
+      await this.tween(20, k => { v.gem.x = 196 - 120 * k; v.gem.y = 56 + 50 * k - Math.sin(k * Math.PI) * 30; });
+      v.gem = null; this.burst('p', '#f8e070', true, 1);
       const N = wName(f).toUpperCase();
-      await this.msg(`Toll! ${N} wurde gefangen!`);
+      await this.msg(`Eingeschlossen! ${N} gehört jetzt zu dir!`);
       state.seen[f.sp] = state.caught[f.sp] = 1;
       if (await ask(`Möchtest du ${N} einen Spitznamen geben?`, ['JA', 'NEIN'], 1) === 0) { const nn = await new NameScreen('', state.profile.look, f.sp).run(); if (nn) f.nick = nn; }
       if (state.team.length < 6) state.team.push(f);
       else { state.box.push(f); await this.msg(`${wName(f).toUpperCase()} wurde ins Lager am Stein-PC geschickt.`); }
       return 'caught';
     }
-    await this.wait(10); v.capsule = null;
-    await this.tween(12, k => { v.fK = k; });
-    await this.msg(['Oh nein! Es hat sich befreit!', 'Mist! Fast hätte es geklappt!', 'Argh! Das war knapp!'][Math.min(2, shakes)]);
+    for (let j = 0; j < 4; j++) A.cracks.push(crack());
+    await this.tween(12, k => { A.glow = k; v.fX = (Math.random() - 0.5) * 5; });
+    v.amber = null; v.fX = 0; v.fFlash = 1; v.shake = 12;
+    this.burst('f', '#f0a020', true, -1); this.burst('f', '#ffe9a0', true, 1);
+    await this.wait(8); v.fFlash = 0;
+    await this.msg(['Der Bernstein zerspringt! Es hat sich befreit!', 'Krach! Fast wäre der Bernstein hart geworden!', 'Argh! Nur ein Riss hat gefehlt!'][Math.min(2, struggles)]);
     return null;
   }
   drawBg() {
@@ -4306,6 +4341,38 @@ class Battle {
     ctx.fillStyle = shade(g, 0.18); ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, 0, 0, 7); ctx.fill();
     ctx.fillStyle = shade(g, 0.35); ctx.beginPath(); ctx.ellipse(cx - rx * 0.15, cy - ry * 0.2, rx * 0.6, ry * 0.45, 0, 0, 7); ctx.fill();
   }
+  drawAmber(cx, by, A) {
+    // Bernsteinkristall um das Wesen: steigt von unten hoch, glüht, bekommt Risse, strahlt beim Fang
+    const s = 1 - A.gem * 0.85, cy = by - 28, W = 30 * s, Hh = 34 * s;
+    const poly = [[cx, cy - Hh], [cx + W, cy - Hh * 0.45], [cx + W * 0.9, cy + Hh * 0.75], [cx, cy + Hh], [cx - W * 0.9, cy + Hh * 0.75], [cx - W, cy - Hh * 0.45]];
+    const path = () => { ctx.beginPath(); poly.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath(); };
+    const level = cy + Hh - (Hh * 2) * A.fill;
+    ctx.save(); path(); ctx.clip();
+    ctx.globalAlpha = 0.5 + 0.35 * A.gem; ctx.fillStyle = '#e88a18'; ctx.fillRect(cx - W - 2, level, W * 2 + 4, cy + Hh - level + 2);
+    ctx.globalAlpha = 0.35; ctx.fillStyle = '#ffd870'; ctx.fillRect(cx - W - 2, level, W * 2 + 4, 2);
+    const sh = ((tick - A.t0) * 1.5) % (W * 4) - W * 2;
+    ctx.globalAlpha = 0.45; ctx.fillStyle = '#fff4c8'; for (let i = 0; i < 6; i++) ctx.fillRect(cx + sh + i - W, level + i * 3, 3, Math.max(0, cy + Hh - level - i * 6));
+    if (A.glow) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = A.glow * 0.45; ctx.fillStyle = '#fff0b0'; ctx.fillRect(cx - W, level, W * 2, cy + Hh - level); ctx.globalCompositeOperation = 'source-over'; }
+    ctx.globalAlpha = 0.9; ctx.strokeStyle = '#fffbe8'; ctx.lineWidth = 1;
+    for (const cr of A.cracks) { ctx.beginPath(); cr.forEach(([x, y], i) => { const X = cx + x * s, Y = by + y * s; i ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }); ctx.stroke(); }
+    ctx.restore();
+    if (A.fill > 0.98) { ctx.globalAlpha = 0.8; ctx.strokeStyle = '#7a3a08'; ctx.lineWidth = 1; path(); ctx.stroke(); }
+    if (A.rays) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = A.rays * 0.7; ctx.fillStyle = '#fff0a0';
+      for (let i = 0; i < 10; i++) { const an = i / 10 * Math.PI * 2 + tick / 20; ctx.save(); ctx.translate(cx, cy); ctx.rotate(an); ctx.fillRect(W * 0.6, -1, 18 + 10 * A.rays, 2); ctx.restore(); }
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+    if (A.gem > 0.5) this.drawGem(cx, cy, (A.gem - 0.5) * 2);
+  }
+  drawGem(x, y, a) {
+    // Das gefangene Wesen als kleines Bernstein-Juwel
+    ctx.globalAlpha = Math.min(1, a); ctx.fillStyle = '#6a3a10'; ctx.beginPath(); ctx.moveTo(x, y - 8); ctx.lineTo(x + 7, y - 2); ctx.lineTo(x, y + 8); ctx.lineTo(x - 7, y - 2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#f0a020'; ctx.beginPath(); ctx.moveTo(x, y - 6); ctx.lineTo(x + 5, y - 2); ctx.lineTo(x, y + 6); ctx.lineTo(x - 5, y - 2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff4c0'; ctx.fillRect(x - 2, y - 4, 2, 2);
+    if ((tick >> 2) & 1) { ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 6, y - 9, 1, 3); ctx.fillRect(x + 5, y - 8, 3, 1); }
+    ctx.globalAlpha = 1;
+  }
   drawMon(w, cx, by, k, a, back, flash) {
     if (k <= 0 || a <= 0) return;
     const sc = back ? 4 / 3 : 1, size = 64 * sc * k, x = cx - size / 2, y = by - 58 * sc * k;
@@ -4321,7 +4388,8 @@ class Battle {
     rr(x, y, wd, h, 5, '#283028'); rr(x + 1, y + 1, wd - 2, h - 2, 4, side === 'p' && this.view.lvlFlash && (tick >> 2) & 1 ? '#fff4b0' : '#f8f4e0');
     ctx.fillStyle = '#e4dcc0'; ctx.fillRect(x + 3, y + h - 6, wd - 6, 2);
     const nm = wName(w).toUpperCase(), lv = `Lv.${w.lvl}`;
-    text(nm, x + 7, y, UI.text, UI.shadow, 16, wd - 18 - measure(lv)); text(lv, x + wd - 7 - measure(lv), y, UI.text, UI.shadow);
+    const nmw = Math.min(measure(nm), wd - 28 - measure(lv));
+    text(nm, x + 7, y, UI.text, UI.shadow, 16, nmw); genderIcon(w.g, x + 9 + nmw, y + 6); text(lv, x + wd - 7 - measure(lv), y, UI.text, UI.shadow);
     if (w.status) { const si = STATUS_INFO[w.status]; rr(x + 7, y + 17, 22, 9, 2, si.col); text(si.tag, x + 18 - measure(si.tag) / 2, y + 13, '#ffffff', null); }
     else text('KP', x + 9, y + 13, '#d06030', null);
     hpBar(x + 32, y + 19, wd - 40, this.dhp[side], max);
@@ -4343,11 +4411,14 @@ class Battle {
     if (!(v.blink === 'p' && (tick >> 2) & 1)) this.drawMon(this.P, px + v.pX, 132 + v.pY, v.pK, v.pA, true, 0);
     const c = v.capsule;
     if (c) {
-      ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.rot || 0);
+      // leuchtende Bernsteinkapsel mit Glutschweif
+      (c.trail || []).forEach(([tx, ty], i) => { ctx.globalAlpha = i / 10; ctx.fillStyle = '#f8b030'; ctx.fillRect(Math.round(tx) - 1, Math.round(ty) - 1, 3, 3); });
+      ctx.globalAlpha = 1; ctx.save(); ctx.translate(c.x, c.y); ctx.rotate(c.rot || 0);
       rr(-6, -6, 12, 12, 5, '#6a3a10'); rr(-5, -5, 10, 10, 4, '#f0a020'); ctx.fillStyle = '#fff0b0'; ctx.fillRect(-3, -3, 2, 2);
       ctx.restore();
-      if (c.star) { ctx.fillStyle = '#ffffff'; for (const [dx, dy] of [[-10, -12], [10, -14], [0, -18]]) { ctx.fillRect(c.x + dx, c.y + dy - 2, 1, 5); ctx.fillRect(c.x + dx - 2, c.y + dy, 5, 1); } }
     }
+    if (v.amber) this.drawAmber(fx + v.fX, 86 + v.fY, v.amber);
+    if (v.gem) this.drawGem(v.gem.x, v.gem.y, 1);
     for (const p of this.fx) { ctx.globalAlpha = Math.min(1, p.life / 10); ctx.fillStyle = p.c; ctx.fillRect(Math.round(p.x), Math.round(p.y), p.s, p.s); }
     ctx.globalAlpha = 1;
     ctx.restore();
@@ -4734,6 +4805,13 @@ async function stationTalk(k) {
   }
 }
 async function openShop() { await openScreen(new ShopScreen()); await say('Danke für deinen Besuch!'); }
+async function catchGuide() {
+  await say('PROF. BERNSTEIN: So fängst du wilde Wesen:');
+  await say('1. Im hohen Farn auf den Routen tauchen wilde Wesen auf.');
+  await say('2. Schwäche das Wesen im Kampf, aber besiege es nicht ganz. Schlafende oder gelähmte Wesen sind leichter zu fangen.');
+  await say('3. Öffne im Kampf die TASCHE und wirf eine BERNSTEINKAPSEL. Flüssiger Bernstein schließt das Wesen ein.');
+  await say('4. Hält der Bernstein, gehört das Wesen dir! Neue Kapseln gibt es in jedem Tauschladen.');
+}
 async function chooseStarter() {
   if (state.team.length) return say('Die übrigen Kapseln gehören anderen jungen Trainern.');
   for (;;) {
@@ -4751,9 +4829,10 @@ async function chooseStarter() {
       const nn = await new NameScreen('', state.profile.look, sp.id).run();
       if (nn) w.nick = nn;
     }
-    state.items.Bernsteinkapsel = (state.items.Bernsteinkapsel || 0) + 5;
+    state.items.Bernsteinkapsel = (state.items.Bernsteinkapsel || 0) + 10;
     state.items.Trank = (state.items.Trank || 0) + 3;
-    await say(`PROF. BERNSTEIN: Nimm diese 5 BERNSTEINKAPSELN und 3 TRÄNKE mit. Damit kannst du wilde Wesen fangen!`);
+    await say(`PROF. BERNSTEIN: Nimm diese 10 BERNSTEINKAPSELN und 3 TRÄNKE mit. Damit kannst du wilde Wesen fangen!`);
+    await catchGuide();
     await say(`Du und ${wName(w).toUpperCase()} seid jetzt ein Team! Mein Assistent auf Route 1 lässt euch durch.`);
     saveGame();
     return;
@@ -5288,6 +5367,11 @@ function applySave(s) {
   if ((s.dexv || 1) < 3) {
     // Version 3: die früheren Wind- und Elektro-Starter (Nr. 1–6) stehen jetzt am Ende des Urdex
     const mv = id => id <= 6 ? id + 74 : id, mvk = o => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [mv(+k), v]));
+    [...(s.team || []), ...(s.box || [])].forEach(w => { w.sp = mv(w.sp); }); s.seen = mvk(s.seen); s.caught = mvk(s.caught);
+  }
+  if ((s.dexv || 1) < 4) {
+    // Version 4: Reihenfolge Pflanze (1-3), Boden (4-6), Gift (7-9)
+    const mv = id => id <= 3 ? id + 3 : id <= 6 ? id + 3 : id <= 9 ? id - 6 : id, mvk = o => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [mv(+k), v]));
     [...(s.team || []), ...(s.box || [])].forEach(w => { w.sp = mv(w.sp); }); s.seen = mvk(s.seen); s.caught = mvk(s.caught);
   }
   state.team = (s.team || []).filter(w => SPECIES[w.sp - 1]).map(ensureWesen); state.seen = s.seen || {}; state.caught = s.caught || {};
