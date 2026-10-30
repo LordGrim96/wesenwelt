@@ -2988,12 +2988,13 @@ class TrainerCard {
 }
 
 class OptionsScreen {
-  constructor() { this.sel = 0; this.rows = [['gfx', 'GRAFIK', GFX_NAMES], ['time', 'TAGESZEIT', ['AUTOMATISCH', 'MORGEN', 'TAG', 'ABEND', 'NACHT']], ['text', 'TEXTTEMPO', TEXT_NAMES], ['konto', 'KONTO'], ['code', 'SPIELSTAND-CODE'], ['dev', 'GOAT-MODUS'], ['back', 'ZURÜCK']]; }
+  constructor() { this.sel = 0; this.rows = [['gfx', 'GRAFIK', GFX_NAMES], ['time', 'TAGESZEIT', ['AUTOMATISCH', 'MORGEN', 'TAG', 'ABEND', 'NACHT']], ['text', 'TEXTTEMPO', TEXT_NAMES], ['diff', 'SCHWIERIGKEIT', DIFFS.slice(0, 2)], ['konto', 'KONTO'], ['code', 'SPIELSTAND-CODE'], ['dev', 'GOAT-MODUS'], ['back', 'ZURÜCK']]; }
   update() {
     const n = this.rows.length, [key, , vals] = this.rows[this.sel];
     if (pressed.up) this.sel = (this.sel + n - 1) % n;
     if (pressed.down) this.sel = (this.sel + 1) % n;
-    if (vals && (pressed.left || pressed.right || pressed.A)) {
+    if (key === 'diff' && (pressed.left || pressed.right || pressed.A)) { state.diff = (state.diff ?? 1) ? 0 : 1; saveGame(); }
+    else if (vals && (pressed.left || pressed.right || pressed.A)) {
       OPTS[key] = (OPTS[key] + (pressed.left ? vals.length - 1 : 1)) % vals.length;
       timeMode = OPTS.time; CONFIG.textSpeed = TEXT_SPEEDS[OPTS.text]; saveOpts();
     }
@@ -3013,12 +3014,12 @@ class OptionsScreen {
       if (key === 'konto') { const v = account ? 'ANGEMELDET' : 'GAST'; text(v, 186 - measure(v) / 2, y + 1, account ? '#2f8a3a' : '#7888a0', null); }
       if (key === 'dev') { const v = devOn ? 'AN' : 'AUS'; text(v, 186 - measure(v) / 2, y + 1, devOn ? '#2f8a3a' : '#7888a0', null); }
       if (!vals) return;
-      const v = vals[OPTS[key]]; text(v, 186 - measure(v) / 2, y + 1, UI.text, null);
+      const v = vals[key === 'diff' ? state.diff ?? 1 : OPTS[key]]; text(v, 186 - measure(v) / 2, y + 1, UI.text, null);
       if (sel) { ctx.fillStyle = UI.red; for (let i = 0; i < 4; i++) { ctx.fillRect(126 + i, y + 9 - i, 1, 1 + i * 2); ctx.fillRect(244 - i, y + 9 - i, 1, 1 + i * 2); } }
     });
     box(2, 146, 252, 44);
     const key = this.rows[this.sel][0];
-    const info = { gfx: ['Alle Effekte: Wolken, Flugsaurier, Vignette.', 'Fast alle Effekte, schont den Akku.', 'Ohne Wetter und Effekte, für ältere Handys.'][OPTS.gfx], time: OPTS.time ? 'Feste Tageszeit für die ganze Welt.' : 'Tageszeit nach deiner echten Uhrzeit.', text: 'So schnell erscheinen die Texte.', code: 'Spielstand auf Handy oder PC mitnehmen.', konto: account ? `Angemeldet als ${accName()}` : 'Anmelden: Spielstände auf allen Geräten.', dev: devOn ? 'A: GOAT-Modus ausschalten.' : 'A: Passwort eingeben.', back: 'Einstellungen werden automatisch gespeichert.' }[key];
+    const info = { gfx: ['Alle Effekte: Wolken, Flugsaurier, Vignette.', 'Fast alle Effekte, schont den Akku.', 'Ohne Wetter und Effekte, für ältere Handys.'][OPTS.gfx], time: OPTS.time ? 'Feste Tageszeit für die ganze Welt.' : 'Tageszeit nach deiner echten Uhrzeit.', text: 'So schnell erscheinen die Texte.', diff: (state.diff ?? 1) ? 'Trainer 1-2 Level über deinem besten Wesen.' : 'Gegner auf deinem Level oder 1 darunter.', code: 'Spielstand auf Handy oder PC mitnehmen.', konto: account ? `Angemeldet als ${accName()}` : 'Anmelden: Spielstände auf allen Geräten.', dev: devOn ? 'A: GOAT-Modus ausschalten.' : 'A: Passwort eingeben.', back: 'Einstellungen werden automatisch gespeichert.' }[key];
     text(info, 12, 150); text('Links/Rechts: ändern   B: zurück', 12, 166, '#7888a0', null);
   }
 }
@@ -3999,7 +4000,8 @@ class Battle {
   full = true;
   constructor(o) {
     this.o = o; this.wild = !!o.wild; this.tr = o.trainer || null;
-    this.foes = this.wild ? [makeWesen(o.wild.sp, o.wild.lvl)] : this.tr.team.map(t => makeWesen(t.sp, t.lvl));
+    const team = this.wild ? [o.wild] : this.tr.team, ace = team.reduce((a, t, k) => (t.lvl > team[a].lvl ? k : a), 0);
+    this.foes = team.map((t, k) => { const l = o.fixed ? t.lvl : foeLevel(this.wild ? 'wild' : isBoss(this.tr) ? 'boss' : 'trainer', k === ace); return makeWesen(o.fixed ? t.sp : speciesAtLevel(t.sp, l), l); });
     this.fi = 0; this.pi = Math.max(0, state.team.findIndex(w => w.hp > 0));
     this.st = { p: freshStages(), f: freshStages() };
     this.part = new Set(); this.leveled = new Set();
@@ -4532,6 +4534,25 @@ async function useCandy(w) {
 }
 
 /* --- Kampf starten und auswerten --- */
+/* --- Schwierigkeit (wählt man bei Prof. Dennis im Intro) ---
+   LEICHT: Trainer und wilde Wesen haben dein Level oder 1 weniger.
+   NORMAL: Trainer 1 Level über dir, Arenaleiter, Rivale und Champion mit ihrem Ass 2 Level über dir.
+           Wilde Wesen wie bei LEICHT. (TODESMARSCH folgt später.) */
+const DIFFS = ['LEICHT', 'NORMAL', 'TODESMARSCH'];
+const isBoss = tr => !!(tr.rival || tr.boss || /^(gym:|champion)/.test(tr.id || ''));
+function foeLevel(kind, ace) {
+  const top = Math.max(1, ...state.team.map(w => w.lvl)), diff = state.diff ?? 1;
+  const l = kind === 'wild' || diff === 0 ? top - (Math.random() < 0.5 ? 1 : 0) : top + (kind === 'boss' && ace ? 2 : 1);
+  return Math.max(2, Math.min(100, l));
+}
+async function chooseDifficulty() {
+  for (;;) {
+    const c = await ask('Wie schwer soll dein Abenteuer sein?', DIFFS, 1);
+    if (c === 2) { await say('Der TODESMARSCH … dafür bist du noch nicht bereit. Dieser Weg öffnet sich erst später!'); continue; }
+    await say(c === 0 ? 'LEICHT: Trainer und wilde Wesen sind so stark wie du oder etwas schwächer.' : 'NORMAL: Trainer sind 1 Level stärker als du, Arenaleiter und dein Rivale sogar 2. Wilde Wesen sind so stark wie du oder etwas schwächer.');
+    if (await ask('Bist du dir sicher?', ['JA', 'NEIN'], 0) === 0) return c;
+  }
+}
 async function startBattle(o) {
   await flash();
   const b = new Battle(o);
@@ -4772,7 +4793,7 @@ function encounterTable(x, y) {
 async function wildEncounter(x, y) {
   const t = encounterTable(x, y), e = t[Math.floor(Math.random() * t.length)];
   const lvl = Math.max(2, e.lvl + Math.floor(Math.random() * 3) - 1);
-  await startBattle({ wild: { sp: speciesAtLevel(e.sp, lvl), lvl } });
+  await startBattle({ wild: { sp: e.sp, lvl } });
 }
 async function healTeam(home) {
   if (!state.team.length) return say(home ? 'Ruh dich kurz aus... So, jetzt bist du wieder fit!' : 'Später werden hier deine Wesen geheilt. Noch hast du keine!');
@@ -5410,7 +5431,7 @@ function versionLabel() {
 const PROFILE_COUNT = 3;
 const slotKey = i => `wesenwelt.urzeit.slot${i + 1}`;
 let currentSlot = 0;
-function snapshot() { return { rival: state.rival, wv: WORLD_VERSION, dexv: DEX_VERSION, savedAt: Date.now(), gid: state.gid, money: state.money, box: state.box, lastCenter: state.lastCenter, slot: currentSlot, profile: state.profile, time: state.time, map: cur ? cur.id : 'home:0', x: player.x, y: player.y, dir: player.dir, badges: state.badges, flags: state.flags, items: state.items, steps: state.steps, team: state.team, seen: state.seen, caught: state.caught }; }
+function snapshot() { return { rival: state.rival, diff: state.diff, wv: WORLD_VERSION, dexv: DEX_VERSION, savedAt: Date.now(), gid: state.gid, money: state.money, box: state.box, lastCenter: state.lastCenter, slot: currentSlot, profile: state.profile, time: state.time, map: cur ? cur.id : 'home:0', x: player.x, y: player.y, dir: player.dir, badges: state.badges, flags: state.flags, items: state.items, steps: state.steps, team: state.team, seen: state.seen, caught: state.caught }; }
 function loadSlot(i) { try { const s = localStorage.getItem(slotKey(i)); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function writeSlot(i, d) { try { localStorage.setItem(slotKey(i), JSON.stringify(d)); return true; } catch (e) { return false; } }
 function deleteSlot(i) { try { localStorage.removeItem(slotKey(i)); } catch (e) {} if (account) api(`/api/saves/${i}`, 'DELETE').catch(() => {}); }
@@ -5426,7 +5447,7 @@ function migrateOldSave() {
 function applySave(s) {
   state.profile = s.profile || { name: 'Spieler', look: { ...DEFAULT_LOOK } };
   state.profile.look = { ...DEFAULT_LOOK, ...state.profile.look };
-  state.time = s.time || 0; state.gid = s.gid || newGid(); state.rival = s.rival || null;
+  state.time = s.time || 0; state.gid = s.gid || newGid(); state.rival = s.rival || null; state.diff = s.diff ?? 1;
   state.badges = (s.badges || []).slice(0, 16).concat(Array(16).fill(false)).slice(0, 16);
   state.flags = s.flags || {}; state.items = s.items || {}; state.steps = s.steps || 0;
   if ((s.dexv || 1) < 2) {
@@ -5467,8 +5488,8 @@ function placeName(d) {
 /* ---------------------------------------------------------------------
    START
    --------------------------------------------------------------------- */
-async function newGame(profile, rival) {
-  Object.assign(state, { gid: newGid(), profile, rival: rival || null, time: 0, money: 3000, box: [], lastCenter: null, badges: Array(16).fill(false), flags: {}, items: {}, steps: 0, team: [], seen: {}, caught: {} });
+async function newGame(profile, rival, diff = 1) {
+  Object.assign(state, { gid: newGid(), profile, rival: rival || null, diff, time: 0, money: 3000, box: [], lastCenter: null, badges: Array(16).fill(false), flags: {}, items: {}, steps: 0, team: [], seen: {}, caught: {} });
   lastArea = 0;
   setMap('home:0', 4, 4, 'down');
   mode = 'world';
@@ -5528,6 +5549,9 @@ async function runIntro() {
   await say('Unsere Welt hat zwei Regionen: JURANIA im Westen und KREIDARA im Osten. Dazwischen liegt das Urmeer.');
   await say('In jeder Region warten 8 Arenaleiter. Wer alle 16 Orden sammelt, darf auf dem METEORGIPFEL den Champion herausfordern.');
   await say('Ich selbst erforsche, auf welchen echten Urzeittieren die Wesen beruhen. Das Leben ist voller Rätsel!');
+  await say('Bevor wir anfangen: Jede Reise ist anders. Manche wollen es gemütlich, andere suchen die Herausforderung.');
+  const diff = await chooseDifficulty();
+  await say(diff === 0 ? 'Gut! Genieß die Reise in aller Ruhe.' : 'Sehr gut! Eine faire Herausforderung wartet auf dich.');
   await Promise.all([tweenTo(sc, 'mon', 0, 14), tweenTo(sc, 'prof', 0, 14)]);
   await tweenTo(sc, 'player', 1, 20);
   await say('Aber jetzt erzähl mir von dir! Wie heißt du?');
@@ -5548,7 +5572,7 @@ async function runIntro() {
   await say('Eine Welt voller Urzeit-Wesen und Abenteuer wartet auf dich. Auf geht\'s!');
   await tweenTo(sc, 'shrink', 1, 70);
   await waitTicks(10); await fadeTo(4); pop(sc);
-  return [{ name, look: sc.look }, { name: rival, look: sc.rivalLook }];
+  return [{ name, look: sc.look }, { name: rival, look: sc.rivalLook }, diff];
 }
 async function profileFlow() {
   const ps = new ProfileScreen(); layers.push(ps);
@@ -5610,7 +5634,7 @@ async function boot() {
     currentSlot = r.slot;
     await fadeTo(4);
     if (r.data) { applySave(r.data); mode = 'world'; await fadeTo(0); }
-    else { await fadeTo(0); const [prof, rival] = await runIntro(); await run(() => newGame(prof, rival)); }
+    else { await fadeTo(0); const [prof, rival, diff] = await runIntro(); await run(() => newGame(prof, rival, diff)); }
     return;
   }
 }
