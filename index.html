@@ -749,7 +749,7 @@ const VARIANTS = [
   { h: '#5a7a3a', H: '#3a5a28', r: '#6a8a4a', R: '#4a6a30', y: '#6a8a4a', Y: '#4a6a30', p: '#4a3a28' },
   { h: '#303038', H: '#181820', r: '#e0b030', R: '#a07818', y: '#e0b030', Y: '#a07818', p: '#303038', P: '#181820' },
   { h: '#f8a8b8', H: '#d88098', r: '#f8f8f8', R: '#e0c0c8', y: '#f8f8f8', Y: '#e0c0c8', p: '#f0a0b0', P: '#c87888' },
-  // 7: Meteor-Bande (lila Kutten mit Glut-Abzeichen), 8: Kommandantin Krater
+  // 7, 8: Gegner-Team (lila Kutten mit Glut-Abzeichen) und dessen Anführerin, kommen ab der 2. Arena
   { h: '#3a2a4a', H: '#221830', r: '#4a2a6a', R: '#2e1a44', y: '#f86828', Y: '#b04818', p: '#2a2038', P: '#181020' },
   { h: '#c83820', H: '#8a2010', r: '#2a2038', R: '#181020', y: '#f86828', Y: '#b04818', p: '#2a2038', P: '#181020' },
 ];
@@ -4815,8 +4815,9 @@ async function stationTalk(k) {
 async function openShop() { await openScreen(new ShopScreen()); await say('Danke für deinen Besuch!'); }
 /* =====================================================================
    STORY – Kapitel 1: Der Aufbruch
-   Der Rivale holt sich im Labor den Starter mit Typvorteil, die Meteor-Bande
-   belagert die Arena von Zykadenhain, und auf Route 2 wartet der Rivale erneut.
+   Bis zur 2. Arena ist alles klassisch: Der Rivale holt sich im Labor den
+   Starter mit Typvorteil und wartet auf Route 2 erneut. Ein heller Schweif am
+   Nachthimmel kündigt den Meteor an, der später auf die Welt zu stürzen droht.
    ===================================================================== */
 const rivalName = () => ((state.rival && state.rival.name) || 'Rex').toUpperCase();
 // Der Rivale nimmt immer den Starter, der gegen deinen stark ist (Pflanze > Boden > Gift > Pflanze)
@@ -4845,21 +4846,10 @@ async function labRivalScene() {
   await walk(rv, 'dd'); cur.npcs = cur.npcs.filter(n => n !== rv);
   state.flags['st:lab'] = 1; saveGame();
   await say(`PROF. DENNIS: Ach, die Jugend. ${PN()}, die erste Arena ist in ZYKADENHAIN. Viel Glück!`);
-}
-function storyTrainer(id, name, team, variant) {
-  return { id, name, variant, money: 400, team: team.map(([n, lvl]) => ({ sp: speciesAtLevel(SPID[n], lvl), lvl })), lose: 'Mist! Das gibt Ärger mit der Kommandantin!' };
+  await say('PROF. DENNIS: Ach, und noch etwas: Seit ein paar Nächten zieht ein heller Schweif über den Himmel.');
+  await say('Ein Meteor, vermute ich. Wenn du unterwegs etwas Seltsames bemerkst, sag mir Bescheid!');
 }
 function placeStoryNpcs(m) {
-  // Zykadenhain: Die Meteor-Bande versperrt die Arena, bis man sie besiegt
-  const d = DOORS['gym:1'];
-  if (d) {
-    const gone = () => !!state.flags['st:grunt1'] || state.badges[0];
-    const g1 = new Actor({ x: d.x, y: d.y + 1, dir: 'down', variant: 7, id: 'grunt:z:1', hidden: gone });
-    const g2 = new Actor({ x: d.x + 1, y: d.y + 1, dir: 'down', variant: 7, id: 'grunt:z:2', hidden: gone });
-    if (SOLID.has(tget(m, g2.x, g2.y))) g2.x = d.x - 1;
-    g1.talk = g2.talk = () => gruntScene();
-    m.npcs.push(g1, g2);
-  }
   // Route 2: Der Rivale wartet ein Stück hinter dem Ranger, sobald man den Farn-Orden hat
   const r2 = ROUTES.find(r => r.from === 1), src = TOWN_RECTS[1];
   if (r2 && r2.pts.length > 20) {
@@ -4876,23 +4866,9 @@ function placeStoryNpcs(m) {
     m.npcs.push(a);
   }
 }
-async function gruntScene() {
-  if (state.flags['st:grunt1']) return;
-  if (!state.team.some(w => w.hp > 0)) return say('MANN IN LILA: Komm wieder, wenn deine Wesen fit sind. Hahaha!');
-  await say('MANN IN LILA: Halt! Hier kommt keiner rein. Wir von der METEOR-BANDE durchsuchen die Arena!');
-  await say('FRAU IN LILA: Unter Zykadenhain soll ein METEOR-SPLITTER liegen. Kommandantin Krater will ihn haben!');
-  await say('MANN IN LILA: Du willst uns stören? Dann zeig, was du drauf hast!');
-  if (await startBattle({ trainer: storyTrainer('grunt:z:1', 'Bandit', [['Kompso', 6], ['Pteri', 7]], 7) }) !== 'win') return;
-  await say('FRAU IN LILA: Pff. Dann eben ich!');
-  if (await startBattle({ trainer: storyTrainer('grunt:z:2', 'Banditin', [['Halmi', 7], ['Kopfnuss', 8]], 7) }) !== 'win') return;
-  await say('MANN IN LILA: Rückzug! Das melden wir Kommandantin Krater!');
-  await fadeTo(4); state.flags['st:grunt1'] = 1; saveGame(); await fadeTo(0);
-  await say('Die METEOR-BANDE ist abgehauen. Die Arena von Zykadenhain ist wieder offen!');
-}
 // Was als Nächstes zu tun ist (steht im START-Menü)
 function currentGoal() {
   if (!state.team.length) return 'Geh ins Labor von Prof. Dennis und hol dir dein erstes Wesen.';
-  if (!state.flags['st:grunt1'] && !state.badges[0]) return 'Reise nach Zykadenhain. Dort belagern Leute in Lila die Arena!';
   const i = state.badges.findIndex(b => !b);
   if (i === 1 && !state.flags['beat:rival:2']) return `${rivalName()} wartet auf Route 2 Richtung Fossilfurt.`;
   if (i >= 0) return `Reise nach ${TOWNS[i + 1].name} und hol dir den ${TOWNS[i + 1].badge}.`;
