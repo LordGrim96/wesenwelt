@@ -1897,7 +1897,7 @@ function genWorld() {
           hidden: () => state.team.length > 0,
           talk: async () => {
             await say('ASSISTENT: Warte! Ohne eigenes Wesen ist das hohe Farnkraut viel zu gefährlich.');
-            await say('Prof. Bernstein erwartet dich im Labor von Farnweiler!');
+            await say('Prof. Dennis erwartet dich im Labor von Farnweiler!');
           },
         }));
       } else {
@@ -2552,15 +2552,15 @@ function makeInterior(id) {
       const lexikon = async () => {
         const c = await ask('LABOR-PC: Was möchtest du lesen?', ['URZEIT-LEXIKON', 'NOTIZEN', 'ZURÜCK']);
         if (c === 0) await openScreen(new DexScreen(false, true));
-        if (c === 1) await say('Prof. Bernsteins Notizen: Jedes Wesen beruht auf einem echten Tier aus der Urzeit. Im LEXIKON steht, auf welchem.');
+        if (c === 1) await say('Notizen von Prof. Dennis: Jedes Wesen beruht auf einem echten Tier aus der Urzeit. Im LEXIKON steht, auf welchem.');
       };
       m.objs.set(K(9, 6), { fn: lexikon });
       for (const x of [6, 7, 8]) m.objs.set(K(x, 1), { fn: async () => { await say('Das Fossil-Archiv des Professors. Hier steht, welche echten Urzeittiere hinter den Wesen stecken.'); await openScreen(new DexScreen(false, true)); } });
       for (const x of [4, 5, 6]) m.objs.set(K(x, 4), { fn: () => chooseStarter() });
       npc({ x: 5, y: 3, dir: 'down', variant: 3, id: 'prof', talk: async () => {
-        if (!state.team.length) { await say(`PROF. BERNSTEIN: Da bist du ja, ${PN()}! In diesen drei Bernsteinkapseln warten junge Dinos auf einen Partner.`); await say('Das sanfte PARASPROSS vom Typ PFLANZE, das gepanzerte ANKYLINO vom Typ BODEN und das flinke DILOSPRITZ vom Typ GIFT. Wen wählst du?'); await chooseStarter(); }
+        if (!state.team.length) { await say(`PROF. DENNIS: Da bist du ja, ${PN()}! In diesen drei Bernsteinkapseln warten junge Dinos auf einen Partner.`); await say('Das sanfte PARASPROSS vom Typ PFLANZE, das gepanzerte ANKYLINO vom Typ BODEN und das flinke DILOSPRITZ vom Typ GIFT. Wen wählst du?'); await chooseStarter(); }
         else {
-          await say(`PROF. BERNSTEIN: Wie geht es ${wName(state.team[0]).toUpperCase()}? Triff viele Wesen und fülle deinen URDEX!`);
+          await say(`PROF. DENNIS: Wie geht es ${wName(state.team[0]).toUpperCase()}? Triff viele Wesen und fülle deinen URDEX!`);
           if (await ask('Soll ich dir das Fangen noch einmal erklären?', ['JA', 'NEIN'], 1) === 0) await catchGuide();
           else await say('Am PC und im Fossil-Archiv erfährst du, auf welchen echten Urzeittieren die Wesen beruhen.');
         }
@@ -4806,7 +4806,7 @@ async function stationTalk(k) {
 }
 async function openShop() { await openScreen(new ShopScreen()); await say('Danke für deinen Besuch!'); }
 async function catchGuide() {
-  await say('PROF. BERNSTEIN: So fängst du wilde Wesen:');
+  await say('PROF. DENNIS: So fängst du wilde Wesen:');
   await say('1. Im hohen Farn auf den Routen tauchen wilde Wesen auf.');
   await say('2. Schwäche das Wesen im Kampf, aber besiege es nicht ganz. Schlafende oder gelähmte Wesen sind leichter zu fangen.');
   await say('3. Öffne im Kampf die TASCHE und wirf eine BERNSTEINKAPSEL. Flüssiger Bernstein schließt das Wesen ein.');
@@ -4817,7 +4817,7 @@ async function chooseStarter() {
   for (;;) {
     STARTERS.forEach(id => { state.seen[id] = 1; });
     const c = await openScreen(new StarterScreen());
-    if (c < 0) return say('PROF. BERNSTEIN: Lass dir ruhig Zeit.');
+    if (c < 0) return say('PROF. DENNIS: Lass dir ruhig Zeit.');
     const sp = SPECIES[STARTERS[c] - 1];
     const ok = await ask(`${sp.name.toUpperCase()}, das Wesen vom Typ ${sp.types[0]}. Bist du sicher?`, ['JA', 'NEIN']);
     if (ok !== 0) continue;
@@ -4831,7 +4831,7 @@ async function chooseStarter() {
     }
     state.items.Bernsteinkapsel = (state.items.Bernsteinkapsel || 0) + 10;
     state.items.Trank = (state.items.Trank || 0) + 3;
-    await say(`PROF. BERNSTEIN: Nimm diese 10 BERNSTEINKAPSELN und 3 TRÄNKE mit. Damit kannst du wilde Wesen fangen!`);
+    await say(`PROF. DENNIS: Nimm diese 10 BERNSTEINKAPSELN und 3 TRÄNKE mit. Damit kannst du wilde Wesen fangen!`);
     await catchGuide();
     await say(`Du und ${wName(w).toUpperCase()} seid jetzt ein Team! Mein Assistent auf Route 1 lässt euch durch.`);
     saveGame();
@@ -5340,7 +5340,7 @@ function versionLabel() {
 const PROFILE_COUNT = 3;
 const slotKey = i => `wesenwelt.urzeit.slot${i + 1}`;
 let currentSlot = 0;
-function snapshot() { return { wv: WORLD_VERSION, dexv: DEX_VERSION, savedAt: Date.now(), gid: state.gid, money: state.money, box: state.box, lastCenter: state.lastCenter, slot: currentSlot, profile: state.profile, time: state.time, map: cur ? cur.id : 'home:0', x: player.x, y: player.y, dir: player.dir, badges: state.badges, flags: state.flags, items: state.items, steps: state.steps, team: state.team, seen: state.seen, caught: state.caught }; }
+function snapshot() { return { rival: state.rival, wv: WORLD_VERSION, dexv: DEX_VERSION, savedAt: Date.now(), gid: state.gid, money: state.money, box: state.box, lastCenter: state.lastCenter, slot: currentSlot, profile: state.profile, time: state.time, map: cur ? cur.id : 'home:0', x: player.x, y: player.y, dir: player.dir, badges: state.badges, flags: state.flags, items: state.items, steps: state.steps, team: state.team, seen: state.seen, caught: state.caught }; }
 function loadSlot(i) { try { const s = localStorage.getItem(slotKey(i)); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 function writeSlot(i, d) { try { localStorage.setItem(slotKey(i), JSON.stringify(d)); return true; } catch (e) { return false; } }
 function deleteSlot(i) { try { localStorage.removeItem(slotKey(i)); } catch (e) {} if (account) api(`/api/saves/${i}`, 'DELETE').catch(() => {}); }
@@ -5356,7 +5356,7 @@ function migrateOldSave() {
 function applySave(s) {
   state.profile = s.profile || { name: 'Spieler', look: { ...DEFAULT_LOOK } };
   state.profile.look = { ...DEFAULT_LOOK, ...state.profile.look };
-  state.time = s.time || 0; state.gid = s.gid || newGid();
+  state.time = s.time || 0; state.gid = s.gid || newGid(); state.rival = s.rival || null;
   state.badges = (s.badges || []).slice(0, 16).concat(Array(16).fill(false)).slice(0, 16);
   state.flags = s.flags || {}; state.items = s.items || {}; state.steps = s.steps || 0;
   if ((s.dexv || 1) < 2) {
@@ -5397,18 +5397,88 @@ function placeName(d) {
 /* ---------------------------------------------------------------------
    START
    --------------------------------------------------------------------- */
-async function newGame(profile) {
-  Object.assign(state, { gid: newGid(), profile, time: 0, money: 3000, box: [], lastCenter: null, badges: Array(16).fill(false), flags: {}, items: {}, steps: 0, team: [], seen: {}, caught: {} });
+async function newGame(profile, rival) {
+  Object.assign(state, { gid: newGid(), profile, rival: rival || null, time: 0, money: 3000, box: [], lastCenter: null, badges: Array(16).fill(false), flags: {}, items: {}, steps: 0, team: [], seen: {}, caught: {} });
   lastArea = 0;
   setMap('home:0', 4, 4, 'down');
   mode = 'world';
   saveGame();
   await fadeTo(0);
-  await say(`PROF. BERNSTEIN: Hallo, ${PN()}! Willkommen in der Urzeit, der Welt der WESEN!`);
-  await say('Unsere Welt hat zwei Regionen: JURANIA im Westen und KREIDARA im Osten.');
-  await say('In jeder Region warten 8 Arenaleiter. Sammle alle 16 Orden!');
-  await say('Dann darfst du auf dem METEORGIPFEL den Champion herausfordern.');
-  await say('Doch zuerst brauchst du ein eigenes Wesen. Komm in mein Labor in FARNWEILER!');
+  await say(`MAMA: Guten Morgen, ${PN()}! Gut geschlafen?`);
+  await say('Prof. Dennis hat angerufen. Er wartet im Labor von FARNWEILER auf dich. Heute bekommst du dein erstes Wesen!');
+  if (state.rival) await say(`${state.rival.name.toUpperCase()} ist schon vor einer Stunde losgerannt. Beeil dich!`);
+}
+
+/* --- Intro: Prof. Dennis erklärt die Welt, dann Name, Aussehen, Rivale – und man schrumpft ins Spiel --- */
+const RIVAL_LOOKS = [{ style: 1, hair: 3, skin: 0, hat: 0, jacket: 1, pants: 1, pack: 1 }, { style: 2, hair: 1, skin: 2, hat: 0, jacket: 4, pants: 0, pack: 4 }, { style: 0, hair: 0, skin: 1, hat: 3, jacket: 6, pants: 2, pack: 2 }];
+class IntroScene {
+  constructor() { this.prof = 0; this.mon = 0; this.player = 0; this.rival = 0; this.shrink = 0; this.look = { ...DEFAULT_LOOK }; this.rivalLook = { ...DEFAULT_LOOK, ...RIVAL_LOOKS[Math.floor(Math.random() * RIVAL_LOOKS.length)] }; this.monT = 0; }
+  update() {}
+  draw() {
+    // Bühne: Abendhimmel in Bernsteintönen, Lichtkegel, schwebende Funken
+    const bands = ['#2a1a22', '#3a2228', '#4e2c2c', '#6a3a30', '#8a4a32', '#a85a34'];
+    bands.forEach((c, i) => { ctx.fillStyle = c; ctx.fillRect(-OX, i === 0 ? -OY : i * 24, RW, i === 0 ? 24 + OY : 24); });
+    ctx.fillStyle = '#1a1014'; ctx.fillRect(-OX, 144, RW, 48 + OY);
+    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.35; ctx.drawImage(glowOf('#ffc060'), 48, 20, 160, 140); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(128, 132, 54, 9, 0, 0, 7); ctx.fill();
+    for (let i = 0; i < 24; i++) { const x = (i * 47 + tick * 0.3) % 256, y = 140 - ((tick * (0.2 + (i % 4) * 0.08) + i * 31) % 140); ctx.fillStyle = i % 3 ? '#f8a040' : '#ffe080'; ctx.globalAlpha = Math.min(1, y / 50); ctx.fillRect(Math.round(x), Math.round(y), 1, 1); }
+    ctx.globalAlpha = 1;
+    const big = (img, cx, a, sc = 3) => { if (a <= 0) return; ctx.globalAlpha = Math.min(1, a); ctx.drawImage(img, Math.round(cx - 8 * sc), Math.round(132 - 24 * sc), 16 * sc, 24 * sc); ctx.globalAlpha = 1; };
+    big(getChar('hero', 3, 'down', 0), this.mon > 0 ? 96 : 128, this.prof);
+    if (this.mon > 0) {
+      // Das Wesen springt aus einer Bernsteinkapsel
+      const k = Math.min(1, this.mon), bob = Math.round(Math.sin(tick / 10) * 2);
+      ctx.globalAlpha = k; ctx.drawImage(wesenSprite(SPID.Paraspross), 0, 0, 64, 64, 150, 70 + bob + (1 - k) * 20, 64 * k, 64 * k); ctx.globalAlpha = 1;
+      if (tick - this.monT < 30) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 1 - (tick - this.monT) / 30; ctx.drawImage(glowOf('#ffd060'), 140, 60, 84, 84); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
+    }
+    // Der Spieler: groß auf der Bühne, beim Schrumpfen wird er klein wie im Spiel
+    if (this.player > 0) {
+      const s = 3 - 2 * this.shrink, fr = this.shrink > 0 ? [1, 0, 2, 0][(tick >> 3) & 3] : 0;
+      big(playerSprite(this.look, 'down', fr), 128, this.player, s);
+      if (this.shrink > 0) {
+        ctx.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 12; i++) { const an = i / 12 * Math.PI * 2 + tick / 8, r = 40 * (1 - this.shrink) + 8; ctx.fillStyle = '#fff0b0'; ctx.fillRect(Math.round(128 + Math.cos(an) * r), Math.round(110 + Math.sin(an) * r * 0.6), 2, 2); }
+        ctx.globalAlpha = this.shrink * 0.5; ctx.drawImage(glowOf('#ffe0a0'), 96, 80, 64, 64); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+      }
+    }
+    big(playerSprite(this.rivalLook, 'down', 0), 128, this.rival);
+  }
+}
+IntroScene.prototype.full = true;
+async function tweenTo(o, key, to, n) { const from = o[key]; for (let i = 1; i <= n; i++) { o[key] = from + (to - from) * i / n; await waitTicks(1); } }
+async function runIntro() {
+  const sc = new IntroScene(); layers.push(sc);
+  await fadeTo(0);
+  await tweenTo(sc, 'prof', 1, 30);
+  await say('Hallo! Willkommen in der Welt der WESEN!');
+  await say('Mein Name ist DENNIS. Die Leute hier nennen mich den Urzeit-Professor.');
+  sc.monT = tick; await tweenTo(sc, 'mon', 1, 18);
+  await say('Das hier ist ein WESEN. Wesen stammen von den Tieren der Urzeit ab: Dinosaurier, Flugsaurier, Mammuts und noch viele mehr.');
+  await say('Manche Menschen leben mit Wesen als Freunde zusammen. Andere treten mit ihnen in spannenden Kämpfen an.');
+  await say('Unsere Welt hat zwei Regionen: JURANIA im Westen und KREIDARA im Osten. Dazwischen liegt das Urmeer.');
+  await say('In jeder Region warten 8 Arenaleiter. Wer alle 16 Orden sammelt, darf auf dem METEORGIPFEL den Champion herausfordern.');
+  await say('Ich selbst erforsche, auf welchen echten Urzeittieren die Wesen beruhen. Das Leben ist voller Rätsel!');
+  await Promise.all([tweenTo(sc, 'mon', 0, 14), tweenTo(sc, 'prof', 0, 14)]);
+  await tweenTo(sc, 'player', 1, 20);
+  await say('Aber jetzt erzähl mir von dir! Wie heißt du?');
+  let name = (await new NameScreen('', sc.look).run()) || 'Spieler';
+  await say(`${name}, richtig? Und wie siehst du aus?`);
+  const ed = await new EditorScreen({ name, look: sc.look }, 'DEIN AUSSEHEN').run();
+  if (ed) { name = ed.name || name; sc.look = ed.look; }
+  await say(`Schön, dich kennenzulernen, ${name}!`);
+  await tweenTo(sc, 'player', 0, 14); await tweenTo(sc, 'rival', 1, 20);
+  await say('Das hier ist dein Nachbar. Ihr kennt euch, seit ihr klein wart, und seid schon immer Rivalen.');
+  await say('Hmm … wie hieß er noch gleich?');
+  const c = await ask('Wie heißt dein Rivale?', ['REX', 'KIRA', 'TYRO', 'EIGENER NAME'], 0);
+  let rival = ['Rex', 'Kira', 'Tyro'][c];
+  if (c === 3) rival = (await new NameScreen('', sc.rivalLook, 0, { title: 'NAME DES RIVALEN' }).run()) || 'Rex';
+  await say(`Richtig! ${rival.toUpperCase()} heißt er!`);
+  await tweenTo(sc, 'rival', 0, 14); await tweenTo(sc, 'player', 1, 16);
+  await say(`${name.toUpperCase()}! Deine eigene Geschichte mit den Wesen beginnt jetzt.`);
+  await say('Eine Welt voller Urzeit-Wesen und Abenteuer wartet auf dich. Auf geht\'s!');
+  await tweenTo(sc, 'shrink', 1, 70);
+  await waitTicks(10); await fadeTo(4); pop(sc);
+  return [{ name, look: sc.look }, { name: rival, look: sc.rivalLook }];
 }
 async function profileFlow() {
   const ps = new ProfileScreen(); layers.push(ps);
@@ -5427,9 +5497,7 @@ async function profileFlow() {
         const c = await ask('Leerer Platz. Was möchtest du tun?', ['NEUES PROFIL', 'CODE LADEN', 'ZURÜCK']);
         if (c === 1) { await importCode(slot); ps.refresh(); continue; }
         if (c !== 0) continue;
-        const prof = await new EditorScreen({ name: '', look: { ...DEFAULT_LOOK } }, 'NEUES PROFIL').run();
-        if (prof) return { slot, profile: prof };
-        continue;
+        return { slot, fresh: true };
       }
       const prof = { name: 'Spieler', ...data.profile, look: { ...DEFAULT_LOOK, ...(data.profile || {}).look } };
       const c = await ask(`Profil von ${prof.name}`, ['SPIELEN', 'AUSSEHEN', 'CODE ZEIGEN', 'LÖSCHEN', 'ZURÜCK']);
@@ -5472,7 +5540,7 @@ async function boot() {
     currentSlot = r.slot;
     await fadeTo(4);
     if (r.data) { applySave(r.data); mode = 'world'; await fadeTo(0); }
-    else await run(() => newGame(r.profile));
+    else { await fadeTo(0); const [prof, rival] = await runIntro(); await run(() => newGame(prof, rival)); }
     return;
   }
 }
