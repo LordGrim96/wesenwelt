@@ -100,7 +100,7 @@ const CONFIG = {
   // Adresse des Konto-Servers (worker/). Leer = nur Gast-Spielstände auf dem Gerät
   api: 'https://wesenwelt-api.edengrim67.workers.dev',
 };
-const GAME_VERSION = '202610301305'; // wird von build_app.py durch die Build-Zeit ersetzt
+const GAME_VERSION = '202610301327'; // wird von build_app.py durch die Build-Zeit ersetzt
 
 // Logische Bildgröße passt sich dem Bildschirm an (mindestens 256x192); SC = interne Auflösung für scharfe Schrift
 let VW = 256, VH = 192, OX = 0, OY = 0, RW = 256, RH = 192;
@@ -3521,7 +3521,7 @@ const DEV_INFO = {
   'KOORDINATEN': 'Zeigt Karte, X/Y und Gebiet unten links.', 'TRAINER': 'Aus: Trainer greifen nicht mehr an.', 'WILDE WESEN': 'Begegnungen im hohen Gras an oder aus.',
   'ORDEN': 'Alle Orden geben oder wegnehmen.', 'WESEN HOLEN': 'Ein beliebiges Wesen mit Wunsch-Level.',
   'TEAM +5 LEVEL': 'Alle Team-Wesen steigen 5 Level auf.', 'TEAM HEILEN': 'KP, AP und Status voll.',
-  'ITEMS & TALER': 'Von jedem Item 10 Stück und 10000 Taler.', 'URDEX FÜLLEN': 'Alle Wesen als gesehen und gefangen.',
+  'ITEMS & TALER': 'Von jedem Item 10 Stück und 10000 Taler.', 'URDEX FÜLLEN': 'Alle Wesen als gesehen und gefangen.', 'METEOR-AMULETT': 'Urzeit-Erwachen im Kampf an oder aus.',
   'DATENBANK': 'Alle Wesen mit Bild und Text ansehen.', 'TAGESZEIT': 'Tageszeit wechseln (auch Alt+T).',
   'SPIELSTAND-CODE': 'Spielstand als Code für ein anderes Gerät.', 'SPIELER': 'Konten verwalten: Passwort, Rechte, löschen.', 'ZUGÄNGE': 'So viele Spieler dürfen ein Konto haben.', 'SPERREN': 'GOAT-Modus auf diesem Gerät ausschalten.',
 };
@@ -3533,7 +3533,7 @@ async function devMenu() {
     // Vergebene GOAT-Rechte: nur Einstellungen. Alles andere nur für den Admin (oder mit dem GOAT-Passwort)
     const AN = v => v ? 'AN' : 'AUS';
     const rows = !goatFull() ? [['DURCH WÄNDE', AN(noclip)], ['WILDE WESEN', AN(CONFIG.encounters)], ['TRAINER', AN(CONFIG.trainers)], ['KOORDINATEN', AN(devCoords)], ['TAGESZEIT', TIMES[timeMode].toUpperCase()]] : [['SCHNELLREISE'], ['DURCH WÄNDE', AN(noclip)], ['KOORDINATEN', AN(devCoords)], ['WILDE WESEN', AN(CONFIG.encounters)], ['TRAINER', AN(CONFIG.trainers)],
-      ['ORDEN', `${state.badges.filter(Boolean).length}/16`], ['WESEN HOLEN'], ['TEAM +5 LEVEL'], ['TEAM HEILEN'], ['ITEMS & TALER', String(state.money)], ['URDEX FÜLLEN'],
+      ['ORDEN', `${state.badges.filter(Boolean).length}/16`], ['WESEN HOLEN'], ['TEAM +5 LEVEL'], ['TEAM HEILEN'], ['ITEMS & TALER', String(state.money)], ['URDEX FÜLLEN'], ['METEOR-AMULETT', AN(state.flags.amulet)],
       ['DATENBANK'], ['TAGESZEIT', TIMES[timeMode].toUpperCase()], ['SPIELSTAND-CODE'], ...(account && account.admin ? [['ZUGÄNGE', slots ? `${slots.players}/${slots.max_players < 0 ? 'OFFEN' : slots.max_players}` : '?'], ['SPIELER', 'ADMIN']] : []), ['SPERREN']];
     sel = await openScreen(new ListScreen('GOAT-MODUS', rows, sel, i => DEV_INFO[rows[i][0]]));
     if (sel < 0) return;
@@ -3564,6 +3564,7 @@ async function devMenu() {
     }
     if (it === 'TEAM HEILEN') { state.team.forEach(healWesen); await say('Dein Team ist wieder fit.'); }
     if (it === 'ITEMS & TALER') { for (const n of Object.keys(ITEMS)) state.items[n] = (state.items[n] || 0) + 10; state.money += 10000; await say('Von jedem Item 10 Stück und 10000 Taler dazu.'); }
+    if (it === 'METEOR-AMULETT') { state.flags.amulet = state.flags.amulet ? 0 : 1; saveGame(); }
     if (it === 'URDEX FÜLLEN') { SPECIES.forEach(s => { state.seen[s.id] = state.caught[s.id] = 1; }); await say('Der Urdex ist vollständig.'); }
     if (it === 'DATENBANK') await openScreen(new DexScreen(true));
     if (it === 'TAGESZEIT') { timeMode = OPTS.time = (timeMode + 1) % TIMES.length; saveOpts(); }
@@ -4005,7 +4006,7 @@ const STAGE_IDX = { atk: 1, def: 2, spa: 3, spd: 4, ini: 5 };
 const STAGE_NAMES = { atk: 'ANGRIFF', def: 'VERTEIDIGUNG', spa: 'SP.-ANGRIFF', spd: 'SP.-VERTEIDIGUNG', ini: 'INITIATIVE' };
 const freshStages = () => ({ atk: 0, def: 0, spa: 0, spd: 0, ini: 0 });
 const stageMul = s => (s >= 0 ? (2 + s) / 2 : 2 / (2 - s));
-function bStat(w, key, st) { let v = calcStats(w)[STAGE_IDX[key]] * stageMul(st[key]); if (key === 'ini' && w.status === 'PAR') v /= 2; return v; }
+function bStat(w, key, st) { let v = calcStats(w)[STAGE_IDX[key]] * stageMul(st[key]) * (w._aw ? AWAKE_BOOST : 1); if (key === 'ini' && w.status === 'PAR') v /= 2; return v; }
 function calcDamage(u, t, Mv, us, ts, crit) {
   const phys = Mv.cat === 'phys';
   let A = bStat(u, phys ? 'atk' : 'spa', us); const D = bStat(t, phys ? 'def' : 'spd', ts);
@@ -4063,7 +4064,7 @@ class Battle {
     this.fi = 0; this.pi = Math.max(0, state.team.findIndex(w => w.hp > 0));
     this.st = { p: freshStages(), f: freshStages() };
     this.part = new Set(); this.leveled = new Set();
-    this.waits = []; this.fx = []; this.message = null; this.ui = null; this.sel = 0; this.msel = 0; this.note = null; this.runs = 0;
+    this.waits = []; this.fx = []; this.message = null; this.ui = null; this.sel = 0; this.msel = 0; this.note = null; this.runs = 0; this.awUsed = { p: false, f: false };
     this.view = { intro: 0, pX: 0, fX: 0, pY: 0, fY: 0, pK: 0, fK: 0, pA: 1, fA: 1, trP: 1, trF: this.tr ? 1 : 0, shake: 0, blink: null, capsule: null, fFlash: 0, lvlFlash: 0 };
     this.dhp = { p: 0, f: 0 }; this.dexp = 0;
     this.biome = cur.outdoor ? bget(cur, player.x, player.y) : -1;
@@ -4083,7 +4084,7 @@ class Battle {
   }
   async run() {
     layers.push(this);
-    try { return await this.flow(); } finally { pop(this); }
+    try { return await this.flow(); } finally { pop(this); for (const w of [...state.team, ...this.foes]) delete w._aw; }
   }
   update() {
     for (let i = this.waits.length - 1; i >= 0; i--) { const w = this.waits[i]; w.n--; if (w.fn) w.fn(1 - w.n / w.total); if (w.n <= 0) { this.waits.splice(i, 1); w.r(); } }
@@ -4097,6 +4098,9 @@ class Battle {
       return;
     }
     if (this.ui === 'main') {
+      const canAw = this.canAwaken();
+      if (this.sel === 4) { if (pressed.right || !canAw) this.sel = 0; else if (pressed.A) { this.ui = null; this.uiRes({ kind: 'awaken' }); } return; }
+      if (pressed.left && canAw && !(this.sel & 1)) { this.sel = 4; return; }
       if (pressed.left || pressed.right) this.sel ^= 1;
       if (pressed.up || pressed.down) this.sel ^= 2;
       if (pressed.A) {
@@ -4146,11 +4150,14 @@ class Battle {
       state.seen[this.F.sp] = 1; this.st.f = freshStages(); this.dhp.f = this.F.hp; v.fY = 0; v.fA = 1; v.fK = 0;
       this.part = new Set([this.pi]);
       await Promise.all([this.msg(`${this.tr.name.toUpperCase()} schickt ${wName(this.F).toUpperCase()} in den Kampf!`), this.tween(22, k => { v.fK = k; })]);
+      if (this.tr.awaken && !this.awUsed.f && this.fi === this.foes.length - 1) await this.awaken('f');
     }
   }
+  canAwaken() { return !!state.flags.amulet && !this.awUsed.p && !this.P._aw; }
   async chooseAction() {
     for (;;) {
       const a = await new Promise(r => { this.ui = 'main'; this.uiRes = r; });
+      if (a.kind === 'awaken') { this.sel = 0; await this.awaken('p'); continue; }
       if (a.kind === 'move' || a.kind === 'run') return a;
       if (a.kind === 'bag') { const r = await openScreen(new BagScreen(this)); if (r && r.item) return { kind: 'item', ...r }; }
       if (a.kind === 'team') {
@@ -4452,10 +4459,80 @@ class Battle {
     if (k <= 0 || a <= 0) return;
     const sc = back ? 4 / 3 : 1, size = 64 * sc * k, x = cx - size / 2, y = by - 58 * sc * k;
     ctx.globalAlpha = Math.max(0, a);
-    const img = flash || k < 0.6 ? tintSprite(w.sp, '#fff8e0') : wesenSprite(w.sp);
-    if (back) { ctx.save(); ctx.translate(x + size, y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, 64, 64, 0, 0, size, size); ctx.restore(); }
-    else ctx.drawImage(img, 0, 0, 64, 64, x, y, size, size);
+    const side = back ? 'p' : 'f', A = this.view.aw;
+    if (w._aw && k >= 1 && a > 0.5) {
+      // Aura der Urform: pulsierendes Leuchten und aufsteigende Kristallfunken
+      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.35 + 0.15 * Math.sin(tick / 8);
+      ctx.drawImage(glowOf('#40d8ff'), cx - size * 0.75, y - size * 0.1, size * 1.5, size * 1.2);
+      ctx.globalAlpha = 0.25; ctx.drawImage(glowOf('#c060ff'), cx - size * 0.5, y + size * 0.2, size, size * 0.9);
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = Math.max(0, a);
+      if (tick % 5 === 0) this.fx.push({ x: cx + (Math.random() - 0.5) * size * 0.8, y: by - 4, vx: (Math.random() - 0.5) * 0.3, vy: -0.6 - Math.random() * 0.6, c: Math.random() < 0.5 ? '#9ff4ff' : '#e0b0ff', life: 30 + Math.floor(Math.random() * 20), s: 1 + (Math.random() < 0.3) });
+    }
+    let img = flash || k < 0.6 ? tintSprite(w.sp, '#fff8e0') : w._aw ? awakeSprite(w.sp) : wesenSprite(w.sp);
+    if (A && A.side === side) {
+      // Verwandlung: Aufladen (immer heller), Fossil (Knochenfarbe mit Rissen), dann die Urform
+      if (A.ph === 'charge') img = A.k > 0.55 ? tintSprite(w.sp, A.k > 0.8 ? '#ffffff' : '#c8f4ff') : img;
+      if (A.ph === 'fossil') img = tintSprite(w.sp, '#efe4c4');
+    }
+    const beat = A && A.side === side && A.ph === 'fossil' ? 1 + 0.06 * Math.abs(Math.sin(A.k * Math.PI * 4)) : 1, S = size * beat, X = cx - S / 2, Y = by - 58 * sc * k * beat;
+    if (back) { ctx.save(); ctx.translate(X + S, Y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, 64, 64, 0, 0, S, S); ctx.restore(); }
+    else ctx.drawImage(img, 0, 0, 64, 64, X, Y, S, S);
+    if (A && A.side === side && A.ph === 'fossil') {
+      // Risse im Fossil, die immer weiter aufbrechen
+      for (let i = 0; i < Math.floor(A.k * 10) + 2; i++) {
+        const pts = []; let px = cx + (hash(i, 3, 7) - 0.5) * S * 0.5, py = by - S * (0.25 + hash(i, 5, 7) * 0.45); pts.push([px, py]);
+        for (let j = 0; j < 5; j++) { px += (hash(i, j, 11) - 0.5) * 14; py += (hash(i, j, 13) - 0.5) * 12; pts.push([px, py]); }
+        for (const [lw, col] of [[3, '#2a4a6a'], [1.2, '#7ff0ff']]) { ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.beginPath(); pts.forEach(([x, y], j) => (j ? ctx.lineTo(x, y) : ctx.moveTo(x, y))); ctx.stroke(); }
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    }
     ctx.globalAlpha = 1;
+  }
+  drawAwaken() {
+    const A = this.view.aw; if (!A) return;
+    const [cx, cy] = A.side === 'p' ? [64, 100] : [196, 58];
+    if (A.ph === 'charge') {
+      // Energieringe und Lichtfäden ziehen sich im Wesen zusammen
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 3; i++) { const r = (1 - ((A.k * 2.2 + i / 3) % 1)) * 70; ctx.globalAlpha = 0.6 * (1 - r / 70); ctx.strokeStyle = i % 2 ? '#c070ff' : '#60e8ff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.stroke(); }
+      for (let i = 0; i < 14; i++) { const an = i * 0.45 + tick * 0.03, d = 90 * (1 - ((A.k * 3 + i / 14) % 1)); ctx.globalAlpha = 0.8; ctx.fillStyle = i % 3 ? '#9ff4ff' : '#ffffff'; ctx.fillRect(Math.round(cx + Math.cos(an) * d), Math.round(cy + Math.sin(an) * d * 0.7), 2, 2); }
+      ctx.globalAlpha = A.k * 0.6; ctx.drawImage(glowOf('#80f0ff'), cx - 50, cy - 50, 100, 100);
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    }
+    if (A.ph === 'burst') {
+      // Druckwelle, Lichtsäule und Blitz
+      const r = A.k * 190;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 1 - A.k; ctx.strokeStyle = '#a0f4ff'; ctx.lineWidth = 6 * (1 - A.k) + 1; ctx.beginPath(); ctx.ellipse(cx, cy + 10, r, r * 0.45, 0, 0, 7); ctx.stroke();
+      ctx.strokeStyle = '#e0a0ff'; ctx.lineWidth = 3 * (1 - A.k) + 1; ctx.beginPath(); ctx.ellipse(cx, cy + 10, r * 0.7, r * 0.32, 0, 0, 7); ctx.stroke();
+      ctx.globalAlpha = (1 - A.k) * 0.8; ctx.fillStyle = '#c8f8ff'; ctx.fillRect(cx - 14 * (1 - A.k) - 2, -OY, 28 * (1 - A.k) + 4, cy + OY + 20);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = Math.max(0, 1 - A.k * 2.5); ctx.fillStyle = '#ffffff'; ctx.fillRect(-OX, -OY, RW, RH); ctx.globalAlpha = 1;
+    }
+    if (A.banner > 0) {
+      // Schriftzug fliegt durchs Bild
+      const t = A.banner, x = t < 0.2 ? 256 - t / 0.2 * 230 : t > 0.8 ? 26 - (t - 0.8) / 0.2 * 280 : 26 - (t - 0.2) * 20;
+      ctx.fillStyle = 'rgba(10,20,40,.75)'; ctx.fillRect(-OX, 62, RW, 26); ctx.fillStyle = '#60e8ff'; ctx.fillRect(-OX, 62, RW, 1); ctx.fillRect(-OX, 87, RW, 1);
+      textOutline('URZEIT-ERWACHEN!', x, 62, '#e8fcff', '#1a3a6a', 24);
+    }
+  }
+  async awaken(side) {
+    const v = this.view, w = side === 'p' ? this.P : this.F, N = this.nm(side);
+    this.awUsed[side] = true;
+    await this.msg(side === 'p' ? `${PN()}s METEOR-AMULETT beginnt zu leuchten!` : `${this.tr.name.toUpperCase()} hält ein METEOR-AMULETT in die Höhe!`);
+    await this.tween(20, k => { v.dim = k * 0.7; });
+    v.aw = { side, ph: 'charge', k: 0, banner: 0 };
+    await this.tween(70, k => { v.aw.k = k; v[side + 'X'] = (Math.random() - 0.5) * k * 4; });
+    v.aw.ph = 'fossil'; v[side + 'X'] = 0;
+    await this.tween(50, k => { v.aw.k = k; if (k > 0.5) v.shake = 2; });
+    v.aw.ph = 'burst'; w._aw = true; v.shake = 24;
+    for (let i = 0; i < 26; i++) { const an = Math.random() * 7, sp = 1.2 + Math.random() * 2.4, [cx, cy] = side === 'p' ? [64, 100] : [196, 58]; this.fx.push({ x: cx, y: cy, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp - 1, g: 0.06, c: ['#9ff4ff', '#ffffff', '#c080ff', '#5ad0ff'][i % 4], life: 40 + Math.floor(Math.random() * 20), s: 2 + (i % 3 === 0) }); }
+    await this.tween(40, k => { v.aw.k = k; v.dim = 0.7 * (1 - k); });
+    v.aw.ph = 'done';
+    await this.tween(70, k => { v.aw.banner = k; });
+    v.aw = null; v.dim = 0;
+    await this.msg(`${N} ist zur URFORM erwacht!`);
+    await this.msg(`Alle Werte ${this.ofName(side)} steigen!`);
   }
   infoBox(side) {
     const w = side === 'p' ? this.P : this.F, max = calcStats(w)[0];
@@ -4480,6 +4557,7 @@ class Battle {
     this.drawBg();
     const fx = 196 + (1 - e) * -280, px = 64 + (1 - e) * 280;
     this.platform(fx, 86, 52, 11); this.platform(px, 132, 64, 13);
+    if (v.dim) { ctx.fillStyle = `rgba(6,8,24,${v.dim})`; ctx.fillRect(-OX, -OY, RW, RH); }
     if (this.tr && v.trF > 0) { ctx.globalAlpha = v.trF; ctx.drawImage((this.tr.rival ? getChar('rival', 0, 'down', 0) : getChar('hero', this.tr.variant ?? 1, 'down', 0)), fx - 21 + (1 - v.trF) * 70, 24, 128 / 3, 64); ctx.globalAlpha = 1; }
     if (v.trP > 0) { ctx.globalAlpha = Math.min(1, v.trP * 1.5); ctx.drawImage(playerSprite(state.profile.look, 'up', 0), px - 21 - (1 - v.trP) * 70, 70, 128 / 3, 64); ctx.globalAlpha = 1; }
     if (!(v.blink === 'f' && (tick >> 2) & 1)) this.drawMon(this.F, fx + v.fX, 86 + v.fY, v.fK, v.fA, false, v.fFlash);
@@ -4496,6 +4574,7 @@ class Battle {
     if (v.gem) this.drawGem(v.gem.x, v.gem.y, 1);
     for (const p of this.fx) { ctx.globalAlpha = Math.min(1, p.life / 10); ctx.fillStyle = p.c; ctx.fillRect(Math.round(p.x), Math.round(p.y), p.s, p.s); }
     ctx.globalAlpha = 1;
+    this.drawAwaken();
     ctx.restore();
     if (v.intro >= 1) { if (v.fK > 0 && v.fA > 0.05) this.infoBox('f'); if (v.pK > 0 && v.pA > 0.05) this.infoBox('p'); }
     this.drawPanel();
@@ -4521,7 +4600,13 @@ class Battle {
     }
     if (this.ui === 'main') {
       box(2, 146, 124, 44);
-      wrapW(`Was soll ${wName(this.P).toUpperCase()} tun?`, 104).slice(0, 2).forEach((l, i) => text(l, 12, 150 + i * 16));
+      if (this.canAwaken()) {
+        // Knopf fürs Urzeit-Erwachen, pulsiert leicht
+        const sel = this.sel === 4, gl = 0.5 + 0.5 * Math.sin(tick / 7);
+        rr(8, 151, 112, 34, 6, sel ? '#ffffff' : '#1a3a6a'); rr(9, 152, 110, 32, 5, sel ? '#5ad0ff' : shade('#2a6aa8', gl * 0.25));
+        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.3 * gl; ctx.drawImage(glowOf('#80f0ff'), 20, 140, 90, 56); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+        text('ERWACHEN', 64 - measure('ERWACHEN') / 2, 152, '#ffffff', '#1a3a6a'); text(sel ? 'A: Urform wecken' : '< LINKS', 64 - measure(sel ? 'A: Urform wecken' : '< LINKS') / 2, 167, sel ? '#1a3a6a' : '#a8e8ff', null);
+      } else wrapW(`Was soll ${wName(this.P).toUpperCase()} tun?`, 104).slice(0, 2).forEach((l, i) => text(l, 12, 150 + i * 16));
       box(128, 146, 126, 44);
       const cmds = [['KAMPF', '#d84830'], ['TASCHE', '#d89820'], ['WESEN', '#3a9848'], ['FLUCHT', '#3870c8']];
       cmds.forEach(([label, col], i) => {
@@ -4537,6 +4622,33 @@ class Battle {
       m.pages[m.pi].forEach((ln, k) => { const n = Math.max(0, Math.min(ln.length, left)); left -= ln.length; if (n > 0) text(ln, 12, 150 + k * 16, UI.text, UI.shadow, 16, n >= ln.length ? undefined : measure(ln.slice(0, n)) + 1); });
     }
   }
+}
+/* --- Urzeit-Erwachen ---
+   Einmal pro Kampf weckt das METEOR-AMULETT die Urform eines Wesens: Kristallpanzer aus Fossil und
+   Meteor, leuchtende Adern, alle Werte +30 % bis zum Kampfende. Auch Team Eden nutzt diese Kraft. */
+const AWAKE_BOOST = 1.3;
+function awakeSprite(id) {
+  const key = 'aw' + id; if (SPR[key]) return SPR[key];
+  const base = wesenSprite(id), c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  const a = base.getContext('2d').getImageData(0, 0, 64, 64).data, O = (x, y) => x >= 0 && y >= 0 && x < 64 && y < 64 && a[(y * 64 + x) * 4 + 3] > 0;
+  // leuchtender Rand
+  const rim = tintSprite(id, '#5ae8ff');
+  for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) g.drawImage(rim, dx, dy);
+  g.drawImage(base, 0, 0);
+  // Kristalladern im Körper
+  g.globalCompositeOperation = 'source-atop';
+  g.fillStyle = 'rgba(30,10,70,.26)'; g.fillRect(0, 0, 64, 64);
+  for (let i = -64; i < 64; i += 8) { g.fillStyle = (i >> 3) & 1 ? 'rgba(220,150,255,.7)' : 'rgba(140,240,255,.8)'; for (let t = 0; t < 64; t++) { const x = i + t, y = t + Math.round(Math.sin(t / 5 + i) * 2); g.fillRect(x, y, 1, 1); } }
+  g.globalCompositeOperation = 'source-over';
+  // Kristallzacken auf dem Rücken
+  for (let x = 6; x < 60; x += 7) {
+    let y = 0; while (y < 64 && !O(x, y)) y++; if (y >= 60) continue;
+    const h = 4 + ((x * 7) % 4);
+    g.fillStyle = '#1a4a6a'; g.beginPath(); g.moveTo(x - 3, y + 2); g.lineTo(x, y - h - 1); g.lineTo(x + 3, y + 2); g.fill();
+    g.fillStyle = '#6ae0ff'; g.beginPath(); g.moveTo(x - 2, y + 1); g.lineTo(x, y - h); g.lineTo(x + 2, y + 1); g.fill();
+    g.fillStyle = '#e8fcff'; g.fillRect(x - 1, y - h + 2, 1, h - 2);
+  }
+  return (SPR[key] = c);
 }
 const TINTS = {};
 function tintSprite(id, col) {

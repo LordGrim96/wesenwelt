@@ -1,5 +1,5 @@
-// Offline-Speicher für Wesenwelt (Version 202610301305)
-const VERSION = '202610301305';
+// Offline-Speicher für Wesenwelt (Version 202610301327)
+const VERSION = '202610301327';
 const CACHE = 'wesenwelt-' + VERSION;
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png',
   './icons/icon-maskable-512.png', './icons/apple-touch-icon.png', './icons/favicon-32.png'];
