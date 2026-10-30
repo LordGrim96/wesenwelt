@@ -749,9 +749,9 @@ const VARIANTS = [
   { h: '#5a7a3a', H: '#3a5a28', r: '#6a8a4a', R: '#4a6a30', y: '#6a8a4a', Y: '#4a6a30', p: '#4a3a28' },
   { h: '#303038', H: '#181820', r: '#e0b030', R: '#a07818', y: '#e0b030', Y: '#a07818', p: '#303038', P: '#181820' },
   { h: '#f8a8b8', H: '#d88098', r: '#f8f8f8', R: '#e0c0c8', y: '#f8f8f8', Y: '#e0c0c8', p: '#f0a0b0', P: '#c87888' },
-  // 7: TEAM MAGNETAR (dunkle Anzüge in Magnet-Rot und -Blau), 8: Kommandantin Krater
-  { h: '#2a2f45', H: '#181c2c', r: '#2a3048', R: '#1a1e30', y: '#d83838', Y: '#3a6ad8', p: '#2a3048', P: '#181c2c' },
-  { h: '#e0e4f0', H: '#a0a8c0', r: '#c83030', R: '#8a1e1e', y: '#3a6ad8', Y: '#24448a', p: '#2a3048', P: '#181c2c' },
+  // 7: TEAM EDEN (moosgrüne Kutten mit rotem Apfel-Abzeichen), 8: Kommandanten im Laborkittel
+  { h: '#3a2a1a', H: '#24180e', r: '#2f4a2a', R: '#1f3020', y: '#c83030', Y: '#8a1e1e', p: '#3a2a1a', P: '#24180e' },
+  { h: '#e0e4f0', H: '#a0a8c0', r: '#eef0ec', R: '#b8c0b8', y: '#2f6a2a', Y: '#1f4a1a', p: '#2f4a2a', P: '#1f3020' },
 ];
 const mirror = rows => rows.map(r => r.split('').reverse().join(''));
 const sym = half => half.map(r => r + r.split('').reverse().join(''));
@@ -4931,10 +4931,11 @@ function placeStoryNpcs(m) {
   }
   placeChapter2(m);
 }
-/* --- Kapitel 2: TEAM MAGNETAR taucht auf ---
+/* --- Kapitel 2: TEAM EDEN taucht auf ---
    Nach dem Fossil-Orden stehlen zwei Rüpel einen magnetischen Meteorsplitter aus Fossilfurt.
-   Auf Route 3 stellt man sie, Kommandantin Krater verrät das Ziel: Mit den magnetischen Strömen des
-   großen Meteors wollen sie allen Strom der Welt kontrollieren und ziehen ihn dafür zu sich herab. */
+   Auf Route 3 stellt man sie, Kommandantin Curia deutet nur an, worum es geht. Das ganze Ziel
+   (mit den Strömen des Meteors allen Strom der Welt an sich reißen und sie damit in die Steinzeit
+   zurückwerfen) wird erst nach und nach über die späteren Orden enthüllt. */
 function storyTrainer(id, name, team, variant) {
   return { id, name, variant, money: 600, team: team.map(([n, lvl]) => ({ sp: SPID[n], lvl })), lose: 'Mist! Das gibt Ärger mit der Kommandantin!', noSight: true };
 }
@@ -4968,22 +4969,22 @@ async function magnetarAmbush(g1, g2, path, spotted) {
   if (spotted) await approach(g1);
   face(g1, player); face(player, g1); face(g2, player);
   await say('RÜPEL: Verdammt, wir werden verfolgt! Den Splitter kriegst du nicht!');
-  await say('RÜPELIN: Weißt du überhaupt, mit wem du dich anlegst? Wir sind TEAM MAGNETAR!');
-  await say('RÜPEL: Dieser Splitter stammt vom großen Meteor da oben am Himmel. Er steckt voller magnetischer Ströme.');
-  await say('RÜPELIN: Daraus machen wir Strom für die ganze Welt. Und wer den Strom hat, hat die Macht!');
+  await say('RÜPELIN: Weißt du überhaupt, mit wem du dich anlegst? Wir sind TEAM EDEN!');
+  await say('RÜPEL: Dieser Splitter ist vom Himmel gefallen. Er steckt voller magnetischer Ströme. Unsere Kommandantin braucht ihn!');
+  await say('RÜPELIN: Mehr musst du nicht wissen. Verschwinde!');
   if (await startBattle({ trainer: storyTrainer('mag:r3:1', 'Rüpel', [['Zappraptor', 14], ['Kompso', 15]], 7) }) !== 'win') return;
   await say('RÜPELIN: Du Nervensäge! Jetzt bin ich dran!');
   if (await startBattle({ trainer: storyTrainer('mag:r3:2', 'Rüpelin', [['Panzerling', 14], ['Zappraptor', 15]], 7) }) !== 'win') return;
-  // Kommandantin Krater kommt dazu
-  const k = new Actor({ x: path[0].x, y: path[0].y, dir: 'down', variant: 8, id: 'krater' }); cur.npcs.push(k);
+  // Kommandantin Curia kommt dazu
+  const k = new Actor({ x: path[0].x, y: path[0].y, dir: 'down', variant: 8, id: 'curia' }); cur.npcs.push(k);
   await say('???: Was ist hier los?!');
   await walkPath(k, path.slice(1)); face(k, player); face(g1, k); face(g2, k);
-  await say('RÜPEL: K-Kommandantin Krater! Das Kind hat uns …');
-  await say('KRATER: Ihr Nichtsnutze verliert gegen ein Kind? Gebt ihm den Splitter. Wir brauchen ihn nicht mehr.');
-  await say(`KRATER: Ich bin KOMMANDANTIN KRATER von TEAM MAGNETAR. Merk dir das, ${PN()}.`);
-  await say('KRATER: Unsere Magnettürme ziehen den großen Meteor schon jetzt zu uns herab. Seine Ströme werden uns gehören.');
-  await say('KRATER: Dann läuft keine Lampe, keine Maschine und kein Wesen-Center mehr ohne TEAM MAGNETAR. Die ganze Welt wird nach unserer Pfeife tanzen!');
-  await say('KRATER: Abmarsch!');
+  await say('RÜPEL: K-Kommandantin Curia! Das Kind hat uns …');
+  await say('CURIA: Ihr verliert gegen ein Kind? Gebt ihm den Splitter. Die Messungen habe ich längst gemacht.');
+  await say(`CURIA: Ich bin KOMMANDANTIN CURIA von TEAM EDEN. Ich habe mein Leben lang Steine und Strahlen erforscht, ${PN()}.`);
+  await say('CURIA: Und weißt du, was ich gelernt habe? Diese Welt hat sich verirrt. Zu viele Maschinen, zu viel Lärm.');
+  await say('CURIA: Bald wird der Strom dieser Welt uns gehören. Und dann beginnt etwas Neues … ein Paradies.');
+  await say('CURIA: Komm uns nicht noch einmal in die Quere. Abmarsch!');
   await fadeTo(4); cur.npcs = cur.npcs.filter(n => n !== k); state.flags['st:r3'] = 1; saveGame(); await fadeTo(0);
   await say(`${PN()} hat den METEORSPLITTER zurückbekommen! Er summt leise und zieht an allem, was aus Metall ist.`);
 }
@@ -4991,8 +4992,8 @@ async function splinterReturn() {
   if (!state.flags['st:r3']) return say('FORSCHERIN: Diebe in dunklen Anzügen! Sie sind zur ROUTE 3 gerannt. Bitte hilf uns!');
   if (state.flags['st:ret']) return say('FORSCHERIN: Sei vorsichtig da draußen. Ich behalte den Himmel im Auge.');
   await say(`FORSCHERIN: Du hast den METEORSPLITTER! Danke, ${PN()}!`);
-  await say('FORSCHERIN: TEAM MAGNETAR? Magnettürme? … Oh nein. Wenn sie den großen Meteor mit Magneten anziehen …');
-  await say('FORSCHERIN: … dann holen sie ihn nicht nur näher heran. Dann stürzt er auf unsere Welt!');
+  await say('FORSCHERIN: TEAM EDEN? Und eine Kommandantin, die den Splitter vermessen hat? Was wollen die bloß mit seinen magnetischen Strömen …');
+  await say('FORSCHERIN: Der Splitter stammt bestimmt von dem hellen Schweif, der seit Tagen am Himmel zieht. Das gefällt mir gar nicht.');
   await say('FORSCHERIN: Ich schicke sofort eine Nachricht an Prof. Dennis. Nimm das hier als Dank.');
   state.items.Supertrank = (state.items.Supertrank || 0) + 3;
   await say(`${PN()} erhält 3 SUPERTRÄNKE!`);
@@ -5013,7 +5014,7 @@ function placeChapter2(m) {
   const show = () => !state.flags['st:theft'] || !!state.flags['st:r3'];
   const g1 = new Actor({ x: p1.x, y: p1.y, dir: back(p1), variant: 7, id: 'mag:r3', hidden: show, trainer: { id: 'mag:r3', name: 'Rüpel' } });
   const g2 = new Actor({ x: p2.x, y: p2.y, dir: back(p2), variant: 7, id: 'mag:r3b', hidden: show });
-  // Der zweite Rüpel steht neben dem Weg, damit Krater später durchkommt
+  // Der zweite Rüpel steht neben dem Weg, damit Curia später durchkommt
   for (const o of [1, -1]) { const x = p2.x + (p2.dy ? o : 0), y = p2.y + (p2.dy ? 0 : o); if (!SOLID.has(tget(m, x, y))) { g2.x = x; g2.y = y; break; } }
   g1.scene = spotted => magnetarAmbush(g1, g2, pts.slice(gi + 1, gi + 19).reverse(), spotted);
   g1.talk = g2.talk = () => g1.scene(false);
