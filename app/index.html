@@ -99,7 +99,7 @@ const CONFIG = {
   // Adresse des Konto-Servers (worker/). Leer = nur Gast-Spielstände auf dem Gerät
   api: 'https://wesenwelt-api.edengrim67.workers.dev',
 };
-const GAME_VERSION = '202610300520'; // wird von build_app.py durch die Build-Zeit ersetzt
+const GAME_VERSION = '202610300523'; // wird von build_app.py durch die Build-Zeit ersetzt
 
 // Logische Bildgröße passt sich dem Bildschirm an (mindestens 256x192); SC = interne Auflösung für scharfe Schrift
 let VW = 256, VH = 192, OX = 0, OY = 0, RW = 256, RH = 192;
@@ -2985,7 +2985,7 @@ class TrainerCard {
 }
 
 class OptionsScreen {
-  constructor() { this.sel = 0; this.rows = [['gfx', 'GRAFIK', GFX_NAMES], ['time', 'TAGESZEIT', ['AUTOMATISCH', 'MORGEN', 'TAG', 'ABEND', 'NACHT']], ['text', 'TEXTTEMPO', TEXT_NAMES], ['konto', 'KONTO'], ['offline', 'OFFLINE-MODUS', ['AUS', 'AN']], ['code', 'SPIELSTAND-CODE'], ['dev', 'GOAT-MODUS'], ['back', 'ZURÜCK']]; }
+  constructor() { this.sel = 0; this.rows = [['gfx', 'GRAFIK', GFX_NAMES], ['time', 'TAGESZEIT', ['AUTOMATISCH', 'MORGEN', 'TAG', 'ABEND', 'NACHT']], ['text', 'TEXTTEMPO', TEXT_NAMES], ['konto', 'KONTO'], ['code', 'SPIELSTAND-CODE'], ['dev', 'GOAT-MODUS'], ['back', 'ZURÜCK']]; }
   update() {
     const n = this.rows.length, [key, , vals] = this.rows[this.sel];
     if (pressed.up) this.sel = (this.sel + n - 1) % n;
@@ -2993,7 +2993,6 @@ class OptionsScreen {
     if (vals && (pressed.left || pressed.right || pressed.A)) {
       OPTS[key] = (OPTS[key] + (pressed.left ? vals.length - 1 : 1)) % vals.length;
       timeMode = OPTS.time; CONFIG.textSpeed = TEXT_SPEEDS[OPTS.text]; saveOpts();
-      if (key === 'offline' && !OPTS.offline) { pendingSync = true; syncWhenOnline(); }
     }
     if (pressed.A && key === 'dev') run(devToggle);
     if (pressed.A && key === 'code') run(() => exportCode());
@@ -3016,7 +3015,7 @@ class OptionsScreen {
     });
     box(2, 146, 252, 44);
     const key = this.rows[this.sel][0];
-    const info = { gfx: ['Alle Effekte: Wolken, Flugsaurier, Vignette.', 'Fast alle Effekte, schont den Akku.', 'Ohne Wetter und Effekte, für ältere Handys.'][OPTS.gfx], time: OPTS.time ? 'Feste Tageszeit für die ganze Welt.' : 'Tageszeit nach deiner echten Uhrzeit.', text: 'So schnell erscheinen die Texte.', code: 'Spielstand auf Handy oder PC mitnehmen.', konto: account ? `Angemeldet als ${accName()}` : 'Anmelden: Spielstände auf allen Geräten.', offline: OPTS.offline ? 'Spielstände nur auf dem Gerät.' : 'An: ohne Internet, Abgleich später.', dev: devOn ? 'A: GOAT-Modus ausschalten.' : 'A: Passwort eingeben.', back: 'Einstellungen werden automatisch gespeichert.' }[key];
+    const info = { gfx: ['Alle Effekte: Wolken, Flugsaurier, Vignette.', 'Fast alle Effekte, schont den Akku.', 'Ohne Wetter und Effekte, für ältere Handys.'][OPTS.gfx], time: OPTS.time ? 'Feste Tageszeit für die ganze Welt.' : 'Tageszeit nach deiner echten Uhrzeit.', text: 'So schnell erscheinen die Texte.', code: 'Spielstand auf Handy oder PC mitnehmen.', konto: account ? `Angemeldet als ${accName()}` : 'Anmelden: Spielstände auf allen Geräten.', dev: devOn ? 'A: GOAT-Modus ausschalten.' : 'A: Passwort eingeben.', back: 'Einstellungen werden automatisch gespeichert.' }[key];
     text(info, 12, 150); text('Links/Rechts: ändern   B: zurück', 12, 166, '#7888a0', null);
   }
 }
@@ -3591,17 +3590,18 @@ function claimDevice(name) {
 }
 // Offline: entweder von Hand eingeschaltet (spart Internet) oder ohne Konto gestartet, weil der Server nicht erreichbar war
 let offlineSession = false, pendingSync = false;
-const isOffline = () => !!OPTS.offline || offlineSession || !navigator.onLine;
+let netDown = false; // letzter Versuch, den Server zu erreichen, ist gescheitert
+const isOffline = () => offlineSession || netDown || !navigator.onLine;
 async function serverReachable() {
-  if (OPTS.offline || !navigator.onLine) return false;
+  if (!navigator.onLine) return false;
   try { const c = new AbortController(), t = setTimeout(() => c.abort(), 5000); const r = await fetch(CONFIG.api + '/api', { cache: 'no-store', signal: c.signal }); clearTimeout(t); return r.ok; } catch (e) { return false; }
 }
 async function api(path, method = 'GET', body) {
-  if (OPTS.offline) throw new Error('Der Offline-Modus ist an. Schalte ihn unter OPTIONEN aus.');
   let r;
   try {
     r = await fetch(CONFIG.api + path, { method, headers: { 'content-type': 'application/json', ...(account ? { authorization: 'Bearer ' + account.token } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
-  } catch (e) { throw new Error('Keine Verbindung zum Server. Bist du online?'); }
+  } catch (e) { netDown = true; throw new Error('Keine Verbindung zum Server. Bist du online?'); }
+  netDown = false;
   const d = await r.json().catch(() => ({}));
   // Abgelaufene oder gelöschte Anmeldung: lokal abmelden
   if (r.status === 401 && account && path !== '/api/login') forgetAccount();
@@ -3635,15 +3635,19 @@ let pushTimer = 0;
 function cloudPush(slot) {
   if (!account || !accountsReady()) return;
   clearTimeout(pushTimer);
-  if (OPTS.offline || !navigator.onLine) { pendingSync = true; return; }
+  if (!navigator.onLine) { pendingSync = true; return; }
   pushTimer = setTimeout(() => { const d = loadSlot(slot); if (d) api(`/api/saves/${slot}`, 'PUT', d).then(() => { pendingSync = false; }, () => { pendingSync = true; }); }, 1200);
 }
 // Wieder online: offline Gespeichertes automatisch hochladen
 async function syncWhenOnline() {
-  if (!account || !accountsReady() || OPTS.offline || !pendingSync) return;
+  if (!account || !accountsReady() || !pendingSync) return;
   try { if (mode === 'world') saveGame(); await syncSaves(); pendingSync = false; popup = { text: 'CLOUD ABGEGLICHEN', t: 120 }; } catch (e) {}
 }
+// Offline ist automatisch: ohne Internet wird nur auf dem Gerät gespeichert, danach von selbst hochgeladen
 addEventListener('online', () => setTimeout(syncWhenOnline, 1500));
+addEventListener('offline', () => { if (account && mode === 'world') popup = { text: 'OFFLINE · WIRD SPÄTER GESICHERT', t: 160 }; });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') syncWhenOnline(); });
+setInterval(() => { if (navigator.onLine) syncWhenOnline(); }, 60000);
 // Echte Eingabefelder für Name und Passwort, damit Handy-Tastatur und Passwort-Manager funktionieren
 function formModal({ title, hint, fields, ok, onSubmit }) {
   return new Promise(res => {
@@ -3761,20 +3765,19 @@ async function setAccessLimit(slots) {
   return slots;
 }
 // GOAT-Übersicht (nur Admins, schon vom Titelbild aus): Server, Zugänge, Spielerliste, Einstellungen
-const GOAT_INFO = { SERVER: 'Ist der Konto-Server gerade erreichbar?', KONTO: 'Mit diesem Admin-Konto bist du angemeldet.', 'ZUGÄNGE': 'A: festlegen, wie viele Spieler ein Konto haben dürfen.', GESPERRT: 'So viele Spieler sind gerade gesperrt.', SPIELERLISTE: 'Alle Spieler: zuletzt da, sperren, Passwort, löschen.', 'OFFLINE-MODUS': 'A: umschalten (kein Internet nötig).', GRAFIK: 'A: Grafikstufe wechseln.', TAGESZEIT: 'A: Tageszeit wechseln.', VERSION: 'Diese Spielversion ist installiert.' };
+const GOAT_INFO = { SERVER: 'Ist der Konto-Server gerade erreichbar?', KONTO: 'Mit diesem Admin-Konto bist du angemeldet.', 'ZUGÄNGE': 'A: festlegen, wie viele Spieler ein Konto haben dürfen.', GESPERRT: 'So viele Spieler sind gerade gesperrt.', SPIELERLISTE: 'Alle Spieler: zuletzt da, sperren, Passwort, löschen.', GRAFIK: 'A: Grafikstufe wechseln.', TAGESZEIT: 'A: Tageszeit wechseln.', VERSION: 'Diese Spielversion ist installiert.' };
 async function goatPanel() {
   let sel = 0;
   for (;;) {
     const online = await serverReachable(); let slots = null;
     if (online) try { slots = await api('/api/admin/settings'); } catch (e) {}
     const rows = [['SERVER', online ? 'ONLINE' : 'OFFLINE'], ['KONTO', accName()], ['ZUGÄNGE', slots ? `${slots.players}/${slots.max_players < 0 ? 'OFFEN' : slots.max_players}` : '?'], ['GESPERRT', slots ? String(slots.blocked) : '?'], ['SPIELERLISTE'],
-      ['OFFLINE-MODUS', OPTS.offline ? 'AN' : 'AUS'], ['GRAFIK', GFX_NAMES[OPTS.gfx]], ['TAGESZEIT', TIMES[timeMode].toUpperCase()], ['VERSION', GAME_VERSION], ['ZURÜCK']];
+      ['GRAFIK', GFX_NAMES[OPTS.gfx]], ['TAGESZEIT', TIMES[timeMode].toUpperCase()], ['VERSION', GAME_VERSION], ['ZURÜCK']];
     sel = await openScreen(new ListScreen('GOAT-ÜBERSICHT', rows, sel, i => GOAT_INFO[rows[i][0]] || ''));
     if (sel < 0 || rows[sel][0] === 'ZURÜCK') return;
     const it = rows[sel][0];
     if (it === 'SPIELERLISTE') await adminPlayers();
     if (it === 'ZUGÄNGE') await setAccessLimit(slots);
-    if (it === 'OFFLINE-MODUS') { OPTS.offline = OPTS.offline ? 0 : 1; saveOpts(); }
     if (it === 'GRAFIK') { OPTS.gfx = (OPTS.gfx + 1) % GFX_NAMES.length; saveOpts(); }
     if (it === 'TAGESZEIT') { timeMode = OPTS.time = (timeMode + 1) % TIMES.length; saveOpts(); }
   }
@@ -4904,10 +4907,10 @@ let tick = 0;
 let mode = 'title';
 const tileIndex = (t, x, y) => (t === T.TREE ? TREE_Q + (x & 1) + ((y & 1) << 1) : t);
 /* --- Optionen: Grafikstufe, Tageszeit, Textgeschwindigkeit --- */
-const OPTS = { gfx: 0, time: 0, text: 1, offline: 0 };
+const OPTS = { gfx: 0, time: 0, text: 1 };
 const GFX_NAMES = ['ULTRA', 'HOCH', 'EINFACH'], TEXT_NAMES = ['LANGSAM', 'NORMAL', 'SCHNELL'], TEXT_SPEEDS = [0.5, 1, 2];
 const gfx = lvl => OPTS.gfx <= lvl; // gfx(0): nur ULTRA, gfx(1): ULTRA und HOCH
-function loadOpts() { try { Object.assign(OPTS, JSON.parse(localStorage.getItem('wesenwelt.options') || '{}')); } catch (e) {} timeMode = OPTS.time; CONFIG.textSpeed = TEXT_SPEEDS[OPTS.text]; }
+function loadOpts() { try { Object.assign(OPTS, JSON.parse(localStorage.getItem('wesenwelt.options') || '{}')); } catch (e) {} delete OPTS.offline; timeMode = OPTS.time; CONFIG.textSpeed = TEXT_SPEEDS[OPTS.text]; }
 function saveOpts() { try { localStorage.setItem('wesenwelt.options', JSON.stringify(OPTS)); } catch (e) {} }
 /* --- Tageszeit (wie auf dem DS nach echter Uhrzeit), Alt+T schaltet zum Testen durch --- */
 const TIMES = ['auto', 'morgen', 'tag', 'abend', 'nacht'];
