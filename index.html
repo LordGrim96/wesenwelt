@@ -954,6 +954,8 @@ S('Sturmtaurus', ['WIND', 'KAMPF'], [80, 110, 75, 90, 70, 105], 0, 'Sturmhorn', 
 S('Funkhorn', ['ELEKTRO'], [50, 55, 60, 50, 50, 40], 16, 'Donnerhorn', 'Gutmütig und verfressen. Wird es wütend, knistern Funken zwischen seinen Hörnern.', { k: 'quad', h: 'cerato', s: .56, c: ['#d8b038', '#fff0b8', '#4a6ad0'], horns: 1, bolt: 1 });
 S('Donnerhorn', ['ELEKTRO'], [70, 75, 85, 65, 65, 50], 36, 'Donnerhorn', 'Senkt es den Kopf, schlagen Blitze in seine drei Hörner ein. Dann gibt es kein Halten mehr.', { k: 'quad', h: 'cerato', s: .78, c: ['#c8a028', '#fff0b8', '#3a58c0'], horns: 3, bolt: 1 });
 S('Blitzeratops', ['ELEKTRO', 'BODEN'], [95, 105, 110, 80, 85, 55], 0, 'Gewitterhorn', 'Sein Ansturm klingt wie Donnergrollen. Selbst Felswände zerspringen unter seinen Hörnern.', { k: 'quad', h: 'cerato', s: 1, c: ['#b89020', '#fff0b8', '#2a48b0'], horns: 3, bolt: 1, armor: 1 });
+// Der legendäre Sternendrache: langer Schlangenleib mit Mähne und Barthaaren, gepanzerte Brust und große Schwingen
+S('Astralong', ['DRACHE', 'FEE'], [100, 125, 105, 130, 105, 115], 0, 'Sternendrache', 'Schläft hoch über den Wolken zwischen den Sternen. Droht ein Meteor die Welt zu treffen, steigt er herab und stellt sich ihm entgegen.', { k: 'serpent', s: 1, c: ['#b8202c', '#f0c050', '#2fae78'], noDecor: 1 });
 // Urzeit-Lexikon: auf welchem echten Tier (oder Ding) jedes Wesen beruht. [Vorbild, Zeit, Größe, Wissenswertes]
 const REAL_GROUPS = [
   [['Ankylino', 'Ankylodon', 'Juwelkylos'], 'Ankylosaurus', 'Oberkreide, vor etwa 68 bis 66 Mio. Jahren', 'bis etwa 8 m lang', 'Sein Körper war mit Knochenplatten gepanzert. Mit der schweren Keule am Schwanz konnte er sich gegen Raubsaurier wehren.'],
@@ -992,6 +994,7 @@ const REAL_GROUPS = [
   [['Meteorlein', 'Meteoros'], 'Chicxulub-Asteroid', 'Ende der Kreidezeit, vor 66 Mio. Jahren', 'etwa 10 km Durchmesser', 'Sein Einschlag im heutigen Mexiko löste das große Artensterben aus. Nur die Vögel überlebten von den Dinosauriern.'],
   [['Draki', 'Drakodon', 'Tyrannodrak'], 'Dracorex', 'Oberkreide, vor etwa 66 Mio. Jahren', 'etwa 2,5 m lang', 'Ein Dickkopfsaurier mit stacheligem Kopf. Sein ganzer Name lautet Dracorex hogwartsia: Drachenkönig von Hogwarts!'],
   [['Magmator'], 'Dekkan-Trapp (Vulkane in Indien)', 'Ende der Kreidezeit, vor etwa 66 Mio. Jahren', 'Lavafelder größer als Deutschland', 'Gewaltige Vulkanausbrüche über Hunderttausende Jahre veränderten das Klima der ganzen Erde.'],
+  [['Astralong'], 'Drachenknochen aus China', 'Sagen über mehr als 2.000 Jahre', 'in Sagen so lang wie ein Fluss', 'In China wurden Fossilien früher als Drachenknochen verkauft und zu Medizin gemahlen. Manche Forscher glauben, dass Saurierknochen Drachen-Sagen beeinflusst haben.'],
   [['Chronodon'], 'die Erdzeitalter', 'vor 252 bis 66 Mio. Jahren: das Erdmittelalter', 'Trias, Jura und Kreide', 'Die Dinosaurier lebten über 160 Millionen Jahre lang. Wir Menschen gibt es erst seit etwa 300.000 Jahren.'],
   [['Karnokid', 'Karnotaurus', 'Sturmtaurus'], 'Carnotaurus', 'Oberkreide, vor etwa 72 bis 69 Mio. Jahren', 'etwa 8 m lang', 'Er hatte zwei Hörner über den Augen und winzige Ärmchen, noch kleiner als die des Tyrannosaurus. Ein schneller Läufer.'],
   [['Funkhorn', 'Donnerhorn', 'Blitzeratops'], 'Styracosaurus', 'Oberkreide, vor etwa 75 Mio. Jahren', 'etwa 5,5 m lang', 'Ein Horngesicht-Dinosaurier mit einem langen Nasenhorn und vielen Stacheln am Nackenschild.'],
@@ -1293,6 +1296,33 @@ function pixelize(c, pal, eyes, s) {
 }
 
 const ARCH = {
+  serpent(D, a, k) {
+    // Schwingen hinter dem Körper
+    D.P([[38, 30], [42, 10], [50, 1], [62, 4], [58, 12], [63, 18], [55, 20], [58, 27], [48, 30]], k.d3);
+    for (const [x, y] of [[50, 1], [62, 4], [63, 18], [58, 27]]) D.L(40, 28, x, y, 1.6, k.d1);
+    // Schlangenleib vom Schwanz bis zum Hals, darunter ein goldener Bauchstreifen, auf dem Rücken eine Mähne
+    const body = [[62, 55], [52, 57.5], [41, 55.5], [34, 49], [36, 42], [44, 38], [48, 31], [45, 24], [37, 19.5], [28, 19]];
+    D.T(body.map(([x, y]) => [x - 1.2, y + 1.6]), 1.5, 7.5, k.c2);
+    D.T(body, 2.5, 9.5, k.c1);
+    D.T(body.slice(2).map(([x, y]) => [x - 1.5, y + 2]), 2, 4.5, k.c2, false);
+    for (const [x, y, an] of [[49, 53, -1.6], [38, 45, -2.6], [47, 35, -0.3], [47, 27, 0.3], [41, 21, -1.0], [34, 18, -1.5]]) D.P([[x - 2, y], [x + Math.cos(an) * 6, y + Math.sin(an) * 6], [x + 2, y + 1]], k.c3);
+    // Arme mit Krallen
+    D.T([[40, 31], [33, 35], [28, 33]], 3.6, 2.4, k.c1); D.P([[26, 31], [29, 34], [25, 35.5]], k.c2);
+    D.T([[38, 45], [31, 47], [27, 45]], 3.6, 2.4, k.c1); D.P([[25, 43], [28, 46], [24, 47.5]], k.c2);
+    // Kopf: lange Schnauze, Panzerkamm, goldene Hörner, Mähne und Barthaare
+    const hx = 17, hy = 16;
+    D.P([[hx + 5, hy - 2], [hx + 18, hy - 12], [hx + 14, hy - 4], [hx + 20, hy - 6], [hx + 10, hy + 2]], k.c3);
+    D.T([[hx + 4, hy - 4], [hx + 10, hy - 11], [hx + 16, hy - 14]], 2.8, 1, k.c2);
+    D.T([[hx + 1, hy - 4], [hx + 4, hy - 12], [hx + 9, hy - 16]], 2.6, 1, k.c2);
+    D.E(hx + 2, hy, 9, 6.5, k.c1, -0.15);
+    D.E(hx - 6, hy + 2.5, 8, 4, k.c1, -0.05);
+    D.E(hx - 5, hy + 5.5, 6, 1.8, k.c2, -0.05, false);
+    D.P([[hx - 4, hy - 4], [hx + 4, hy - 7], [hx + 7, hy - 3], [hx, hy - 1.5]], k.c2);
+    for (let i = 0; i < 3; i++) D.P([[hx - 10 + i * 3, hy + 4], [hx - 9 + i * 3, hy + 6], [hx - 8 + i * 3, hy + 4]], k.white, false);
+    D.L(hx - 11, hy + 1, hx - 16, hy + 7, 1.1, k.c3); D.L(hx - 16, hy + 7, hx - 14, hy + 13, 1.1, k.c3);
+    D.L(hx - 9, hy + 2, hx - 11, hy + 10, 1.1, k.c3); D.L(hx - 11, hy + 10, hx - 8, hy + 15, 1.1, k.c3);
+    D.eye(hx + 1, hy - 1.5, '#f8e040');
+  },
   bi(D, a, k) {
     const hz = a.pose === 'horiz';
     D.T([[37, 43], [34, 51], [36, 57]], 5, 3.5, k.d1); D.E(34, 57, 4, 1.6, k.d1);
@@ -3340,7 +3370,13 @@ class Title {
       ctx.fillStyle = i % 3 ? '#f8a040' : '#ffe080'; ctx.globalAlpha = Math.min(1, y / 60); ctx.fillRect(Math.round(x), Math.round(y), 1 + (i % 2), 1 + (i % 2)); ctx.globalAlpha = 1;
     }
     const breath = Math.round(Math.sin(tick / 28) * 1.5);
-    drawWesen(SPID.Tyrannodrak, 152, 40 + breath, 1.5);
+    // Der Meteor rast auf die Welt zu, der Sternendrache stellt sich ihm entgegen
+    const mx = 198 + Math.round(Math.sin(tick / 37)), my = 27;
+    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.55 + 0.15 * Math.sin(tick / 9); ctx.drawImage(glowOf('#ff9040'), mx - 22, my - 22, 44, 44);
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    for (let i = 16; i > 0; i--) { const w = Math.max(1, 5 - (i >> 2)); ctx.fillStyle = ['#fff6d0', '#ffd060', '#f88830', '#c84a28'][Math.min(3, i >> 2)]; ctx.globalAlpha = 1 - i / 18; ctx.fillRect(mx + i * 3, my - i - (w >> 1), w, w); }
+    ctx.globalAlpha = 1; ctx.fillStyle = '#c84a28'; ctx.fillRect(mx - 3, my - 3, 7, 7); ctx.fillStyle = '#fff6d0'; ctx.fillRect(mx - 2, my - 2, 5, 5); ctx.fillStyle = '#ffffff'; ctx.fillRect(mx - 1, my - 1, 2, 2);
+    drawWesen(SPID.Astralong, 150, 34 + breath, 1.5);
     textOutline('WESENWELT', 14, 10, '#f8e8b0', '#3a1a10', 40);
     textOutline('URZEIT-EDITION', 18, 50, '#f8a030', '#3a1a10', 16);
     ctx.fillStyle = '#1a1014'; ctx.fillRect(-OX, 152, RW, 40 + OY);
@@ -3940,7 +3976,7 @@ const isEvoTarget = id => id > 1 && SPECIES[id - 2].evo > 0;
 const canEvolve = w => SPECIES[w.sp - 1].evo > 0 && w.lvl >= SPECIES[w.sp - 1].evo;
 function speciesAtLevel(id, lvl) { while (SPECIES[id - 1].evo && lvl >= SPECIES[id - 1].evo) id++; return id; }
 function lineOf(id) { const L = [id]; while (SPECIES[L[L.length - 1] - 1].evo) L.push(L[L.length - 1] + 1); return L; }
-const LEGENDS = new Set([SPID.Magmator, SPID.Chronodon]);
+const LEGENDS = new Set([SPID.Magmator, SPID.Chronodon, SPID.Astralong]);
 function catchRate(id) { if (LEGENDS.has(id)) return 3; if (!isEvoTarget(id)) return SPECIES[id - 1].evo ? 190 : 100; return SPECIES[id - 1].evo ? 90 : 45; }
 
 const STAGE_IDX = { atk: 1, def: 2, spa: 3, spd: 4, ini: 5 };
