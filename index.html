@@ -71,6 +71,7 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 const CONFIG = {
   seed: 1996,
   encounters: true,
+  trainers: true,
   encounterRate: 1 / 10,
   textSpeed: 1,
   saveKey: 'wesenwelt.urzeit.v1',
@@ -3270,7 +3271,7 @@ class MapScreen {
   update() {
     if (pressed.left || pressed.up) this.sel = (this.sel + TOWNS.length - 1) % TOWNS.length;
     if (pressed.right || pressed.down) this.sel = (this.sel + 1) % TOWNS.length;
-    if (pressed.A && devOn) { pop(this); this.done(); closeMenus(); const r = TOWN_RECTS[this.sel]; run(() => devTravel({ map: 'world', x: r.cx, y: r.cy })); return; }
+    if (pressed.A && devOn && goatFull()) { pop(this); this.done(); closeMenus(); const r = TOWN_RECTS[this.sel]; run(() => devTravel({ map: 'world', x: r.cx, y: r.cy })); return; }
     if (pressed.B || pressed.A || pressed.START || pressed.SELECT) { pop(this); this.done(); }
   }
   draw() {
@@ -3286,7 +3287,7 @@ class MapScreen {
     const t = TOWNS[this.sel];
     text(`${t.name.toUpperCase()}  ·  ${BIOMES[t.biome].name}`, 12, 150);
     const info = t.start ? 'Dein Heimatort' : t.league ? 'Champion-Liga' : (state.badges[this.sel - 1] ? `${t.badge} erhalten` : `Arena: ${t.leader} · Typ ${t.type}`);
-    text(devOn ? info + ' · A: HINREISEN' : info, 12, 166, devOn ? UI.red : '#7888a0', null, 16, 232);
+    text(devOn && goatFull() ? info + ' · A: HINREISEN' : info, 12, 166, devOn && goatFull() ? UI.red : '#7888a0', null, 16, 232);
   }
 }
 
@@ -3365,6 +3366,10 @@ class ListScreen {
 const DEV_HASH = 'f7a8160978b77c6c56e18a5347972c11efcb80295d7339ba08c6a9c3c4866e9b';
 const DEV_KEY = 'wesenwelt.dev';
 let devOn = false, devCoords = false;
+// Volle GOAT-Macht: Admin-Konto oder das GOAT-Passwort auf diesem Gerät. Vergebene GOAT-Rechte = nur Einstellungen.
+const goatFull = () => (typeof account !== 'undefined' && account && account.admin) || (() => { try { return localStorage.getItem(DEV_KEY) === DEV_HASH; } catch (e) { return false; } })();
+function saveGoat() { try { localStorage.setItem('wesenwelt.goat', JSON.stringify({ noclip, devCoords, encounters: CONFIG.encounters, trainers: CONFIG.trainers })); } catch (e) {} }
+function loadGoat() { try { const g = JSON.parse(localStorage.getItem('wesenwelt.goat') || 'null'); if (g && devOn) { noclip = !!g.noclip; devCoords = !!g.devCoords; CONFIG.encounters = g.encounters !== false; CONFIG.trainers = g.trainers !== false; } } catch (e) {} }
 try { devOn = localStorage.getItem(DEV_KEY) === DEV_HASH; } catch (e) {}
 function sha256(str) {
   const b = new TextEncoder().encode(str), K = [], H = [];
@@ -3399,7 +3404,7 @@ async function devToggle() {
   if (account) { try { const d = await api('/api/dev', 'POST', { password: pw }); account.dev = d.user.dev; storeAccount(); } catch (e) {} }
   await say('GOAT-Modus aktiv! Im START-Menü gibt es jetzt den Punkt GOAT, und auf der KARTE reist du mit A sofort an jeden Ort.');
 }
-function devLock() { devOn = false; noclip = false; devCoords = false; try { localStorage.removeItem(DEV_KEY); } catch (e) {} }
+function devLock() { devOn = false; noclip = false; devCoords = false; CONFIG.encounters = true; CONFIG.trainers = true; saveGoat(); try { localStorage.removeItem(DEV_KEY); } catch (e) {} }
 function unstick() {
   // Steht die Figur in einer Wand, rückt sie auf die nächste freie Kachel
   if (!SOLID.has(tget(cur, player.x, player.y)) && !npcAt(cur, player.x, player.y)) return;
@@ -3427,7 +3432,7 @@ function devDests() {
 }
 const DEV_INFO = {
   'SCHNELLREISE': 'Sofort zu Stadt, Arena oder Route.', 'DURCH WÄNDE': 'Durch Bäume, Wände und Wasser laufen.',
-  'KOORDINATEN': 'Zeigt Karte, X/Y und Gebiet unten links.', 'WILDE WESEN': 'Begegnungen im hohen Gras an oder aus.',
+  'KOORDINATEN': 'Zeigt Karte, X/Y und Gebiet unten links.', 'TRAINER': 'Aus: Trainer greifen nicht mehr an.', 'WILDE WESEN': 'Begegnungen im hohen Gras an oder aus.',
   'ORDEN': 'Alle Orden geben oder wegnehmen.', 'WESEN HOLEN': 'Ein beliebiges Wesen mit Wunsch-Level.',
   'TEAM +5 LEVEL': 'Alle Team-Wesen steigen 5 Level auf.', 'TEAM HEILEN': 'KP, AP und Status voll.',
   'ITEMS & TALER': 'Von jedem Item 10 Stück und 10000 Taler.', 'URDEX FÜLLEN': 'Alle Wesen als gesehen und gefangen.',
@@ -3439,7 +3444,9 @@ async function devMenu() {
   const loadSlotsInfo = async () => { if (account && account.admin) try { slots = await api('/api/admin/settings'); } catch (e) { slots = null; } };
   await loadSlotsInfo();
   for (;;) {
-    const rows = [['SCHNELLREISE'], ['DURCH WÄNDE', noclip ? 'AN' : 'AUS'], ['KOORDINATEN', devCoords ? 'AN' : 'AUS'], ['WILDE WESEN', CONFIG.encounters ? 'AN' : 'AUS'],
+    // Vergebene GOAT-Rechte: nur Einstellungen. Alles andere nur für den Admin (oder mit dem GOAT-Passwort)
+    const AN = v => v ? 'AN' : 'AUS';
+    const rows = !goatFull() ? [['DURCH WÄNDE', AN(noclip)], ['WILDE WESEN', AN(CONFIG.encounters)], ['TRAINER', AN(CONFIG.trainers)], ['KOORDINATEN', AN(devCoords)], ['TAGESZEIT', TIMES[timeMode].toUpperCase()]] : [['SCHNELLREISE'], ['DURCH WÄNDE', AN(noclip)], ['KOORDINATEN', AN(devCoords)], ['WILDE WESEN', AN(CONFIG.encounters)], ['TRAINER', AN(CONFIG.trainers)],
       ['ORDEN', `${state.badges.filter(Boolean).length}/16`], ['WESEN HOLEN'], ['TEAM +5 LEVEL'], ['TEAM HEILEN'], ['ITEMS & TALER', String(state.money)], ['URDEX FÜLLEN'],
       ['DATENBANK'], ['TAGESZEIT', TIMES[timeMode].toUpperCase()], ['SPIELSTAND-CODE'], ...(account && account.admin ? [['ZUGÄNGE', slots ? `${slots.players}/${slots.max_players < 0 ? 'OFFEN' : slots.max_players}` : '?'], ['SPIELER', 'ADMIN']] : []), ['SPERREN']];
     sel = await openScreen(new ListScreen('GOAT-MODUS', rows, sel, i => DEV_INFO[rows[i][0]]));
@@ -3452,6 +3459,8 @@ async function devMenu() {
     if (it === 'DURCH WÄNDE') noclip = !noclip;
     if (it === 'KOORDINATEN') devCoords = !devCoords;
     if (it === 'WILDE WESEN') CONFIG.encounters = !CONFIG.encounters;
+    if (it === 'TRAINER') CONFIG.trainers = !CONFIG.trainers;
+    saveGoat();
     if (it === 'ORDEN') { const c = await ask('Orden ändern?', ['ALLE GEBEN', 'ALLE WEG', 'ZURÜCK'], 0); if (c < 2) state.badges = Array(16).fill(c === 0); }
     if (it === 'WESEN HOLEN') {
       const si = await openScreen(new ListScreen('WESEN HOLEN', SPECIES.map(s => [`${String(s.id).padStart(3, '0')} ${s.name}`, s.types.map(t => t.slice(0, 3)).join('/')]), 0, k => SPECIES[k].cat + '-Wesen'));
@@ -4515,6 +4524,7 @@ async function trainerEncounter(n, spotted) {
   if (r === 'win') { state.flags['beat:' + tr.id] = 1; saveGame(); }
 }
 function checkTrainerSight() {
+  if (CONFIG.trainers === false) return false; // GOAT: Trainer greifen nicht an
   for (const n of cur.npcs) {
     if (!n.trainer || !n.visible() || n.trainer.noSight || state.flags['beat:' + n.trainer.id]) continue;
     if (trainerSees(n) && state.team.some(w => w.hp > 0)) { run(() => trainerEncounter(n, true)); return true; }
@@ -5354,6 +5364,7 @@ async function boot() {
   buildGlow();
   buildAmbient();
   loadOpts();
+  loadGoat();
   genWorld();
   buildMinimap(MAPS.world);
   requestAnimationFrame(loop);
