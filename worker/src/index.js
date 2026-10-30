@@ -94,7 +94,7 @@ async function handle(req, env) {
     const slots = await playerSlots(db);
     if (slots.max_players >= 0 && slots.players >= slots.max_players) return fail(403, 'Es sind gerade keine Plätze frei. Frag den Entwickler nach einem Zugang.');
     const salt = rand(16), hash = await pbkdf2(b.password, salt);
-    const r = await db.prepare('INSERT INTO users (name, pw_hash, pw_salt, created_at) VALUES (?, ?, ?, ?)').bind(name, hash, salt, Date.now()).run();
+    const r = await db.prepare('INSERT INTO users (name, pw_hash, pw_salt, created_at, last_login) VALUES (?, ?, ?, ?, ?)').bind(name, hash, salt, Date.now(), Date.now()).run();
     return json({ token: await newSession(db, r.meta.last_row_id), user: { name, dev: false, admin: false } });
   }
 
@@ -106,6 +106,7 @@ async function handle(req, env) {
     const hash = await pbkdf2(String(b.password || ''), u ? u.pw_salt : '00'.repeat(16));
     if (!u || !sameText(hash, u.pw_hash)) return fail(401, 'Name oder Passwort stimmt nicht.');
     if (u.blocked) return fail(403, 'Dein Zugang ist gesperrt. Frag den Entwickler.');
+    await db.prepare('UPDATE users SET last_login = ? WHERE id = ?').bind(Date.now(), u.id).run();
     return json({ token: await newSession(db, u.id), user: publicUser(u) });
   }
 
@@ -119,6 +120,8 @@ async function handle(req, env) {
   if (path === '/api/gamekey' && method === 'GET') {
     const r = await db.prepare("SELECT v FROM settings WHERE k = 'game_key'").first();
     if (!r) return fail(503, 'Das Spiel ist noch nicht eingerichtet.');
+    // Jeder Spielstart zählt als „zuletzt da“
+    await db.prepare('UPDATE users SET last_login = ? WHERE id = ?').bind(Date.now(), user.id).run();
     return json({ key: r.v, user: publicUser(user) });
   }
 
@@ -174,7 +177,7 @@ async function handle(req, env) {
       return json(await playerSlots(db));
     }
     if (path === '/api/admin/users' && method === 'GET') {
-      const r = await db.prepare('SELECT u.id, u.name, u.dev, u.admin, u.blocked, u.created_at, (SELECT COUNT(*) FROM saves s WHERE s.user_id = u.id) AS saves, (SELECT MAX(saved_at) FROM saves s WHERE s.user_id = u.id) AS last_save FROM users u ORDER BY u.created_at DESC LIMIT 500').all();
+      const r = await db.prepare('SELECT u.id, u.name, u.dev, u.admin, u.blocked, u.created_at, u.last_login, (SELECT COUNT(*) FROM saves s WHERE s.user_id = u.id) AS saves, (SELECT MAX(saved_at) FROM saves s WHERE s.user_id = u.id) AS last_save FROM users u ORDER BY u.created_at DESC LIMIT 500').all();
       return json({ users: r.results.map(u => ({ ...u, dev: !!u.dev, admin: !!u.admin, blocked: !!u.blocked })) });
     }
     const am = /^\/api\/admin\/users\/(\d+)(?:\/(reset|dev|block))?$/.exec(path);

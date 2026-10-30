@@ -3739,7 +3739,7 @@ async function setAccessLimit(slots) {
   return slots;
 }
 // GOAT-Übersicht (nur Admins, schon vom Titelbild aus): Server, Zugänge, Spielerliste, Einstellungen
-const GOAT_INFO = { SERVER: 'Ist der Konto-Server gerade erreichbar?', KONTO: 'Mit diesem Admin-Konto bist du angemeldet.', 'ZUGÄNGE': 'A: festlegen, wie viele Spieler ein Konto haben dürfen.', GESPERRT: 'So viele Spieler sind gerade gesperrt.', SPIELERLISTE: 'A: sperren, entsperren, Passwort, GOAT-Rechte, löschen.', 'OFFLINE-MODUS': 'A: umschalten (kein Internet nötig).', GRAFIK: 'A: Grafikstufe wechseln.', TAGESZEIT: 'A: Tageszeit wechseln.', VERSION: 'Diese Spielversion ist installiert.' };
+const GOAT_INFO = { SERVER: 'Ist der Konto-Server gerade erreichbar?', KONTO: 'Mit diesem Admin-Konto bist du angemeldet.', 'ZUGÄNGE': 'A: festlegen, wie viele Spieler ein Konto haben dürfen.', GESPERRT: 'So viele Spieler sind gerade gesperrt.', SPIELERLISTE: 'Alle Spieler: zuletzt da, sperren, Passwort, löschen.', 'OFFLINE-MODUS': 'A: umschalten (kein Internet nötig).', GRAFIK: 'A: Grafikstufe wechseln.', TAGESZEIT: 'A: Tageszeit wechseln.', VERSION: 'Diese Spielversion ist installiert.' };
 async function goatPanel() {
   let sel = 0;
   for (;;) {
@@ -3750,7 +3750,7 @@ async function goatPanel() {
     sel = await openScreen(new ListScreen('GOAT-ÜBERSICHT', rows, sel, i => GOAT_INFO[rows[i][0]] || ''));
     if (sel < 0 || rows[sel][0] === 'ZURÜCK') return;
     const it = rows[sel][0];
-    if (it === 'SPIELERLISTE') { if (online) await adminPlayers(); else await say('Die Spielerliste braucht eine Verbindung zum Server.'); }
+    if (it === 'SPIELERLISTE') await adminPlayers();
     if (it === 'ZUGÄNGE') await setAccessLimit(slots);
     if (it === 'OFFLINE-MODUS') { OPTS.offline = OPTS.offline ? 0 : 1; saveOpts(); }
     if (it === 'GRAFIK') { OPTS.gfx = (OPTS.gfx + 1) % GFX_NAMES.length; saveOpts(); }
@@ -3761,11 +3761,17 @@ async function goatPanel() {
 async function adminPlayers() {
   let sel = 0;
   for (;;) {
-    let users; try { users = (await api('/api/admin/users')).users; } catch (e) { await say(e.message); return; }
+    // Alle registrierten Spieler; ohne Verbindung die zuletzt abgerufene Liste (nur ansehen)
+    let users, cached = null;
+    try { users = (await api('/api/admin/users')).users; try { localStorage.setItem('wesenwelt.players', JSON.stringify({ at: Date.now(), users })); } catch (e) {} }
+    catch (e) { try { cached = JSON.parse(localStorage.getItem('wesenwelt.players')); } catch (_) {} if (!cached) { await say(e.message); return; } users = cached.users; }
     const day = t => { const d = new Date(t); return `${d.getDate()}.${d.getMonth() + 1}.${String(d.getFullYear()).slice(2)}`; };
-    const tag = u => u.admin ? 'ADMIN' : u.blocked ? 'GESPERRT' : u.dev ? 'GOAT' : u.last_save ? day(u.last_save) : 'neu';
-    sel = await openScreen(new ListScreen('SPIELER', users.map(u => [u.name, tag(u)]), sel, i => `Seit ${day(users[i].created_at)} · ${users[i].saves} Spielstände`));
+    const ago = t => { if (!t) return 'nie'; const d = Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(t).setHours(0, 0, 0, 0)) / 864e5); return d <= 0 ? 'heute' : d === 1 ? 'gestern' : day(t); };
+    const tag = u => u.admin ? 'ADMIN' : u.blocked ? 'GESPERRT' : ago(u.last_login);
+    const title = cached ? `SPIELER (STAND ${day(cached.at)})` : `SPIELER · ${users.length}`;
+    sel = await openScreen(new ListScreen(title, users.map(u => [u.name + (u.dev && !u.admin ? ' (G)' : ''), tag(u)]), sel, i => `Zuletzt da: ${ago(users[i].last_login)} · Konto seit ${day(users[i].created_at)}`));
     if (sel < 0) return;
+    if (cached) { await say('Ohne Verbindung kannst du die Liste nur ansehen. Änderungen gehen erst wieder online.'); continue; }
     const u = users[sel];
     if (u.admin) { await say('Admins kann man hier nicht ändern. Dein Passwort änderst du unter OPTIONEN → KONTO.'); continue; }
     const c = await ask(`Spieler ${u.name}${u.blocked ? ' (gesperrt)' : ''}`, ['NEUES PASSWORT', u.dev ? 'GOAT WEGNEHMEN' : 'GOAT GEBEN', 'LÖSCHEN', u.blocked ? 'ENTSPERREN' : 'SPERREN', 'ZURÜCK'], 4);
