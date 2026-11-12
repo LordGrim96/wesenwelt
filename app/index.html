@@ -100,13 +100,14 @@ const CONFIG = {
   // Adresse des Konto-Servers (worker/). Leer = nur Gast-Spielstände auf dem Gerät
   api: 'https://wesenwelt-api.edengrim67.workers.dev',
 };
-const GAME_VERSION = '202610311345'; // wird von build_app.py durch die Build-Zeit ersetzt
+const GAME_VERSION = '202611121602'; // wird von build_app.py durch die Build-Zeit ersetzt
 
 // Logische Bildgröße passt sich dem Bildschirm an (mindestens 256x192); SC = interne Auflösung für scharfe Schrift
 let VW = 256, VH = 192, OX = 0, OY = 0, RW = 256, RH = 192;
 const TS = 16, SC = 3;
 const cv = document.getElementById('screen');
-const ctx = cv.getContext('2d');
+const sceneCtx = cv.getContext('2d');
+let ctx = sceneCtx; // zeigt mit 3D-Grafik zeitweise auf die Menüebene (siehe toUi)
 ctx.imageSmoothingEnabled = false;
 
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -3040,7 +3041,7 @@ class TrainerCard {
 }
 
 class OptionsScreen {
-  constructor() { this.sel = 0; this.rows = [['gfx', 'GRAFIK', GFX_NAMES], ['time', 'TAGESZEIT', ['AUTOMATISCH', 'MORGEN', 'TAG', 'ABEND', 'NACHT']], ['text', 'TEXTTEMPO', TEXT_NAMES], ['diff', 'SCHWIERIGKEIT', DIFFS.slice(0, 2)], ['konto', 'KONTO'], ['code', 'SPIELSTAND-CODE'], ['dev', 'GOAT-MODUS'], ['back', 'ZURÜCK']]; }
+  constructor() { this.sel = 0; this.rows = [['fx3d', '3D-GRAFIK', ['AUS', 'AN']], ['gfx', 'GRAFIK', GFX_NAMES], ['time', 'TAGESZEIT', ['AUTOMATISCH', 'MORGEN', 'TAG', 'ABEND', 'NACHT']], ['text', 'TEXTTEMPO', TEXT_NAMES], ['diff', 'SCHWIERIGKEIT', DIFFS.slice(0, 2)], ['konto', 'KONTO'], ['code', 'SPIELSTAND-CODE'], ['dev', 'GOAT-MODUS'], ['back', 'ZURÜCK']]; }
   update() {
     const n = this.rows.length, [key, , vals] = this.rows[this.sel];
     if (pressed.up) this.sel = (this.sel + n - 1) % n;
@@ -3049,6 +3050,7 @@ class OptionsScreen {
     else if (vals && (pressed.left || pressed.right || pressed.A)) {
       OPTS[key] = (OPTS[key] + (pressed.left ? vals.length - 1 : 1)) % vals.length;
       timeMode = OPTS.time; CONFIG.textSpeed = TEXT_SPEEDS[OPTS.text]; saveOpts();
+      if (key === 'fx3d' && OPTS.fx3d) { FX.lite = false; FX.slow = 0; if (FX.cv && !FX.gl.isContextLost()) FX.ok = true; }
     }
     if (pressed.A && key === 'dev') run(devToggle);
     if (pressed.A && key === 'code') run(() => exportCode());
@@ -3058,10 +3060,10 @@ class OptionsScreen {
   draw() {
     bgPattern('#dfe7f0', '#d6e0ec');
     header('OPTIONEN');
-    box(4, 24, 248, 120);
+    box(4, 22, 248, 123);
     this.rows.forEach(([key, label, vals], r) => {
-      const y = 28 + r * 14, sel = r === this.sel;
-      if (sel) rr(10, y + 2, 236, 14, 4, '#f8e0d8');
+      const y = 24 + r * 13, sel = r === this.sel;
+      if (sel) rr(10, y + 2, 236, 13, 4, '#f8e0d8');
       text(label, 20, y + 1, sel ? UI.red : UI.text, null);
       if (key === 'konto') { const v = account ? 'ANGEMELDET' : 'GAST'; text(v, 186 - measure(v) / 2, y + 1, account ? '#2f8a3a' : '#7888a0', null); }
       if (key === 'dev') { const v = devOn ? 'AN' : 'AUS'; text(v, 186 - measure(v) / 2, y + 1, devOn ? '#2f8a3a' : '#7888a0', null); }
@@ -3071,7 +3073,7 @@ class OptionsScreen {
     });
     box(2, 146, 252, 44);
     const key = this.rows[this.sel][0];
-    const info = { gfx: ['Alle Effekte: Wolken, Flugsaurier, Vignette.', 'Fast alle Effekte, schont den Akku.', 'Ohne Wetter und Effekte, für ältere Handys.'][OPTS.gfx], time: OPTS.time ? 'Feste Tageszeit für die ganze Welt.' : 'Tageszeit nach deiner echten Uhrzeit.', text: 'So schnell erscheinen die Texte.', diff: (state.diff ?? 1) ? 'Trainer 1-2 Level über deinem besten Wesen.' : 'Gegner auf deinem Level oder 1 darunter.', code: 'Spielstand auf Handy oder PC mitnehmen.', konto: account ? `Angemeldet als ${accName()}` : 'Anmelden: Spielstände auf allen Geräten.', dev: devOn ? 'A: GOAT-Modus ausschalten.' : 'A: Passwort eingeben.', back: 'Einstellungen werden automatisch gespeichert.' }[key];
+    const info = { fx3d: !FX.ok ? 'Auf diesem Gerät leider nicht verfügbar.' : OPTS.fx3d ? '3D-Welt, Leuchten, Kampfarena.' : 'Klassisches 2D-Bild, schont den Akku.', gfx: ['Alle Effekte: Wolken, Flugsaurier, Vignette.', 'Fast alle Effekte, schont den Akku.', 'Ohne Wetter und Effekte, für ältere Handys.'][OPTS.gfx], time: OPTS.time ? 'Feste Tageszeit für die ganze Welt.' : 'Tageszeit nach deiner echten Uhrzeit.', text: 'So schnell erscheinen die Texte.', diff: (state.diff ?? 1) ? 'Trainer 1-2 Level über deinem besten Wesen.' : 'Gegner auf deinem Level oder 1 darunter.', code: 'Spielstand auf Handy oder PC mitnehmen.', konto: account ? `Angemeldet als ${accName()}` : 'Anmelden: Spielstände auf allen Geräten.', dev: devOn ? 'A: GOAT-Modus ausschalten.' : 'A: Passwort eingeben.', back: 'Einstellungen werden automatisch gespeichert.' }[key];
     text(info, 12, 150); text('Links/Rechts: ändern   B: zurück', 12, 166, '#7888a0', null);
   }
 }
@@ -4062,6 +4064,7 @@ function drawItemIcon(name, x, y) {
 /* --- Kampf --- */
 class Battle {
   full = true;
+  fxKind = 'battle';
   constructor(o) {
     this.o = o; this.wild = !!o.wild; this.tr = o.trainer || null;
     const team = this.wild ? [o.wild] : this.tr.team, ace = team.reduce((a, t, k) => (t.lvl > team[a].lvl ? k : a), 0);
@@ -4070,6 +4073,7 @@ class Battle {
     this.st = { p: freshStages(), f: freshStages() };
     this.part = new Set(); this.leveled = new Set();
     this.waits = []; this.fx = []; this.message = null; this.ui = null; this.sel = 0; this.msel = 0; this.note = null; this.runs = 0; this.awUsed = { p: false, f: false }; this.urUsed = { p: false, f: false };
+    this.cam = { x: 128, y: 96, z: 1, tx: 128, ty: 96, tz: 1 };
     this.view = { intro: 0, pX: 0, fX: 0, pY: 0, fY: 0, pK: 0, fK: 0, pA: 1, fA: 1, trP: 1, trF: this.tr ? 1 : 0, shake: 0, blink: null, capsule: null, fFlash: 0, lvlFlash: 0 };
     this.dhp = { p: 0, f: 0 }; this.dexp = 0;
     this.biome = cur.outdoor ? bget(cur, player.x, player.y) : -1;
@@ -4095,6 +4099,7 @@ class Battle {
     for (let i = this.waits.length - 1; i >= 0; i--) { const w = this.waits[i]; w.n--; if (w.fn) w.fn(1 - w.n / w.total); if (w.n <= 0) { this.waits.splice(i, 1); w.r(); } }
     for (let i = this.fx.length - 1; i >= 0; i--) { const p = this.fx[i]; p.x += p.vx; p.y += p.vy; p.vy += p.g || 0; if (p.ring) p.r += p.vr; if (--p.life <= 0) this.fx.splice(i, 1); }
     const v = this.view; if (v.shake > 0) v.shake--; if (v.lvlFlash > 0) v.lvlFlash--; if (this.note && --this.note.t <= 0) this.note = null;
+    const cm = this.cam; cm.x += (cm.tx - cm.x) * 0.14; cm.y += (cm.ty - cm.y) * 0.14; cm.z += (cm.tz - cm.z) * 0.14;
     const m = this.message;
     if (m) {
       const len = m.pages[m.pi].join('').length;
@@ -4473,6 +4478,7 @@ class Battle {
   drawMon(w, cx, by, k, a, back, flash) {
     if (k <= 0 || a <= 0) return;
     const sc = back ? 4 / 3 : 1, size = 64 * sc * k, x = cx - size / 2, y = by - 58 * sc * k;
+    ctx.globalAlpha = Math.max(0, a) * 0.3; ctx.fillStyle = '#000000'; ctx.beginPath(); ctx.ellipse(cx, by + 1, size * 0.32, size * 0.065, 0, 0, 7); ctx.fill();
     ctx.globalAlpha = Math.max(0, a);
     const side = back ? 'p' : 'f', A = this.view.aw;
     if (w._aw && k >= 1 && a > 0.5) {
@@ -4489,9 +4495,11 @@ class Battle {
       if (A.ph === 'charge') img = A.k > 0.55 ? tintSprite(w.sp, A.k > 0.8 ? '#ffffff' : '#c8f4ff') : img;
       if (A.ph === 'fossil') img = tintSprite(w.sp, '#efe4c4');
     }
-    const beat = A && A.side === side && A.ph === 'fossil' ? 1 + 0.06 * Math.abs(Math.sin(A.k * Math.PI * 4)) : 1, S = size * beat, X = cx - S / 2, Y = by - 58 * sc * k * beat;
-    if (back) { ctx.save(); ctx.translate(X + S, Y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, 64, 64, 0, 0, S, S); ctx.restore(); }
-    else ctx.drawImage(img, 0, 0, 64, 64, X, Y, S, S);
+    const beat = A && A.side === side && A.ph === 'fossil' ? 1 + 0.06 * Math.abs(Math.sin(A.k * Math.PI * 4)) : 1, S = size * beat, X = cx - S / 2;
+    // Atmen: das Wesen hebt und senkt sich leicht, die Füße bleiben stehen
+    const br = k >= 1 && !A && w.hp > 0 ? 1 + 0.022 * Math.sin(tick / 17 + (back ? 0 : 1.9)) : 1, Sh = S * br, Y = by - 58 * sc * k * beat * br;
+    if (back) { ctx.save(); ctx.translate(X + S, Y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, 64, 64, 0, 0, S, Sh); ctx.restore(); }
+    else ctx.drawImage(img, 0, 0, 64, 64, X, Y, S, Sh);
     if (A && A.side === side && A.ph === 'fossil') {
       // Risse im Fossil, die immer weiter aufbrechen
       for (let i = 0; i < Math.floor(A.k * 10) + 2; i++) {
@@ -4533,25 +4541,40 @@ class Battle {
   }
   /* --- Attacken-Animationen: jeder Typ hat seinen eigenen Effekt --- */
   pos(side) { return side === 'p' ? [64, 100] : [196, 58]; }
+  // Kamera: fährt auf ein Wesen zu (oder mit camTo() zurück in die Totale)
+  camTo(side, z = 1) { const c = this.cam; if (!side) { c.tx = 128; c.ty = 96; c.tz = 1; return; } const [x, y] = this.pos(side); c.tx = x; c.ty = y - 4; c.tz = z; }
+  fxOpts() {
+    const v = this.view, c = this.cam, b = this.biome, ind = b < 0, ph = cur && cur.outdoor ? dayPhase() : 'tag', night = ph === 'nacht';
+    let sky = ['#5aa0e8', '#c8e8f8'];
+    if (night) sky = ['#0a1030', '#34407a']; else if (ph === 'abend') sky = ['#c8603a', '#f8d0a0']; else if (b === 1) sky = ['#3a1c1c', '#b05a38']; else if (b === 2) sky = ['#88acd0', '#e0ecf8']; else if (b === 4) sky = ['#4a6058', '#a8b8a0']; else if (ph === 'morgen') sky = ['#78a8e0', '#f8e0c8'];
+    const g = ind ? ['#b8b0a0', '#c8c0b0'] : [BIOMES[b].g[0], BIOMES[b].g[2]], dark = night ? [0.42, 0.5, 0.8] : [1, 1, 1];
+    const ox = Math.floor((VW - 256) / 2), oy = Math.floor((VH - 192) / 2);
+    return { ox, oy, cam: [(c.x + ox) / VW, (c.y + oy) / VH, c.z], shake: v.shake ? [(Math.random() - 0.5) * 6 / VW, (Math.random() - 0.5) * 4 / VH] : [0, 0],
+      sky0: rgb1(sky[0]), sky1: rgb1(sky[1]), g0: rgb1(g[0]).map((x, i) => x * dark[i]), g1: rgb1(g[1]).map((x, i) => x * dark[i]),
+      sun: night ? [56, 24, 0] : ph === 'abend' ? [64, 60, 0] : ph === 'morgen' ? [204, 56, 0] : [210, 20, 0], sunCol: night ? [0.6, 0.66, 0.9] : ph === 'abend' ? [1, 0.55, 0.25] : [1, 0.93, 0.7],
+      accent: rgb1(TYPES[cur && cur.gymType] || '#6890f0'), indoor: ind ? 1 : 0, night: night ? 1 : 0, biome: Math.max(0, b), bloom: ind ? 0.55 : night ? 0.6 : 0.36, thr: ind ? 0.62 : night ? 0.58 : 0.8, vig: 0.6, sat: 1.12 };
+  }
   async atkFx(side, Mv) {
     const v = this.view, o = side === 'p' ? 'f' : 'p';
     if (Mv.cat === 'status') {
       const self = Mv.eff && (Mv.eff.self || Mv.eff.heal) && !Mv.eff.foe;
       v.atk = { side, type: Mv.type, style: self ? 'buff' : 'wave', k: 0, pow: 60 };
+      this.camTo(self ? side : o, 1.1);
       await this.tween(30, k => { v.atk.k = k; });
-      v.atk = null; return;
+      v.atk = null; this.camTo(); return;
     }
     const contact = ['NORMAL', 'KAMPF', 'STAHL', 'FLUG'].includes(Mv.type), [ux, uy] = this.pos(side), [tx, ty] = this.pos(o);
     v.atk = { side, type: Mv.type, style: contact ? 'contact' : 'shot', k: 0, pow: Mv.pow || 60 };
+    this.camTo(contact ? o : side, 1.14);
     if (contact) {
       // Anlauf und Zusammenstoß
       await this.tween(22, k => { v.atk.k = k; const d = Math.sin(Math.min(1, k * 1.4) * Math.PI); v[side + 'X'] = (tx - ux) * 0.45 * d; v[side + 'Y'] = (Mv.type === 'FLUG' ? -18 * Math.sin(k * Math.PI) : 0) + (ty - uy) * 0.3 * d; });
       v[side + 'X'] = 0; v[side + 'Y'] = 0;
     } else {
       if (Mv.type === 'BODEN') v.shake = 30;
-      await this.tween(Mv.type === 'ELEKTRO' ? 26 : 30, k => { v.atk.k = k; });
+      await this.tween(Mv.type === 'ELEKTRO' ? 26 : 30, k => { v.atk.k = k; if (k > 0.4) this.camTo(o, 1.16); });
     }
-    v.atk = null;
+    v.atk = null; this.camTo();
     this.fx.push({ ring: 1, x: tx, y: ty + 6, r: 4, vr: 3 + (Mv.pow || 60) / 40, life: 16, c: TYPES[Mv.type], vx: 0, vy: 0 });
   }
   cmdIcon(i, x, y) {
@@ -4684,7 +4707,7 @@ class Battle {
     // Kapsel fliegt im Bogen auf das Podest, bricht auf, Lichtsäule, das Wesen wächst aus dem Licht
     const v = this.view, [tx, ty] = side === 'p' ? [64, 120] : [196, 76];
     const [sx, sy] = side === 'p' ? (v.trP > 0 ? [52, 104] : [-20, 120]) : (v.trF > 0 ? [206, 50] : [280, 40]);
-    v.capsule = { x: sx, y: sy, rot: 0, trail: [] };
+    v.capsule = { x: sx, y: sy, rot: 0, trail: [] }; this.camTo(side, 1.12);
     await this.tween(20, k => { const c = v.capsule; c.x = sx + (tx - sx) * k; c.y = sy + (ty - sy) * k - Math.sin(k * Math.PI) * 34; c.rot = k * 12; c.trail.push([c.x, c.y]); if (c.trail.length > 10) c.trail.shift(); });
     v.capsule = null;
     for (let i = 0; i < 18; i++) { const an = Math.random() * 7, sp = 0.8 + Math.random() * 2; this.fx.push({ x: tx, y: ty - 4, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp - 1.5, g: 0.08, c: i % 3 ? '#f0a020' : '#fff0b0', life: 26 + Math.floor(Math.random() * 12), s: 2 }); }
@@ -4692,7 +4715,7 @@ class Battle {
     v.sum = { side, k: 0 };
     await this.tween(26, k => { v.sum.k = k; v[side + 'K'] = k < 0.25 ? 0 : Math.min(1.12, 1.12 * Math.sin(((k - 0.25) / 0.75) * Math.PI * 0.62) / Math.sin(Math.PI * 0.62)); });
     await this.tween(8, k => { v[side + 'K'] = 1.12 - 0.12 * k; });
-    v[side + 'K'] = 1; v.sum = null;
+    v[side + 'K'] = 1; v.sum = null; this.camTo();
     for (let i = 0; i < 8; i++) this.fx.push({ x: tx + (Math.random() - 0.5) * 40, y: ty + 4, vx: (Math.random() - 0.5) * 1.2, vy: -0.3 - Math.random() * 0.4, c: '#d8c8a8', life: 20, s: 2 });
   }
   drawSummon() {
@@ -4708,15 +4731,15 @@ class Battle {
     // Aufladen mit Namensband, dann ein gewaltiger Strahl und ein Einschlag mit Druckwelle
     const v = this.view, col = TYPES[Mv.type], o = side === 'p' ? 'f' : 'p';
     await this.tween(14, k => { v.dim = k * 0.75; });
-    v.ur = { side, ph: 'charge', k: 0, col, name: Mv.name.toUpperCase() };
+    v.ur = { side, ph: 'charge', k: 0, col, name: Mv.name.toUpperCase() }; this.camTo(side, 1.32);
     await this.tween(50, k => { v.ur.k = k; v[side + 'X'] = (Math.random() - 0.5) * k * 3; });
-    v[side + 'X'] = 0; v.ur.ph = 'beam';
+    v[side + 'X'] = 0; v.ur.ph = 'beam'; this.camTo();
     await this.tween(16, k => { v.ur.k = k; v[side + 'X'] = (side === 'p' ? 1 : -1) * Math.sin(k * Math.PI) * 10; });
-    v.ur.ph = 'hit'; v.shake = 28;
+    v.ur.ph = 'hit'; v.shake = 28; this.camTo(o, 1.25);
     const [tx, ty] = o === 'p' ? [62, 100] : [196, 58];
     for (let i = 0; i < 34; i++) { const an = Math.random() * 7, sp = 1 + Math.random() * 3; this.fx.push({ x: tx, y: ty, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp - 1.2, g: 0.07, c: i % 3 ? col : '#ffffff', life: 35 + Math.floor(Math.random() * 25), s: 2 + (i % 4 === 0) }); }
     await this.tween(36, k => { v.ur.k = k; });
-    v.ur = null;
+    v.ur = null; this.camTo();
     await this.tween(12, k => { v.dim = 0.75 * (1 - k); }); v.dim = 0;
   }
   drawUr() {
@@ -4749,11 +4772,11 @@ class Battle {
     this.awUsed[side] = true;
     await this.msg(side === 'p' ? `${PN()}s METEOR-AMULETT beginnt zu leuchten!` : `${this.tr.name.toUpperCase()} hält ein METEOR-AMULETT in die Höhe!`);
     await this.tween(20, k => { v.dim = k * 0.7; });
-    v.aw = { side, ph: 'charge', k: 0, banner: 0 };
+    v.aw = { side, ph: 'charge', k: 0, banner: 0 }; this.camTo(side, 1.35);
     await this.tween(70, k => { v.aw.k = k; v[side + 'X'] = (Math.random() - 0.5) * k * 4; });
     v.aw.ph = 'fossil'; v[side + 'X'] = 0;
     await this.tween(50, k => { v.aw.k = k; if (k > 0.5) v.shake = 2; });
-    v.aw.ph = 'burst'; w._aw = true; v.shake = 24;
+    v.aw.ph = 'burst'; w._aw = true; v.shake = 24; this.camTo();
     for (let i = 0; i < 26; i++) { const an = Math.random() * 7, sp = 1.2 + Math.random() * 2.4, [cx, cy] = side === 'p' ? [64, 100] : [196, 58]; this.fx.push({ x: cx, y: cy, vx: Math.cos(an) * sp, vy: Math.sin(an) * sp - 1, g: 0.06, c: ['#9ff4ff', '#ffffff', '#c080ff', '#5ad0ff'][i % 4], life: 40 + Math.floor(Math.random() * 20), s: 2 + (i % 3 === 0) }); }
     await this.tween(40, k => { v.aw.k = k; v.dim = 0.7 * (1 - k); });
     v.aw.ph = 'done';
@@ -4780,9 +4803,14 @@ class Battle {
     }
   }
   draw() {
-    const v = this.view, e = 1 - (1 - v.intro) ** 3;
-    ctx.save(); if (v.shake) ctx.translate(Math.round(Math.random() * 4 - 2), Math.round(Math.random() * 2 - 1));
-    this.drawBg();
+    const v = this.view, e = 1 - (1 - v.intro) ** 3, cm = this.cam;
+    ctx.save();
+    if (!FX.live) {
+      // 2D: Wackeln und Kamera-Zoom direkt im Bild; mit 3D-Grafik übernehmen das die Shader samt Arena
+      if (v.shake) ctx.translate(Math.round(Math.random() * 4 - 2), Math.round(Math.random() * 2 - 1));
+      if (cm.z > 1.002) { ctx.translate(cm.x, cm.y); ctx.scale(cm.z, cm.z); ctx.translate(-cm.x, -cm.y); }
+      this.drawBg();
+    }
     const fx = 196 + (1 - e) * -280, px = 64 + (1 - e) * 280;
     this.platform(fx, 86, 52, 11); this.platform(px, 132, 64, 13);
     if (v.dim) { ctx.fillStyle = `rgba(6,8,24,${v.dim})`; ctx.fillRect(-OX, -OY, RW, RH); }
@@ -4804,9 +4832,12 @@ class Battle {
     ctx.globalAlpha = 1;
     this.drawAtk(); this.drawSummon(); this.drawAwaken(); this.drawUr();
     ctx.restore();
-    if (v.intro >= 1) { if (v.fK > 0 && v.fA > 0.05) this.infoBox('f'); if (v.pK > 0 && v.pA > 0.05) this.infoBox('p'); }
-    this.drawPanel();
-    this.drawVs();
+    const sw = toUi();
+    try {
+      if (v.intro >= 1) { if (v.fK > 0 && v.fA > 0.05) this.infoBox('f'); if (v.pK > 0 && v.pA > 0.05) this.infoBox('p'); }
+      this.drawPanel();
+      this.drawVs();
+    } finally { toScene(sw); }
   }
   drawPanel() {
     const m = this.message;
@@ -5588,7 +5619,7 @@ let tick = 0;
 let mode = 'title';
 const tileIndex = (t, x, y) => (t === T.TREE ? TREE_Q + (x & 1) + ((y & 1) << 1) : t);
 /* --- Optionen: Grafikstufe, Tageszeit, Textgeschwindigkeit --- */
-const OPTS = { gfx: 0, time: 0, text: 1 };
+const OPTS = { gfx: 0, time: 0, text: 1, fx3d: 1 };
 const GFX_NAMES = ['ULTRA', 'HOCH', 'EINFACH'], TEXT_NAMES = ['LANGSAM', 'NORMAL', 'SCHNELL'], TEXT_SPEEDS = [0.5, 1, 2];
 const gfx = lvl => OPTS.gfx <= lvl; // gfx(0): nur ULTRA, gfx(1): ULTRA und HOCH
 function loadOpts() { try { Object.assign(OPTS, JSON.parse(localStorage.getItem('wesenwelt.options') || '{}')); } catch (e) {} delete OPTS.offline; timeMode = OPTS.time; CONFIG.textSpeed = TEXT_SPEEDS[OPTS.text]; }
@@ -5831,6 +5862,7 @@ function drawWorld() {
   for (let ty = y0; ty <= y0 + Math.ceil(VH / TS); ty++) for (let tx = x0; tx <= x0 + Math.ceil(VW / TS); tx++) drawTile(tx, ty, tx * TS - camX, ty * TS - camY, f);
   if (fancy) { drawPrints(camX, camY); drawRipples(camX, camY); drawFlock(camX, camY, true); }
   const actors = cur.npcs.filter(n => n.visible()).concat(player).sort((a, b) => a.py - b.py);
+  if (FX.live) { FX.wcam = [camX, camY]; drawMask(camX, camY, x0, y0, actors); }
   for (const a of actors) {
     const sx = Math.round(a.px) - camX + (a.work ? [0, 1, 0, -1][(tick >> 4) & 3] : 0), sy = Math.round(a.py) - camY - 4;
     if (sx < -16 || sy < -24 || sx > VW || sy > VH) continue;
@@ -5877,7 +5909,10 @@ function drawWorld() {
     }
   }
   drawParticles(camX, camY);
-  if (gfx(0) && VIGNETTE) ctx.drawImage(VIGNETTE, 0, 0);
+  if (gfx(0) && VIGNETTE && !FX.live) ctx.drawImage(VIGNETTE, 0, 0);
+}
+// Einblendungen über der Welt (mit 3D-Grafik auf der Menüebene, damit sie scharf bleiben)
+function drawHud() {
   if (popup.t > 0 && cur.outdoor) {
     const w = Math.max(96, measure(popup.text) + 24), slide = popup.t > 150 ? (popup.t - 150) * 3 : popup.t < 12 ? (12 - popup.t) * 3 : 0;
     rr(2, 2 - slide, w, 22, 4, UI.dark); rr(3, 3 - slide, w - 2, 20, 3, '#f8f0e0'); ctx.fillStyle = '#c8a878'; ctx.fillRect(6, 19 - slide, w - 8, 1);
@@ -5890,6 +5925,279 @@ function drawWorld() {
     rr(2, VH - 18, measure(s) + 12, 16, 3, 'rgba(0,0,0,.62)'); text(s, 8, VH - 20, '#ffffff', null);
   }
 }
+/* =====================================================================
+   3D-GRAFIK (WebGL): Das fertige 2D-Bild wird als Textur durch mehrere Shader geschickt.
+   - Welt: nach hinten gekippte Ebene, Tiefenunschärfe, Dunst, Lichtstrahlen, lebendiges Wasser,
+     glühende Lava, Wind in Bäumen und Gras
+   - Kampf: 3D-Arena mit Himmel, Bergen und perspektivischem Boden, Kamerafahrten
+   - überall: Leuchten (Bloom), Farbabstimmung, Randabdunklung, Wirbel beim Kampfbeginn
+   Menüs und Textfelder liegen auf einer eigenen Ebene und bleiben gestochen scharf.
+   Ohne WebGL (oder bei 3D-GRAFIK: AUS) läuft alles wie bisher in 2D.
+   ===================================================================== */
+const uiCv = document.createElement('canvas'), uiCtx = uiCv.getContext('2d');
+const maskCv = document.createElement('canvas'), maskCtx = maskCv.getContext('2d');
+const FX_VERT = 'attribute vec2 aP; varying vec2 vUv; void main() { vUv = vec2(aP.x * 0.5 + 0.5, 0.5 - aP.y * 0.5); gl_Position = vec4(aP, 0.0, 1.0); }';
+const FX_LIB = `precision highp float;
+varying vec2 vUv;
+uniform float uTime;
+float hash1(float n) { return fract(sin(n * 12.9898) * 43758.5453); }
+float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash2(i), hash2(i + vec2(1.0, 0.0)), f.x), mix(hash2(i + vec2(0.0, 1.0)), hash2(i + vec2(1.0, 1.0)), f.x), f.y); }
+float fbm(vec2 p) { float a = 0.5, s = 0.0; for (int i = 0; i < 4; i++) { s += a * noise(p); p = p * 2.03 + 11.7; a *= 0.5; } return s; }
+float ridge(float x) { float n = noise(vec2(x, 3.7)) * 0.65 + noise(vec2(x * 2.7, 9.1)) * 0.35; return n; }
+vec4 fb(sampler2D s, vec2 uv) { return texture2D(s, vec2(uv.x, 1.0 - uv.y)); }
+`;
+const FX_SCENE = FX_LIB + `
+uniform sampler2D uScene, uMask;
+uniform vec4 uView;   // logische Breite, Höhe, Versatz x, y
+uniform float uMode, uTilt, uIndoor, uNight, uBiome, uHazeAmt, uRays, uHeat;
+uniform vec3 uCam, uSky0, uSky1, uG0, uG1, uSun, uSunCol, uAccent, uHaze;
+uniform vec2 uShake, uWorld;
+vec3 motes(vec2 p, vec3 base) {
+  // Schwebeteilchen je Landschaft: Pollen, Glut, Schnee, Staub, Sumpflichter
+  vec3 col = uBiome < 0.5 ? vec3(1.0, 0.95, 0.6) : uBiome < 1.5 ? vec3(1.0, 0.5, 0.15) : uBiome < 2.5 ? vec3(1.0) : uBiome < 3.5 ? vec3(0.95, 0.85, 0.6) : vec3(0.6, 1.0, 0.7);
+  vec2 dir = uBiome < 0.5 ? vec2(0.3, 0.12) : uBiome < 1.5 ? vec2(0.15, -0.5) : uBiome < 2.5 ? vec2(0.12, 0.55) : uBiome < 3.5 ? vec2(0.8, 0.05) : vec2(0.1, -0.12);
+  float a = 0.0;
+  for (int i = 0; i < 18; i++) { float f = float(i), sp = 0.5 + hash1(f * 3.1);
+    vec2 q = vec2(fract(hash1(f * 1.7) + uTime * 0.06 * sp * dir.x) * 320.0 - 32.0, fract(hash1(f * 5.3) + uTime * 0.06 * sp * dir.y) * 220.0 - 14.0);
+    q.x += sin(uTime * sp + f) * 5.0; a += smoothstep(1.7, 0.3, length(p - q)) * (0.35 + 0.65 * hash1(f * 7.7)); }
+  return base + col * a * 0.7;
+}
+vec3 hall(vec2 p) {
+  // Arena-Halle: Wand mit Säulen, Bannern und Scheinwerfern, spiegelnder Fliesenboden
+  float hor = 82.0; vec3 c;
+  if (p.y < hor) {
+    float t = clamp(p.y / hor, 0.0, 1.0); c = mix(vec3(0.04, 0.045, 0.08), vec3(0.15, 0.16, 0.24), t);
+    c *= 1.0 - 0.3 * smoothstep(0.40, 0.5, abs(fract(p.x / 44.0) - 0.5));
+    float bx = abs(fract(p.x / 88.0 + 0.5) - 0.5) * 88.0;
+    float ban = step(bx, 8.0) * step(6.0, p.y) * step(p.y, 50.0 - bx * 0.9);
+    c = mix(c, uAccent * (0.5 + 0.2 * sin(p.y * 0.5 + uTime)), ban * 0.85);
+    for (int i = 0; i < 3; i++) { float lx = 40.0 + float(i) * 88.0 + sin(uTime * 0.6 + float(i) * 2.0) * 14.0, w = 6.0 + p.y * 0.42;
+      c += mix(uAccent, vec3(1.0), 0.5) * 0.16 * smoothstep(w, 0.0, abs(p.x - lx)) * (1.0 - t * 0.4); }
+    c = mix(c, uAccent * 0.6, smoothstep(2.5, 0.0, abs(p.y - hor + 3.0)) * 0.6);
+  } else {
+    float dy = p.y - hor + 0.6, z = 90.0 / dy; vec2 w = vec2((p.x - 128.0) * z * 0.011, z);
+    vec2 tq = fract(w * vec2(2.2, 1.1)); float chk = mod(floor(w.x * 2.2) + floor(w.y * 1.1), 2.0);
+    float fade = 1.0 - exp(-dy * 0.09), line = max(smoothstep(0.93, 0.98, tq.x), smoothstep(0.9, 0.97, tq.y));
+    c = mix(vec3(0.13, 0.14, 0.2), vec3(0.2, 0.21, 0.29), chk);
+    c = mix(c, uAccent * 0.9, line * 0.55 * fade);
+    c += mix(uAccent, vec3(1.0), 0.6) * 0.22 * pow(max(0.0, 1.0 - abs(p.x - 128.0) / 150.0), 3.0) * exp(-dy * 0.035);
+    c = mix(c, vec3(0.1, 0.11, 0.17), exp(-dy * 0.12) * 0.7);
+  }
+  return c;
+}
+vec3 arena(vec2 p, vec2 pf) {
+  if (uIndoor > 0.5) return hall(p);
+  float hor = 82.0; vec3 c;
+  // Himmel mit Sonne oder Mond, Sternen, Wolken und zwei Bergketten (bewegt sich langsamer als der Boden)
+  float t = clamp(pf.y / hor, 0.0, 1.0); c = mix(uSky0, uSky1, t * t * (3.0 - 2.0 * t));
+  float d = length(pf - uSun.xy);
+  c += uSunCol * (smoothstep(12.0, 10.5, d) * 0.8 + 0.2 * exp(-d * 0.05) + 0.05 * exp(-d * 0.014));
+  c += uNight * step(0.994, hash2(floor(pf * 0.8))) * (0.5 + 0.5 * sin(uTime * 2.0 + pf.x * 3.0)) * (1.0 - t);
+  float cl = fbm(vec2(pf.x * 0.016 + uTime * 0.012, pf.y * 0.055)); cl = smoothstep(0.5, 0.78, cl) * (1.0 - t * 0.6);
+  c = mix(c, mix(vec3(1.0), uSky1, 0.45) * (1.0 - 0.65 * uNight), cl * 0.6);
+  float m1 = hor - 9.0 - 20.0 * ridge(pf.x * 0.011 + 7.0), m2 = hor - 3.0 - 13.0 * ridge(pf.x * 0.02 + 2.0);
+  c = mix(c, mix(uSky1, uG0, 0.3), smoothstep(m1 - 0.6, m1 + 0.6, pf.y) * 0.9);
+  if (uBiome > 0.5 && uBiome < 1.5) c += vec3(1.0, 0.3, 0.05) * 0.5 * exp(-abs(pf.y - m1) * 0.12) * (0.6 + 0.4 * sin(uTime * 1.3 + pf.x * 0.05));
+  c = mix(c, mix(uSky1, uG0, 0.62) * 0.92, smoothstep(m2 - 0.6, m2 + 0.6, pf.y));
+  // Baumreihe am Horizont
+  float th = hor - 2.0 - 5.0 * noise(vec2(p.x * 0.22, 1.0)) - 3.0 * noise(vec2(p.x * 0.7, 5.0));
+  c = mix(c, uG0 * 0.5, step(th, p.y) * step(p.y, hor + 1.0));
+  if (p.y >= hor) {
+    // Boden in Perspektive: Muster, wandernde Wolkenschatten, Dunst zum Horizont
+    float dy = p.y - hor + 0.6, z = 90.0 / dy; vec2 w = vec2((p.x - 128.0) * z * 0.011, z);
+    vec3 g = mix(uG0, uG1, smoothstep(0.3, 0.72, fbm(w * vec2(1.7, 2.3))));
+    g *= 0.95 + 0.05 * step(0.5, fract(w.y * 0.7));
+    g *= 0.8 + 0.2 * smoothstep(0.35, 0.62, fbm(w * 0.45 + vec2(uTime * 0.03, uTime * 0.012)));
+    if (uBiome > 0.5 && uBiome < 1.5) { float cr = abs(fbm(w * 1.3 + 4.0) - 0.5); g += vec3(1.0, 0.35, 0.05) * smoothstep(0.035, 0.0, cr) * (0.6 + 0.4 * sin(uTime * 2.0 + w.y * 3.0)); }
+    if (uBiome > 1.5 && uBiome < 2.5) g += step(0.985, hash2(floor(p * 0.9))) * (0.5 + 0.5 * sin(uTime * 3.0 + p.x)) * 0.5;
+    g = mix(g, mix(uSky1, uG1, 0.5), exp(-dy * 0.075) * 0.75);
+    g += uSunCol * 0.1 * exp(-abs(p.x - uSun.x) * 0.02) * exp(-dy * 0.03);
+    c = g;
+  }
+  return motes(p, c);
+}
+void main() {
+  vec2 uv = vUv;
+  if (uMode > 1.5) {
+    // Kampf: Kamera zoomt auf ihren Fokus, die Arena liegt hinter den Figuren
+    vec2 cu = uCam.xy + (uv - uCam.xy) / uCam.z + uShake, cf = uCam.xy + (uv - uCam.xy) / mix(1.0, uCam.z, 0.35) + uShake * 0.4;
+    vec4 s = texture2D(uScene, cu);
+    vec3 bg = arena(cu * uView.xy - uView.zw, cf * uView.xy - uView.zw);
+    gl_FragColor = vec4(s.rgb + bg * (1.0 - s.a), 1.0); return;
+  }
+  if (uMode < 0.5) { vec4 s = texture2D(uScene, uv); gl_FragColor = vec4(s.rgb + vec3(0.063, 0.078, 0.094) * (1.0 - s.a), 1.0); return; }
+  // Welt: gekippte Ebene (unten nah und groß, oben fern und gestaucht)
+  float T = uTilt, sc = 1.0 + T * uv.y;
+  vec2 wu = vec2(0.5 + (uv.x - 0.5) / sc, uv.y * (1.0 + T) / sc);
+  vec2 wp = wu * uView.xy + uWorld;
+  vec3 m = texture2D(uMask, wu).rgb;
+  vec2 px = 1.0 / uView.xy, off = vec2(0.0);
+  off += m.r * vec2(sin(wp.y * 0.9 + uTime * 2.2) * 0.7, cos(wp.x * 0.45 + uTime * 1.7) * 0.35);
+  off += m.g * vec2(sin(uTime * 1.6 + wp.x * 0.07 + wp.y * 0.045) * 0.55, 0.0);
+  off += m.b * vec2(sin(wp.y * 0.5 + uTime * 1.3) * 0.5, sin(wp.x * 0.4 + uTime) * 0.5);
+  off += uHeat * (1.0 - uv.y) * vec2(sin(wp.y * 0.35 + uTime * 3.0) * 0.35, 0.0);
+  vec4 s = texture2D(uScene, wu + off * px);
+  vec3 c = s.rgb + vec3(0.063, 0.078, 0.094) * (1.0 - s.a);
+  // Wasser: Lichtbänder und Glitzern; Lava: pulsierende Glut
+  if (m.r > 0.01) {
+    float band = fbm(wp * vec2(0.05, 0.12) + vec2(uTime * 0.12, -uTime * 0.05));
+    float gl = noise(wp * 0.33 + vec2(uTime * 0.35, 0.0)) * noise(wp * 0.8 - vec2(0.0, uTime * 0.5));
+    c += m.r * (1.0 - 0.7 * uNight) * (vec3(0.55, 0.75, 1.0) * smoothstep(0.52, 0.7, band) * 0.14 + vec3(1.0) * smoothstep(0.46, 0.6, gl) * 0.55);
+  }
+  if (m.b > 0.01) c += m.b * vec3(1.0, 0.42, 0.08) * (0.16 + 0.2 * smoothstep(0.4, 0.75, fbm(wp * 0.09 + vec2(0.0, uTime * 0.25))) + 0.08 * sin(uTime * 2.4));
+  // Dunst in der Ferne und schräg einfallende Lichtstrahlen
+  c = mix(c, uHaze, pow(1.0 - uv.y, 2.6) * uHazeAmt);
+  float ry = fbm(vec2((uv.x + uv.y * 0.55) * 5.0 + uTime * 0.025, uTime * 0.03));
+  c += uSunCol * smoothstep(0.5, 0.82, ry) * (1.0 - uv.y * 0.7) * uRays;
+  gl_FragColor = vec4(c, 1.0);
+}`;
+const FX_BRIGHT = FX_LIB + `
+uniform sampler2D uA; uniform vec2 uPx; uniform float uThr;
+void main() { vec3 c = (fb(uA, vUv + uPx * vec2(-1.0, -1.0)).rgb + fb(uA, vUv + uPx * vec2(1.0, -1.0)).rgb + fb(uA, vUv + uPx * vec2(-1.0, 1.0)).rgb + fb(uA, vUv + uPx).rgb) * 0.25;
+  float l = max(c.r, max(c.g, c.b)); gl_FragColor = vec4(c * smoothstep(uThr, uThr + 0.3, l), 1.0); }`;
+const FX_BLUR = FX_LIB + `
+uniform sampler2D uA; uniform vec2 uDir;
+void main() { vec3 c = fb(uA, vUv).rgb * 0.227;
+  c += (fb(uA, vUv + uDir * 1.38).rgb + fb(uA, vUv - uDir * 1.38).rgb) * 0.316;
+  c += (fb(uA, vUv + uDir * 3.23).rgb + fb(uA, vUv - uDir * 3.23).rgb) * 0.07;
+  gl_FragColor = vec4(c, 1.0); }`;
+const FX_FINAL = FX_LIB + `
+uniform sampler2D uA, uB, uUi; uniform vec2 uPx;
+uniform float uBloom, uShift, uFocus, uVig, uTrans, uReveal, uSat;
+void main() {
+  vec2 uv = vUv;
+  if (uTrans > 0.0) { vec2 c = uv - 0.5; float r = length(c), a = uTrans * uTrans * 3.2 * (1.0 - r), s = sin(a), co = cos(a); uv = mat2(co, -s, s, co) * c * (1.0 - uTrans * 0.4) + 0.5; }
+  float bl = uShift * smoothstep(0.17, 0.52, abs(vUv.y - uFocus));
+  vec3 col = fb(uA, uv).rgb;
+  if (bl > 0.05) { vec2 r = uPx * bl;
+    col += fb(uA, uv + r * vec2(1.0, 0.0)).rgb + fb(uA, uv + r * vec2(-1.0, 0.0)).rgb + fb(uA, uv + r * vec2(0.0, 1.0)).rgb + fb(uA, uv + r * vec2(0.0, -1.0)).rgb;
+    col += fb(uA, uv + r * vec2(0.7, 0.7)).rgb + fb(uA, uv + r * vec2(-0.7, 0.7)).rgb + fb(uA, uv + r * vec2(0.7, -0.7)).rgb + fb(uA, uv + r * vec2(-0.7, -0.7)).rgb;
+    col /= 9.0; }
+  if (uTrans > 0.0) { vec2 d = (uv - 0.5) * uTrans * 0.05; col.r = fb(uA, uv + d).r; col.b = fb(uA, uv - d).b; }
+  col += fb(uB, uv).rgb * uBloom;
+  float l = dot(col, vec3(0.299, 0.587, 0.114)); col = mix(vec3(l), col, uSat);
+  col = mix(col, col * col * (3.0 - 2.0 * col), 0.22);
+  vec2 q = vUv - 0.5; col *= 1.0 - uVig * dot(q, q) * 1.7;
+  col = mix(col, vec3(1.0), max(smoothstep(0.5, 1.0, uTrans), uReveal));
+  vec4 ui = texture2D(uUi, vUv); col = ui.rgb + col * (1.0 - ui.a);
+  gl_FragColor = vec4(col, 1.0);
+}`;
+const FX = {
+  ok: false, live: false, cv: null, gl: null, uiUsed: false, uiWas: true, trans: 0, reveal: 0, wcam: [0, 0], slow: 0, lite: false,
+  init() {
+    try {
+      const c = document.createElement('canvas'); c.id = 'fx'; c.style.imageRendering = 'auto'; c.style.display = 'none';
+      const gl = c.getContext('webgl', { alpha: false, antialias: false, depth: false, stencil: false, powerPreference: 'high-performance' });
+      if (!gl) return;
+      const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+      const vs = sh(gl.VERTEX_SHADER, FX_VERT);
+      const prog = src => { const p = gl.createProgram(); gl.attachShader(p, vs); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, src)); gl.bindAttribLocation(p, 0, 'aP'); gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p)); const u = {}; return { p, u: n => (n in u ? u[n] : (u[n] = gl.getUniformLocation(p, n))) }; };
+      this.P = { scene: prog(FX_SCENE), bright: prog(FX_BRIGHT), blur: prog(FX_BLUR), final: prog(FX_FINAL) };
+      gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+      const tex = () => { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v); return t; };
+      this.tex = tex; this.tScene = tex(); this.tUi = tex(); this.tMask = tex(); this.fbo = [];
+      c.addEventListener('webglcontextlost', e => { e.preventDefault(); this.ok = false; this.sync(); });
+      cv.after(c); this.cv = c; this.gl = gl; this.ok = true;
+    } catch (e) { console.warn('3D-Grafik nicht verfügbar:', e); this.ok = false; }
+  },
+  target(i, w, h) {
+    // Zwischenbilder: 0 = fertige Szene, 1 und 2 = verkleinert fürs Leuchten
+    const gl = this.gl; let f = this.fbo[i];
+    if (!f || f.w !== w || f.h !== h) {
+      if (f) { gl.deleteTexture(f.t); gl.deleteFramebuffer(f.f); }
+      const t = this.tex(); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+      f = this.fbo[i] = { t, f: fb, w, h };
+    }
+    return f;
+  },
+  // Größe und Lage vom 2D-Bild übernehmen; scharf in echter Bildschirmauflösung
+  sync() {
+    uiCv.width = cv.width; uiCv.height = cv.height; maskCv.width = VW; maskCv.height = VH; this.uiWas = true; this.maskUp = false;
+    if (!this.cv) return;
+    const on = this.ok && OPTS.fx3d !== 0;
+    this.cv.style.display = on ? 'block' : 'none';
+    if (!on) return;
+    const cw = parseFloat(cv.style.width) || cv.width, ch = parseFloat(cv.style.height) || cv.height;
+    const k = Math.min(devicePixelRatio || 1, Math.sqrt(2.6e6 / (cw * ch)), 3);
+    this.cv.width = Math.max(64, Math.round(cw * k)); this.cv.height = Math.max(64, Math.round(ch * k));
+    Object.assign(this.cv.style, { width: cv.style.width, height: cv.style.height, left: cv.style.left, top: cv.style.top });
+  },
+  begin() { const on = this.ok && OPTS.fx3d !== 0; if (on !== this.live) { this.live = on; this.sync(); } this.uiUsed = false; return on; },
+  // Kommt das Gerät nicht mit, erst das Leuchten sparen, dann ganz auf 2D zurück
+  pace(dt) {
+    if (!this.live || this.noGuard || dt > 200) return;
+    this.slow = Math.max(0, this.slow + (dt > 30 ? 1 : -0.5));
+    if (this.slow > 150) { this.slow = 0; if (!this.lite) this.lite = true; else { this.ok = false; popup = { text: '3D-GRAFIK AUS (ZU LANGSAM)', t: 200 }; } }
+  },
+  draw(mode, o) {
+    const gl = this.gl, P = this.P, W = cv.width, H = cv.height, t = tick / 60;
+    const set = (pr, vals) => { gl.useProgram(pr.p); gl.uniform1f(pr.u('uTime'), t); for (const k in vals) { const v = vals[k], l = pr.u(k); if (l == null) continue; if (typeof v === 'number') gl.uniform1f(l, v); else if (v.length === 2) gl.uniform2fv(l, v); else if (v.length === 3) gl.uniform3fv(l, v); else gl.uniform4fv(l, v); } };
+    const bind = (pr, unit, name, texture) => { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, texture); gl.uniform1i(pr.u(name), unit); };
+    const pass = (f, w, h) => { gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.viewport(0, 0, w, h); gl.drawArrays(gl.TRIANGLES, 0, 3); };
+    const up = (texture, src) => { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texture); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src); };
+    up(this.tScene, cv);
+    if (this.uiUsed || this.uiWas) up(this.tUi, uiCv);
+    this.uiWas = this.uiUsed;
+    if (mode === 'world' || !this.maskUp) { up(this.tMask, maskCv); this.maskUp = true; }
+    // 1. Szene: Kippung, Wasser, Arena
+    const A = this.target(0, W, H);
+    set(P.scene, { uMode: mode === 'world' ? 1 : mode === 'battle' ? 2 : 0, uView: [VW, VH, o.ox || 0, o.oy || 0], uTilt: o.tilt || 0, uWorld: this.wcam, uCam: o.cam || [0.5, 0.5, 1], uShake: o.shake || [0, 0],
+      uSky0: o.sky0 || [0, 0, 0], uSky1: o.sky1 || [0, 0, 0], uG0: o.g0 || [0, 0, 0], uG1: o.g1 || [0, 0, 0], uSun: o.sun || [200, 30, 0], uSunCol: o.sunCol || [0, 0, 0], uAccent: o.accent || [1, 1, 1],
+      uIndoor: o.indoor || 0, uNight: o.night || 0, uBiome: o.biome || 0, uHaze: o.haze || [0, 0, 0], uHazeAmt: o.hazeAmt || 0, uRays: o.rays || 0, uHeat: o.heat || 0 });
+    bind(P.scene, 0, 'uScene', this.tScene); bind(P.scene, 1, 'uMask', this.tMask);
+    pass(A.f, W, H);
+    // 2. Leuchten: helle Stellen herausziehen und weichzeichnen
+    const bloom = this.lite ? 0 : o.bloom || 0, bw = W >> 2, bh = H >> 2, B = this.target(1, bw, bh), C = this.target(2, bw, bh);
+    if (bloom) {
+      set(P.bright, { uPx: [1 / W, 1 / H], uThr: o.thr || 0.75 }); bind(P.bright, 0, 'uA', A.t); pass(B.f, bw, bh);
+      for (let i = 0; i < 2; i++) {
+        set(P.blur, { uDir: [(1 + i) / bw, 0] }); bind(P.blur, 0, 'uA', B.t); pass(C.f, bw, bh);
+        set(P.blur, { uDir: [0, (1 + i) / bh] }); bind(P.blur, 0, 'uA', C.t); pass(B.f, bw, bh);
+      }
+    }
+    // 3. Fertiges Bild: Unschärfe, Leuchten, Farben, Wirbel, Menüebene
+    set(P.final, { uPx: [1 / W, 1 / H], uBloom: bloom, uShift: this.lite ? 0 : (o.shift || 0) * SC, uFocus: o.focus || 0.5, uVig: o.vig == null ? 0.5 : o.vig, uTrans: this.trans, uReveal: this.reveal, uSat: o.sat || 1.08 });
+    bind(P.final, 0, 'uA', A.t); bind(P.final, 1, 'uB', B.t); bind(P.final, 2, 'uUi', this.tUi);
+    pass(null, this.cv.width, this.cv.height);
+  },
+};
+const rgb1 = h => hexRgb(h).map(v => v / 255);
+// Auf die Menüebene wechseln (nur mit 3D-Grafik): gleiche Lage wie das Szenenbild
+function toUi() { if (!FX.live || ctx === uiCtx) return false; const m = ctx.getTransform(); ctx = uiCtx; ctx.save(); ctx.setTransform(m); FX.uiUsed = true; return true; }
+function toScene(sw) { if (sw) { ctx.restore(); ctx = sceneCtx; } }
+// Maske für die Shader: Rot = Wasser, Grün = Bäume und hohes Gras, Blau = Lava. Figuren decken sie ab
+function drawMask(camX, camY, x0, y0, actors) {
+  const g = maskCtx; g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.clearRect(0, 0, VW, VH);
+  for (let ty = y0; ty <= y0 + Math.ceil(VH / TS); ty++) for (let tx = x0; tx <= x0 + Math.ceil(VW / TS); tx++) {
+    const t = tget(cur, tx, ty);
+    if (t === T.WATER) { g.fillStyle = bget(cur, tx, ty) === 1 ? '#0000ff' : '#ff0000'; g.fillRect(tx * TS - camX, ty * TS - camY, TS, TS); }
+    // Laub als weicher Fleck, damit das Wiegen am Rand sanft ausläuft
+    else if (t === T.TREE || t === T.TALL || t === T.FERN) g.drawImage(leafBlob(), tx * TS - camX - 6, ty * TS - camY - 6);
+  }
+  g.globalCompositeOperation = 'destination-out';
+  for (const a of actors) { if (a.sprite === 'item') continue; const img = getChar(a.sprite, a.variant, a.dir, a.frame()); g.drawImage(img, Math.round(a.px) - camX, Math.round(a.py) - camY - 4 + 20 - img.height); }
+  g.globalCompositeOperation = 'source-over';
+}
+function leafBlob() {
+  if (leafBlob.c) return leafBlob.c;
+  const c = leafBlob.c = document.createElement('canvas'); c.width = c.height = 28; const g = c.getContext('2d'), gr = g.createRadialGradient(14, 14, 2, 14, 14, 14);
+  gr.addColorStop(0, 'rgba(0,255,0,1)'); gr.addColorStop(1, 'rgba(0,255,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 28, 28);
+  return c;
+}
+// Einstellungen der Shader je nach Ort und Tageszeit
+function fxWorld() {
+  const ph = dayPhase(), out = cur.outdoor, b = out ? bget(cur, player.x, player.y) : -1, T0 = out ? 0.17 : 0.1, night = out && ph === 'nacht';
+  return { tilt: T0, focus: 0.5 / (1 + 0.5 * T0), shift: out ? 1.25 : 0.6, vig: 0.75,
+    bloom: night ? 0.85 : out && ph === 'abend' ? 0.5 : out ? 0.3 : 0.28, thr: night ? 0.42 : b === 2 ? 0.92 : out ? 0.8 : 0.9,
+    haze: { morgen: [1, 0.92, 0.82], tag: [0.78, 0.88, 1], abend: [1, 0.66, 0.42], nacht: [0.1, 0.13, 0.32] }[ph], hazeAmt: out ? (b === 4 ? 0.34 : 0.2) : 0,
+    rays: !out || night ? 0 : (ph === 'tag' ? 0.1 : 0.17) * (b === 0 || b === 4 ? 1.3 : 0.8), sunCol: ph === 'abend' ? [1, 0.6, 0.3] : [1, 0.94, 0.75],
+    heat: b === 1 || b === 3 ? 1 : 0, night: night ? 1 : 0 };
+}
 function drawFull(l) {
   // Menübildschirme sind für 256x192 gebaut: mittig zeichnen, Hintergrund füllt den Rest
   const w = VW, h = VH; RW = w; RH = h; OX = Math.floor((w - 256) / 2); OY = Math.floor((h - 192) / 2);
@@ -5897,23 +6205,48 @@ function drawFull(l) {
   try { l.draw(); } finally { VW = w; VH = h; ctx.restore(); OX = OY = 0; }
 }
 function render() {
-  ctx.setTransform(SC, 0, 0, SC, 0, 0); ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = '#101418'; ctx.fillRect(0, 0, VW, VH);
-  if (cur && mode === 'world') drawWorld();
-  for (const l of layers) { if (l.full) drawFull(l); else l.draw(); }
-  if (fade > 0) { ctx.globalAlpha = Math.min(1, fade / 4); ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, VW, VH); ctx.globalAlpha = 1; }
-  if (flashT > 0 && (flashT >> 2) % 2) { ctx.fillStyle = (flashT >> 3) % 2 ? '#000000' : '#ffffff'; ctx.fillRect(0, 0, VW, VH); }
-  if (updateT) { const s = 'Neue Version! Spiel wird aktualisiert...'; box(VW / 2 - 112, VH / 2 - 15, 224, 30); text(s, VW / 2 - measure(s) / 2, VH / 2 - 9); }
+  const live = FX.begin(), world = cur && mode === 'world';
+  ctx = sceneCtx; ctx.setTransform(SC, 0, 0, SC, 0, 0); ctx.imageSmoothingEnabled = false;
+  uiCtx.setTransform(SC, 0, 0, SC, 0, 0); uiCtx.imageSmoothingEnabled = false;
+  if (!live) {
+    ctx.fillStyle = '#101418'; ctx.fillRect(0, 0, VW, VH);
+    if (world) { drawWorld(); drawHud(); }
+    for (const l of layers) { if (l.full) drawFull(l); else l.draw(); }
+    drawOverlays(true);
+    return;
+  }
+  // Mit 3D-Grafik: Szene (Welt oder der oberste Effekt-Bildschirm) und Menüebene getrennt zeichnen
+  let top = -1; layers.forEach((l, i) => { if (l.full && l.fxKind) top = i; });
+  ctx.clearRect(0, 0, VW, VH);
+  if (FX.uiWas) uiCtx.clearRect(0, 0, VW, VH);
+  let fxMode = 'plain', o = { vig: 0 };
+  if (top >= 0) { const l = layers[top]; drawFull(l); fxMode = l.fxKind === 'battle' ? 'battle' : 'glow'; o = l.fxOpts ? l.fxOpts() : { bloom: 0.5, thr: 0.7, vig: 0.6 }; }
+  else if (world) { drawWorld(); fxMode = 'world'; o = fxWorld(); }
+  ctx = uiCtx;
+  if (world && top < 0 && ((popup.t > 0 && cur.outdoor) || noclip || (devOn && devCoords) || (accountsReady() && isOffline()))) { FX.uiUsed = true; drawHud(); }
+  layers.forEach((l, i) => { if (i > top) { FX.uiUsed = true; if (l.full) drawFull(l); else l.draw(); } });
+  if (drawOverlays(false)) FX.uiUsed = true;
+  ctx = sceneCtx;
+  FX.draw(fxMode, o);
+}
+// Schwarzblende, Kampf-Blitz und Update-Hinweis; liefert true, wenn etwas gezeichnet wurde
+function drawOverlays(strobe) {
+  let any = false;
+  if (fade > 0) { ctx.globalAlpha = Math.min(1, fade / 4); ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, VW, VH); ctx.globalAlpha = 1; any = true; }
+  if (strobe && flashT > 0 && (flashT >> 2) % 2) { ctx.fillStyle = (flashT >> 3) % 2 ? '#000000' : '#ffffff'; ctx.fillRect(0, 0, VW, VH); }
+  if (updateT) { const s = 'Neue Version! Spiel wird aktualisiert...'; box(VW / 2 - 112, VH / 2 - 15, 224, 30); text(s, VW / 2 - measure(s) / 2, VH / 2 - 9); any = true; }
+  return any;
 }
 function step() {
   if (shake > 0) shake--;
   tick++;
+  if (FX.reveal > 0) FX.reveal = Math.max(0, FX.reveal - 0.05);
   for (let i = tickers.length - 1; i >= 0; i--) if (--tickers[i].n <= 0) { const t = tickers[i]; tickers.splice(i, 1); t.r(); }
   if (fade !== fadeTarget) {
     if (tick % 3 === 0) fade += Math.sign(fadeTarget - fade);
     if (fade === fadeTarget && fadeRes) { const r = fadeRes; fadeRes = null; r(); }
   } else if (fadeRes) { const r = fadeRes; fadeRes = null; r(); }
-  if (flashT > 0) { flashT--; if (!flashT && flashRes) { const r = flashRes; flashRes = null; r(); } }
+  if (flashT > 0) { flashT--; FX.trans = 1 - flashT / 40; if (!flashT) { FX.trans = 0; FX.reveal = 1; } if (!flashT && flashRes) { const r = flashRes; flashRes = null; r(); } }
   else if (fade === fadeTarget) {
     if (layers.length) topLayer().update();
     else if (mode === 'world' && busy === 0) worldUpdate();
@@ -6056,6 +6389,7 @@ class IntroScene {
   }
 }
 IntroScene.prototype.full = true;
+for (const C of [Title, IntroScene, EvolutionScreen]) C.prototype.fxKind = 'glow';
 async function tweenTo(o, key, to, n) { const from = o[key]; for (let i = 1; i <= n; i++) { o[key] = from + (to - from) * i / n; await waitTicks(1); } }
 async function runIntro() {
   const sc = new IntroScene(); layers.push(sc);
@@ -6127,6 +6461,7 @@ async function profileFlow() {
 }
 async function boot() {
   try { await Promise.race([Promise.all([document.fonts.load(fontOf(16)), document.fonts.load(fontOf(40))]), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
+  FX.init();
   layout();
   buildAtlas();
   buildOverlays();
@@ -6182,12 +6517,14 @@ function layout() {
   DLG.w = Math.max(240, Math.min(360, VW - side * 2)); DLG.x = Math.floor((VW - DLG.w) / 2); DLG.y = VH - 48;
   ctx.imageSmoothingEnabled = false;
   if (VIGNETTE) buildVignette();
+  FX.sync();
 }
 addEventListener('resize', layout);
 document.addEventListener('fullscreenchange', layout);
 
 let last = performance.now(), acc = 0;
 function loop(now) {
+  FX.pace(now - last);
   acc += Math.min(100, now - last); last = now;
   while (acc >= 1000 / 60) { step(); acc -= 1000 / 60; }
   render();

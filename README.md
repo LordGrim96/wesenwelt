@@ -34,6 +34,8 @@ Auf dem Handy die Seite öffnen und „App installieren“ (Android) bzw. „Zum
 - `app/icons/` – App-Icons
 - `v1-gameboy.html` – die erste Version im Game-Boy-Stil
 
+**3D-Grafik:** Das Spiel zeichnet in 2D und schickt das Bild dann durch WebGL-Shader (gekippte Welt, Tiefenunschärfe, Leuchten, lebendiges Wasser, 3D-Kampfarena mit Kamerafahrten). Unter OPTIONEN → 3D-GRAFIK lässt sich das abschalten. Ohne WebGL oder auf zu langsamen Geräten läuft das Spiel automatisch in 2D.
+
 Die Wesen, Orte und Grafiken sind eigene Entwürfe und stammen nicht aus offiziellen Spielen.
 
 ## Konten (Cloudflare)
