@@ -2786,10 +2786,13 @@ function rr(x, y, w, h, r, col) {
   ctx.fillRect(x, y + r, w, h - r * 2);
 }
 function box(x, y, w, h, fill = UI.white) {
-  rr(x, y, w, h, 4, UI.dark);
-  rr(x + 1, y + 1, w - 2, h - 2, 3, UI.frame);
-  rr(x + 2, y + 2, w - 4, h - 4, 3, UI.frame2);
-  rr(x + 4, y + 4, w - 8, h - 8, 2, fill);
+  // weicher Schatten, dunkler Rand, zweifarbiger Rahmen, Glanzkante oben
+  rr(x + 1, y + 2, w, h, 5, 'rgba(10,16,30,.28)');
+  rr(x, y, w, h, 5, UI.dark);
+  rr(x + 1, y + 1, w - 2, h - 2, 4, UI.frame);
+  rr(x + 2, y + 2, w - 4, h - 4, 4, UI.frame2);
+  rr(x + 4, y + 4, w - 8, h - 8, 3, fill);
+  ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(x + 6, y + 5, w - 12, 1);
 }
 function arrowRight(x, y, c = UI.red) { ctx.fillStyle = shade(c, -0.4); for (let i = 0; i < 5; i++) ctx.fillRect(x + i + 1, y + i + 1, 1, 9 - i * 2); ctx.fillStyle = c; for (let i = 0; i < 5; i++) ctx.fillRect(x + i, y + i, 1, 9 - i * 2); }
 function arrowDown(x, y, c = UI.red) { ctx.fillStyle = c; for (let i = 0; i < 4; i++) ctx.fillRect(x + i, y + i, 7 - i * 2, 1); }
@@ -2805,14 +2808,41 @@ function hpBar(x, y, w, hp, max) {
   ctx.fillStyle = col; ctx.fillRect(x + 2, y + 1, Math.round((w - 4) * r), 4); ctx.fillStyle = shade(col, 0.4); ctx.fillRect(x + 2, y + 1, Math.round((w - 4) * r), 1);
 }
 function bgPattern(c1, c2) {
-  ctx.fillStyle = c1; ctx.fillRect(-OX, -OY, RW, RH);
-  ctx.fillStyle = c2;
-  for (let y = -Math.ceil(OY / 8) * 8; y < RH - OY; y += 8) for (let x = -Math.ceil(OX / 16) * 16 + (((y / 8) % 2 + 2) % 2) * 8; x < RW - OX; x += 16) ctx.fillRect(x, y, 8, 8);
+  // Verlauf von hell nach dunkel, langsam wandernde Rauten, Licht von oben links
+  const g = ctx.createLinearGradient(0, -OY, 0, RH - OY); g.addColorStop(0, shade(c1, 0.22)); g.addColorStop(1, shade(c1, -0.16));
+  ctx.fillStyle = g; ctx.fillRect(-OX, -OY, RW, RH);
+  ctx.fillStyle = c2; ctx.globalAlpha = 0.75; const o = (tick >> 2) % 16;
+  for (let y = -Math.ceil(OY / 8) * 8 - 16; y < RH - OY; y += 8) for (let x = -Math.ceil(OX / 16) * 16 - 16 + (((y / 8) % 2 + 2) % 2) * 8; x < RW - OX; x += 16) ctx.fillRect(x + o, y + (o >> 1), 8, 8);
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.25; ctx.drawImage(glowOf('#ffffff'), -OX - 80, -OY - 90, 260, 220);
+  ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
 }
 function header(title, right) {
-  ctx.fillStyle = UI.header; ctx.fillRect(-OX, 0, RW, 18); ctx.fillStyle = shade(UI.header, -0.4); ctx.fillRect(-OX, 18, RW, 2);
-  text(title, 8, 0, '#ffffff', '#1c2c48');
-  if (right) text(right, VW - 8 - measure(right), 0, '#ffffff', '#1c2c48');
+  // Leiste mit Verlauf, goldener Linie und Glanzstreifen, der langsam darüberläuft
+  const g = ctx.createLinearGradient(0, -OY, 0, 19); g.addColorStop(0, shade(UI.header, -0.35)); g.addColorStop(1, UI.header);
+  ctx.fillStyle = g; ctx.fillRect(-OX, -OY, RW, 19 + OY);
+  ctx.fillStyle = 'rgba(255,255,255,.18)'; ctx.fillRect(-OX, 1, RW, 1);
+  ctx.fillStyle = '#f0c040'; ctx.fillRect(-OX, 19, RW, 1); ctx.fillStyle = shade(UI.header, -0.55); ctx.fillRect(-OX, 20, RW, 2);
+  const sx = ((tick * 2) % (RW + 160)) - OX - 80; ctx.fillStyle = 'rgba(255,255,255,.08)'; ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx + 30, 0); ctx.lineTo(sx + 18, 19); ctx.lineTo(sx - 12, 19); ctx.fill();
+  rr(6, 5, 4, 9, 1, '#f0c040');
+  text(title, 14, 0, '#ffffff', '#101c34');
+  if (right) text(right, VW - 8 - measure(right), 0, '#ffe8a0', '#101c34');
+}
+// kleine Pixel-Symbole (8x8) für Menüs: x = Farbe, o = Glanz
+const ICONS = {
+  URDEX: ['xxxxxxx.', 'xoooooxx', 'xoxxxoxx', 'xooooxxx', 'xoxxxoxx', 'xoooooxx', 'xxxxxxxx', '.xxxxxxx'],
+  TEAM: ['..xxxx..', '.xooxxx.', 'xooxxxxx', 'xxxxxxxx', 'xxxooxxx', 'xxxooxxx', '.xxxxxx.', '..xxxx..'],
+  TASCHE: ['..xxxx..', '.x....x.', 'xxxxxxxx', 'xooxxoox', 'xxxxxxxx', 'xxxooxxx', 'xxxxxxxx', '.xxxxxx.'],
+  PROFIL: ['xxxxxxxx', 'xoxxxxxx', 'xxxooxox', 'xoxooxxx', 'xxxxxxox', 'xooooxxx', 'xxxxxxxx', '........'],
+  ORDEN: ['...xx...', '..xoox..', 'xxxooxxx', '.xooooxx', '..xooxx.', '.xxooxx.', '.xx..xx.', '........'],
+  KARTE: ['xxx.xxx.', 'xoxxxoxx', 'xoxoxoxx', 'xxxoxxox', 'xoxxxoxx', 'xoxoxoxx', 'xxx.xxx.', '........'],
+  OPTIONEN: ['..x..x..', '.xxxxxx.', 'xxx..xxx', '.x.oo.x.', '.x.oo.x.', 'xxx..xxx', '.xxxxxx.', '..x..x..'],
+  SICHERN: ['xxxxxxx.', 'xooooxxx', 'xooooxxx', 'xxxxxxxx', 'xxooooxx', 'xxooooxx', 'xxooooxx', 'xxxxxxxx'],
+  GOAT: ['x..x..x.', 'xx.x.xx.', 'xxxxxxx.', 'xoxoxox.', 'xxxxxxx.', '........', '........', '........'],
+  'ZURÜCK': ['..x.....', '.xx.....', 'xxxxxxx.', '.xx....x', '..x....x', '.......x', '...xxxx.', '........'],
+};
+function icon8(name, x, y, col, sc = 1) {
+  const art = ICONS[name]; if (!art) return;
+  art.forEach((row, r) => { for (let c = 0; c < 8; c++) { const ch = row[c]; if (ch === '.') continue; ctx.fillStyle = ch === 'o' ? shade(col, 0.6) : col; ctx.fillRect(x + c * sc, y + r * sc, sc, sc); } });
 }
 // ♂/♀ als kleine Pixel-Zeichen
 const GENDER_ART = { m: ['....xxx', '.....xx', '.xxx.x.', 'x...x..', 'x...x..', 'x...x..', '.xxx...'], f: ['.xxx.', 'x...x', 'x...x', 'x...x', '.xxx.', '..x..', '.xxx.', '..x..'] };
@@ -3065,18 +3095,36 @@ class TrainerCard {
     else if (pressed.B || pressed.START) { pop(this); this.done(); }
   }
   draw() {
-    bgPattern('#5a8ac8', '#5482c0');
+    bgPattern('#3a5a98', '#36548e');
     header('TRAINERPASS', `PROFIL ${currentSlot + 1}`);
-    rr(8, 26, 240, 116, 8, UI.dark); rr(10, 28, 236, 112, 7, '#d84838'); rr(14, 32, 228, 104, 5, '#f8f0e0');
-    ctx.fillStyle = '#efe2c8'; for (let y = 36; y < 132; y += 6) ctx.fillRect(18, y, 220, 1);
-    text(PN(), 24, 34, UI.text, UI.shadow);
-    const n = state.badges.filter(Boolean).length;
-    const rows = [['ORDEN', `${n}/16`], ['URDEX', `${Object.keys(state.caught).length} gefangen`], ['WESEN', `${state.team.length} im Team`], ['TALER', String(state.money)], ['SPIELZEIT', fmtTime(state.time)]];
-    rows.forEach(([a, b], i) => { text(a, 24, 50 + i * 13, '#7888a0', null); text(b, 100, 50 + i * 13, UI.text, null); });
-    rr(170, 40, 64, 76, 5, '#e6d8bc');
-    drawStage(202, 108, 24);
-    ctx.drawImage(playerSprite(state.profile.look, 'down', 0), 178, 40, 48, 72);
-    for (let i = 0; i < 16; i++) { const x = 24 + i * 13, got = state.badges[i]; rr(x, 120, 11, 9, 2, got ? shade(TYPES[TOWNS[i + 1].type], -0.4) : '#c8bca0'); if (got) rr(x + 1, 121, 9, 7, 2, TYPES[TOWNS[i + 1].type]); }
+    const look = state.profile.look, aura = LOOK_OPTS.jacket[look.jacket], n = state.badges.filter(Boolean).length, stars = Math.floor(n / 4) + (state.flags.champion ? 1 : 0);
+    const id = String(Math.floor(hash(String(state.gid || 1).length, parseInt(String(state.gid || '7').replace(/\D/g, '').slice(-6) || '7'), 3) * 90000) + 10000);
+    // Karte mit Schatten, goldenem Rand und Glanzstreifen
+    rr(9, 29, 240, 114, 9, 'rgba(0,0,0,.35)');
+    rr(6, 25, 244, 116, 9, '#1a1208'); rr(7, 26, 242, 114, 8, '#e8b848'); rr(9, 28, 238, 110, 7, '#b02c22');
+    let g = ctx.createLinearGradient(0, 30, 0, 136); g.addColorStop(0, '#fff8ea'); g.addColorStop(1, '#efe0c2'); ctx.fillStyle = g; rr(12, 31, 232, 104, 6, '#fff8ea'); ctx.fillStyle = g; ctx.fillRect(14, 33, 228, 100);
+    ctx.fillStyle = 'rgba(176,44,34,.06)'; for (let i = -100; i < 240; i += 9) { ctx.beginPath(); ctx.moveTo(14 + i, 133); ctx.lineTo(14 + i + 100, 33); ctx.lineTo(14 + i + 104, 33); ctx.lineTo(14 + i + 4, 133); ctx.fill(); }
+    // Kopfzeile der Karte
+    rr(14, 33, 228, 15, 4, '#b02c22'); text('WESENWELT · TRAINERPASS', 20, 31, '#ffe8b0', '#5a1008', 12);
+    for (let i = 0; i < 5; i++) { const sx = 236 - i * 11, on = i < stars; ctx.fillStyle = on ? '#ffd040' : 'rgba(255,255,255,.25)'; ctx.fillRect(sx, 37, 1, 7); ctx.fillRect(sx - 3, 40, 7, 1); ctx.fillRect(sx - 1, 38, 3, 5); ctx.fillRect(sx - 2, 39, 5, 3); }
+    // Foto mit Aura
+    rr(18, 52, 58, 72, 5, '#3a2a18'); rr(19, 53, 56, 70, 4, '#141a34');
+    ctx.save(); ctx.beginPath(); ctx.rect(19, 53, 56, 70); ctx.clip();
+    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.65 + 0.1 * Math.sin(tick / 15); ctx.drawImage(glowOf(aura), -6, 40, 106, 100); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    for (let i = 0; i < 6; i++) { const yy = 120 - ((tick * (0.3 + i * 0.07) + i * 23) % 66); ctx.fillStyle = shade(aura, 0.5); ctx.fillRect(24 + i * 9, Math.round(yy), 1, 2); }
+    ctx.drawImage(playerSprite(look, 'down', 0), 23, 56, 48, 72); ctx.restore();
+    // Angaben
+    textOutline(PN(), 84, 49, '#3a1a10', '#fff0d0', 20);
+    text(`ID-NR. ${id}`, 238 - measure(`ID-NR. ${id}`, 12), 55, '#a07850', null, 12);
+    const rows = [['ORDEN', `${n} / 16`], ['URDEX', `${Object.keys(state.caught).length} gefangen`], ['TALER', String(state.money)], ['ZEIT', fmtTime(state.time)]];
+    rows.forEach(([a, b], i) => { const y = 75 + i * 12; ctx.fillStyle = 'rgba(176,44,34,.12)'; ctx.fillRect(84, y + 9, 156, 1); text(a, 85, y - 2, '#b02c22', null, 12); text(b, 238 - measure(b, 12), y - 2, '#3a2a20', null, 12); });
+    // Ordensleiste
+    rr(14, 123, 228, 12, 3, 'rgba(58,26,16,.12)');
+    for (let i = 0; i < 16; i++) { const x = 16 + i * 14 + (i >= 8 ? 4 : 0), got = state.badges[i]; ctx.save(); ctx.translate(x, 124); ctx.scale(0.42, 0.42); drawBadge(i, 0, 0, got); ctx.restore(); }
+    // Glanz, der über die Karte wandert
+    const sx = ((tick * 1.6) % 420) - 90; ctx.save(); ctx.beginPath(); ctx.rect(9, 28, 238, 110); ctx.clip();
+    ctx.globalCompositeOperation = 'lighter'; g = ctx.createLinearGradient(sx, 0, sx + 50, 0); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.5, 'rgba(255,240,210,.22)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(sx + 30, 28); ctx.lineTo(sx + 80, 28); ctx.lineTo(sx + 30, 138); ctx.lineTo(sx - 20, 138); ctx.fill(); ctx.restore();
     box(2, 146, 252, 44);
     text('A: Aussehen und Namen ändern', 12, 150); text('B: zurück', 12, 166, '#7888a0', null);
   }
@@ -3146,12 +3194,35 @@ class Menu {
     }
   }
   draw() {
-    const w = this.items.length > 9 ? 100 : 84, h = this.items.length * 16 + 12, x = VW - w - 2;
-    box(x, 2, w, h);
-    this.items.forEach((o, k) => { text(o, x + 22, 6 + k * 16); if (k === this.sel) arrowRight(x + 10, 10 + k * 16); });
-    // Aktuelles Ziel der Geschichte
-    const gw = VW - w - 8, lines = wrapW('ZIEL: ' + currentGoal(), gw - 16).slice(0, 4), gh = lines.length * 14 + 10;
-    box(2, VH - gh - 2, gw, gh); lines.forEach((l, k) => text(l, 10, VH - gh + 1 + k * 14));
+    // Rechts eine Glas-Leiste mit Symbolen, links oben ein kleiner Trainerausweis, links unten das Ziel
+    const ACC = { URDEX: '#e05038', TEAM: '#e0a020', TASCHE: '#c07830', PROFIL: '#3878d8', ORDEN: '#d0a828', KARTE: '#38a858', OPTIONEN: '#7888a8', SICHERN: '#28a8b8', GOAT: '#f0c040', 'ZURÜCK': '#9098b0' };
+    const n = this.items.length, w = 96, rowH = Math.min(16, Math.floor((VH - 12) / n)), h = n * rowH + 8, x = VW - w - 3;
+    rr(x - 1, 3, w + 2, h + 2, 8, 'rgba(160,180,240,.55)'); rr(x, 4, w, h, 7, 'rgba(8,10,24,.9)');
+    this.items.forEach((o, k) => {
+      const y = 8 + k * rowH, sel = k === this.sel, col = ACC[o] || '#8898c0';
+      if (sel) {
+        ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.45; ctx.drawImage(glowOf(col), x - 8, y - 8, w + 16, rowH + 16); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+        rr(x + 2, y - 1, w - 4, rowH, 5, '#ffffff'); rr(x + 3, y, w - 6, rowH - 2, 4, col);
+        ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.fillRect(x + 6, y + 1, w - 12, 1);
+      }
+      icon8(o, x + 9 + (sel ? 2 : 0), y + (rowH - 9) / 2, sel ? '#ffffff' : col);
+      text(o, x + 22 + (sel ? 2 : 0), y + (rowH - 16) / 2 - 1, sel ? '#ffffff' : '#c4cce8', sel ? shade(col, -0.55) : null);
+    });
+    // Mini-Ausweis
+    const cw = Math.min(150, VW - w - 12), look = state.profile.look, aura = LOOK_OPTS.jacket[look.jacket], nb = state.badges.filter(Boolean).length;
+    rr(3, 3, cw, 46, 8, 'rgba(160,180,240,.55)'); rr(4, 4, cw - 2, 44, 7, 'rgba(8,10,24,.9)');
+    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5; ctx.drawImage(glowOf(aura), -8, -10, 60, 64); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(playerSprite(look, 'down', 0), 7, 6, 26, 39);
+    text(PN(), 38, 3, '#ffffff', null, 16, cw - 44);
+    text(`${state.money} Taler`, 38, 17, '#ffe08a', null, 12);
+    text(fmtTime(state.time), cw - 4 - measure(fmtTime(state.time), 12), 17, '#8a94c0', null, 12);
+    for (let i = 0; i < 16; i++) { const bx = 38 + (i % 8) * Math.min(13, (cw - 46) / 8), by = 32 + (i >> 3) * 7, got = state.badges[i], c = TYPES[TOWNS[i + 1].type]; rr(bx, by, 9, 5, 2, got ? c : '#262c48'); if (got) { ctx.fillStyle = shade(c, 0.5); ctx.fillRect(bx + 2, by + 1, 4, 1); } }
+    // Ziel
+    const gw = Math.min(170, VW - w - 12), lines = wrapW(currentGoal(), gw - 16).slice(0, 4), gh = lines.length * 13 + 22, gy = VH - gh - 3;
+    rr(3, gy, gw, gh, 8, 'rgba(160,180,240,.55)'); rr(4, gy + 1, gw - 2, gh - 2, 7, 'rgba(8,10,24,.9)');
+    rr(10, gy - 5, 40, 13, 6, '#f0c040'); text('ZIEL', 30 - measure('ZIEL', 12) / 2, gy - 6, '#2a1a08', null, 12);
+    lines.forEach((l, k) => text(l, 11, gy + 8 + k * 13, '#ffffff', null));
+    text(nb + '/16', gw - 4 - measure(nb + '/16', 12), gy - 1, '#8a94c0', null, 12);
   }
 }
 
@@ -3233,14 +3304,19 @@ class TeamScreen {
     });
   }
   draw() {
-    bgPattern('#5a8a58', '#548252');
+    bgPattern('#3a6a48', '#366444');
     state.team.forEach((w, i) => {
-      const sp = SPECIES[w.sp - 1], st = calcStats(w);
+      const sp = SPECIES[w.sp - 1], st = calcStats(w), tc = TYPES[sp.types[0]];
       const x = 4 + (i % 2) * 126, y = 4 + Math.floor(i / 2) * 46 + (i % 2) * 8;
       const sel = i === this.sel, ko = w.hp <= 0, sw = i === this.swap;
-      rr(x, y, 122, 42, 6, UI.dark);
-      rr(x + 1, y + 1, 120, 40, 5, sw ? '#f8d040' : sel ? '#f8a070' : ko ? '#a87870' : '#58a0d8');
-      rr(x + 3, y + 3, 116, 36, 4, sel ? '#ffd8c0' : ko ? '#e8d0cc' : '#c8e4f8');
+      // Karte in der Typfarbe; die gewählte leuchtet und ist weiß umrandet
+      if (sel) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5; ctx.drawImage(glowOf(tc), x - 12, y - 10, 146, 62); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
+      rr(x + 1, y + 3, 122, 42, 6, 'rgba(0,0,0,.3)');
+      rr(x, y, 122, 42, 6, sw ? '#f8d040' : sel ? '#ffffff' : UI.dark);
+      rr(x + 1, y + 1, 120, 40, 5, ko ? '#a87870' : shade(tc, sel ? 0 : -0.25));
+      rr(x + 3, y + 3, 116, 36, 4, ko ? '#e8d0cc' : shade(tc, sel ? 0.82 : 0.7));
+      ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(x + 5, y + 4, 112, 1);
+      ctx.fillStyle = shade(tc, 0.45); ctx.beginPath(); ctx.ellipse(x + 18, y + 33, 14, 4, 0, 0, 7); ctx.fill();
       drawWesen(w.sp, x + 2, y + 4 + ((tick >> 3) & 1 && sel && !ko ? -1 : 0), 0.5);
       text(wName(w), x + 36, y + 1, UI.text, UI.shadow, 16, Math.min(measure(wName(w)), 72)); genderIcon(w.g, x + 38 + Math.min(measure(wName(w)), 72), y + 6);
       text(`Lv.${w.lvl}`, x + 36, y + 16);
@@ -3399,19 +3475,38 @@ class MapScreen {
     if (pressed.B || pressed.A || pressed.START || pressed.SELECT) { pop(this); this.done(); }
   }
   draw() {
-    bgPattern('#e8c8c8', '#e0bcbc');
+    bgPattern('#5a7a6a', '#567464');
     header('KARTE', REGIONS[regionOf(this.sel)]);
-    const ox = 8, oy = 24, sx = 240 / WORLD_W;
-    rr(ox - 3, oy - 3, MINIMAP.width + 6, MINIMAP.height + 6, 3, UI.dark);
-    ctx.drawImage(MINIMAP, ox, oy);
-    const r = TOWN_RECTS[this.sel];
-    if ((tick >> 3) & 1) { const x = ox + Math.round(r.cx * sx), y = oy + Math.round(r.cy * sx); ctx.fillStyle = '#ffffff'; ctx.fillRect(x - 4, y - 4, 9, 9); ctx.fillStyle = UI.red; ctx.fillRect(x - 3, y - 3, 7, 7); }
-    if ((tick >> 4) & 1) { const x = ox + Math.round(this.here.x * sx), y = oy + Math.round(this.here.y * sx); ctx.fillStyle = UI.dark; ctx.fillRect(x - 2, y - 2, 5, 5); ctx.fillStyle = '#58c8f0'; ctx.fillRect(x - 1, y - 1, 3, 3); }
+    const ox = 8, oy = 25, sx = 240 / WORLD_W, mw = MINIMAP.width, mh = Math.min(MINIMAP.height, 116);
+    // Holzrahmen mit Messingecken
+    rr(ox - 5, oy - 5, mw + 10, mh + 10, 5, '#2a1a0e'); rr(ox - 4, oy - 4, mw + 8, mh + 8, 4, '#8a5a30'); rr(ox - 2, oy - 2, mw + 4, mh + 4, 2, '#4a2e18');
+    for (const [cx, cy] of [[ox - 4, oy - 4], [ox + mw - 2, oy - 4], [ox - 4, oy + mh - 2], [ox + mw - 2, oy + mh - 2]]) { rr(cx, cy, 6, 6, 2, '#f0c040'); ctx.fillStyle = '#fff0a0'; ctx.fillRect(cx + 1, cy + 1, 2, 1); }
+    ctx.drawImage(MINIMAP, 0, 0, mw, mh, ox, oy, mw, mh);
+    ctx.fillStyle = 'rgba(80,50,20,.12)'; ctx.fillRect(ox, oy, mw, mh);
+    // Alle Orte: erledigte gold, offene rot
+    TOWN_RECTS.forEach((r, i) => { const x = ox + Math.round(r.cx * sx), y = oy + Math.round(r.cy * sx), done = i === 0 || state.badges[i - 1]; rr(x - 2, y - 2, 5, 5, 2, '#1a1008'); ctx.fillStyle = done ? '#f0c040' : '#e05038'; ctx.fillRect(x - 1, y - 1, 3, 3); });
+    // Auswahl mit pulsierenden Ringen und Namensschild
+    const r = TOWN_RECTS[this.sel], tx = ox + Math.round(r.cx * sx), ty = oy + Math.round(r.cy * sx), t = TOWNS[this.sel];
+    for (let i = 0; i < 2; i++) { const k = ((tick / 40) + i / 2) % 1; ctx.globalAlpha = 1 - k; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(tx + 0.5, ty + 0.5, 3 + k * 10, 0, 7); ctx.stroke(); }
+    ctx.globalAlpha = 1; rr(tx - 4, ty - 4, 9, 9, 3, '#ffffff'); rr(tx - 3, ty - 3, 7, 7, 2, UI.red);
+    const lw = measure(t.name, 12) + 10, lx = Math.max(ox, Math.min(ox + mw - lw, tx - lw / 2)), ly = ty > oy + 20 ? ty - 20 : ty + 8;
+    rr(lx, ly, lw, 12, 5, 'rgba(10,12,24,.88)'); text(t.name, lx + 5, ly - 2, '#ffffff', null, 12);
+    // Spielerposition
+    const px = ox + Math.round(this.here.x * sx), py = oy + Math.round(this.here.y * sx);
+    if (py < oy + mh) { const b = (tick >> 3) & 1; rr(px - 3, py - 3 - b, 7, 7, 3, '#ffffff'); rr(px - 2, py - 2 - b, 5, 5, 2, '#38b0f0'); if (px + 22 < ox + mw) { rr(px + 5, py - 6, 18, 10, 4, '#38b0f0'); text('DU', px + 8, py - 9, '#ffffff', null, 12); } }
+    // Kompass
+    const kx = ox + mw - 16, ky = oy + mh - 16; ctx.fillStyle = 'rgba(10,12,24,.7)'; ctx.beginPath(); ctx.arc(kx, ky, 11, 0, 7); ctx.fill();
+    ctx.fillStyle = '#e05038'; ctx.beginPath(); ctx.moveTo(kx, ky - 9); ctx.lineTo(kx + 3, ky); ctx.lineTo(kx - 3, ky); ctx.fill(); ctx.fillStyle = '#f0e8d8'; ctx.beginPath(); ctx.moveTo(kx, ky + 9); ctx.lineTo(kx + 3, ky); ctx.lineTo(kx - 3, ky); ctx.fill();
+    text('N', kx - 2, ky - 22, '#ffffff', '#1a1008', 12);
+    // Infos zum Ort
     box(2, 146, 252, 44);
-    const t = TOWNS[this.sel];
-    text(`${t.name.toUpperCase()}  ·  ${BIOMES[t.biome].name}`, 12, 150);
-    const info = t.start ? 'Dein Heimatort' : t.league ? 'Champion-Liga' : (state.badges[this.sel - 1] ? `${t.badge} erhalten` : `Arena: ${t.leader} · Typ ${t.type}`);
-    text(devOn && goatFull() ? info + ' · A: HINREISEN' : info, 12, 166, devOn && goatFull() ? UI.red : '#7888a0', null, 16, 232);
+    const done = this.sel > 0 && state.badges[this.sel - 1];
+    text(t.name.toUpperCase(), 12, 148, UI.text, UI.shadow);
+    const bw = measure(BIOMES[t.biome].name, 12) + 10; rr(18 + measure(t.name.toUpperCase()), 152, bw, 11, 5, '#5a7a6a'); text(BIOMES[t.biome].name, 23 + measure(t.name.toUpperCase()), 150, '#ffffff', null, 12);
+    if (t.type) typeChip(t.type, 198, 151);
+    const info = t.start ? 'Dein Heimatort' : t.league ? 'Champion-Liga' : (done ? `${t.badge} erhalten` : `Arena: ${t.leader}`);
+    text(devOn && goatFull() ? info + ' · A: HINREISEN' : info, 12, 166, devOn && goatFull() ? UI.red : done ? '#2f8a3a' : '#7888a0', null, 16, 232);
+    if (done) { ctx.save(); ctx.translate(230, 166); ctx.scale(0.5, 0.5); drawBadge(this.sel - 1, 0, 0, true); ctx.restore(); }
   }
 }
 
@@ -5159,18 +5254,21 @@ function checkTrainerSight() {
 /* --- Tasche --- */
 class BagScreen {
   full = true;
-  constructor(battle) { this.b = battle; this.sel = 0; this.scroll = 0; this.note = null; }
-  list() { return Object.keys(state.items).filter(k => state.items[k] > 0); }
+  constructor(battle) { this.b = battle; this.sel = 0; this.scroll = 0; this.note = null; this.pocket = 0; }
+  // Fächer: alles, Medizin, Kapseln, Sonstiges
+  list() { const P = BAG_POCKETS[this.pocket][2]; return Object.keys(state.items).filter(k => state.items[k] > 0 && P(ITEMS[k] || {})); }
   setNote(t) { this.note = { t, n: 150 }; }
   update() {
     if (this.note && --this.note.n <= 0) this.note = null;
     const L = this.list(), n = L.length;
     if (pressed.B || pressed.START) { pop(this); this.done(null); return; }
+    if (pressed.left || pressed.right) { this.pocket = (this.pocket + (pressed.left ? BAG_POCKETS.length - 1 : 1)) % BAG_POCKETS.length; this.sel = 0; this.scroll = 0; this.flip = 8; return; }
+    if (this.flip > 0) this.flip--;
     if (!n) return;
     if (pressed.up) this.sel = (this.sel + n - 1) % n;
     if (pressed.down) this.sel = (this.sel + 1) % n;
     this.sel = Math.min(this.sel, n - 1);
-    if (this.sel < this.scroll) this.scroll = this.sel; if (this.sel >= this.scroll + 7) this.scroll = this.sel - 6;
+    if (this.sel < this.scroll) this.scroll = this.sel; if (this.sel >= this.scroll + 6) this.scroll = this.sel - 5;
     if (pressed.A) this.use(L[this.sel]);
   }
   async use(it) {
@@ -5196,26 +5294,48 @@ class BagScreen {
     this.setNote(info.capture ? 'Kapseln wirft man im Kampf gegen wilde Wesen.' : 'Das kann man jetzt nicht benutzen.');
   }
   draw() {
-    bgPattern('#e8b860', '#e0b058');
+    bgPattern('#c89048', '#c08840');
     header('TASCHE', `${state.money} Taler`);
-    const L = this.list();
-    box(4, 24, 180, 120);
-    if (!L.length) text('Die Tasche ist leer.', 16, 30, '#7888a0', null);
-    for (let r = 0; r < 7; r++) {
+    const L = this.list(), it = L.length ? L[Math.min(this.sel, L.length - 1)] : null, info = it ? ITEMS[it] || {} : {};
+    // Fächer als Reiter
+    BAG_POCKETS.forEach(([name, col], i) => {
+      const x = 4 + i * 62, on = i === this.pocket;
+      rr(x, on ? 23 : 25, 60, on ? 16 : 13, 5, on ? '#ffffff' : shade(col, -0.5)); rr(x + 1, on ? 24 : 26, 58, on ? 15 : 12, 4, on ? col : shade(col, -0.25));
+      text(name, x + 30 - measure(name, 12) / 2, on ? 23 : 24, on ? '#ffffff' : '#e8dcc0', on ? shade(col, -0.6) : null, 12);
+    });
+    if (BAG_POCKETS.length) { ctx.fillStyle = '#ffffff'; for (let i = 0; i < 3; i++) { ctx.fillRect(1 + i, 29 - i, 1, 1 + i * 2); ctx.fillRect(254 - i, 29 - i, 1, 1 + i * 2); } }
+    // Links: Bühne mit dem gewählten Gegenstand
+    const col = BAG_POCKETS[this.pocket][1];
+    rr(4, 42, 86, 102, 7, 'rgba(30,18,6,.55)'); rr(5, 43, 84, 100, 6, '#2a1c10');
+    const g = ctx.createRadialGradient(47, 80, 4, 47, 80, 50); g.addColorStop(0, shade(info.col || col, -0.1)); g.addColorStop(1, '#2a1c10'); ctx.fillStyle = g; ctx.fillRect(6, 44, 82, 98);
+    if (it) {
+      const bob = Math.round(Math.sin(tick / 14) * 2);
+      ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.ellipse(47, 110, 20 - bob, 4, 0, 0, 7); ctx.fill();
+      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5; ctx.drawImage(glowOf(info.col || '#ffffff'), 17, 50, 60, 60); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+      ctx.save(); ctx.translate(23, 58 + bob - (this.flip || 0)); ctx.scale(3, 3); drawItemIcon(it, 0, 0); ctx.restore();
+      const c = `x${state.items[it]}`; rr(47 - measure(c) / 2 - 7, 121, measure(c) + 14, 16, 8, '#f0c040'); text(c, 47 - measure(c) / 2, 119, '#2a1a08', null);
+      text(it, 47 - Math.min(78, measure(it, 12)) / 2, 44, '#ffe8b0', null, 12, 78);
+    } else text('leer', 47 - measure('leer') / 2, 84, '#8a7458', null);
+    // Rechts: Liste
+    box(92, 42, 160, 102, '#fbf4e4');
+    if (!L.length) text('Dieses Fach ist leer.', 104, 50, '#9a8a70', null);
+    for (let r = 0; r < 6; r++) {
       const i = this.scroll + r; if (i >= L.length) break;
-      const y = 29 + r * 16, sel = i === this.sel;
-      if (sel) rr(8, y + 1, 172, 15, 3, '#f8e0d8');
-      drawItemIcon(L[i], 11, y);
-      text(L[i], 30, y - 1, UI.text, null, 16, 118);
-      const c = `x${state.items[L[i]]}`; text(c, 174 - measure(c), y - 1, UI.text, null);
+      const y = 48 + r * 15, sel = i === this.sel;
+      if (sel) { rr(97, y, 150, 15, 5, shade(col, -0.35)); rr(98, y + 1, 148, 13, 4, col); }
+      rr(100, y + 1, 14, 13, 3, sel ? 'rgba(255,255,255,.35)' : '#efe2c4'); drawItemIcon(L[i], 99, y - 1);
+      text(L[i], 118, y - 2, sel ? '#ffffff' : UI.text, sel ? shade(col, -0.6) : null, 16, 100);
+      const c = `x${state.items[L[i]]}`; text(c, 243 - measure(c), y - 2, sel ? '#ffffff' : '#8a7458', null);
     }
-    box(188, 24, 64, 120, UI.panel);
-    if (L.length) { const it = L[Math.min(this.sel, L.length - 1)]; ctx.save(); ctx.translate(196, 50); ctx.scale(3, 3); drawItemIcon(it, 0, 0); ctx.restore(); const c = `x${state.items[it]}`; text(c, 220 - measure(c) / 2, 104); }
-    box(2, 146, 252, 44);
+    if (L.length > 6) { const sh = 88 * 6 / L.length; rr(249, 47 + 88 * this.scroll / L.length, 2, sh, 1, '#c8a878'); }
+    // Beschreibung
+    box(2, 146, 252, 44, '#fbf4e4');
     if (this.note) wrapW(this.note.t, 228).slice(0, 2).forEach((l, i) => text(l, 12, 150 + i * 16, UI.red, null));
-    else if (L.length) wrapW((ITEMS[L[Math.min(this.sel, L.length - 1)]] || {}).desc || '', 228).slice(0, 2).forEach((l, i) => text(l, 12, 150 + i * 16));
+    else if (it) wrapW(info.desc || '', 228).slice(0, 2).forEach((l, i) => text(l, 12, 150 + i * 16, UI.text, null));
+    else text('Links/Rechts: Fach wechseln   B: zurück', 12, 150, '#8a7458', null);
   }
 }
+const BAG_POCKETS = [['ALLES', '#d08a38', () => true], ['MEDIZIN', '#d05878', i => !!(i.heal || i.cure || i.level)], ['KAPSELN', '#e0a020', i => !!i.capture], ['BEUTE', '#7a8a58', i => !(i.heal || i.cure || i.level || i.capture)]];
 
 /* --- Laden --- */
 class ShopScreen {
